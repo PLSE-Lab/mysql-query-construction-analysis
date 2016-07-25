@@ -7,13 +7,14 @@ module QCPAnalysis::WriteResults
 import QCPAnalysis::Util;
 import QCPAnalysis::GeneralQCP;
 import QCPAnalysis::QCP2Analysis;
+import QCPAnalysis::VariableAnalysis;
 
 import IO;
 import lang::php::util::Utils;
 import lang::php::ast::System;
 import lang::php::ast::AbstractSyntax;
 
-alias QCP = list[ActualParameter];
+alias Query = list[ActualParameter];
 
 loc results = |project://PHPAnalysis/src/QCPAnalysis/results/full%20QCP%20lists/|;
 loc counts =  |project://PHPAnalysis/src/QCPAnalysis/results/counts/|;
@@ -26,6 +27,7 @@ public void writeResults(){
 	writeQCP3();
 	writeUnmatched();
 	writeQCP2WithProperties();
+	writeVariableAnalysis();
 }
 // writes the counts from all QCP analyses to a file in the results folder
 public void writeCounts(){
@@ -57,37 +59,37 @@ public void writeQCP2Counts(loc location){
 
 // writes all QCP1 occurrences to a file in the results folder
 public void writeQCP1(){
-	map[str, list[QCP]] qcp1Map = getQCPCorpus(1);
+	map[str, list[Query]] qcp1Map = getQCPCorpus(1);
 	iprintToFile(results + "QCP1.txt", qcp1Map);
 }
 
 // writes all QCP2 ocurrences to a file in the results folder
 public void writeQCP2(){
-	map[str, list[QCP]] qcp2Map = getQCPCorpus(2);
+	map[str, list[Query]] qcp2Map = getQCPCorpus(2);
 	iprintToFile(results + "QCP2.txt", qcp2Map);
 }
 
 // writes all QCP3 occurrences to a file in the results folder
 public void writeQCP3(){
-	map[str, list[QCP]] qcp3Map = getQCPCorpus(3);
+	map[str, list[Query]] qcp3Map = getQCPCorpus(3);
 	iprintToFile(results + "QCP3.txt", qcp3Map);
 }
 
 // writes all mysql_query parameters that did not match any QCP (if any)
 public void writeUnmatched(){
-	map[str, list[QCP]] unmatchedMap = getQCPCorpus(4);
+	map[str, list[Query]] unmatchedMap = getQCPCorpus(4);
 	iprintToFile(results + "unmatched.txt", unmatchedMap);
 }
 
 // for each boolean parameter, writes to a file in the results folder a list of
 // all QCP2 that satisfy that boolean parameter
 public void writeQCP2WithProperties(){
-	list[QCP] concat = [];
-	list[QCP] inter  = [];
-	list[QCP] lit    = [];
-	list[QCP] func   = [];
-	list[QCP] var    = [];
-	list[QCP] unsafe = [];
+	list[Query] concat = [];
+	list[Query] inter  = [];
+	list[Query] lit    = [];
+	list[Query] func   = [];
+	list[Query] var    = [];
+	list[Query] unsafe = [];
 	map[str, list[QCP2Info]] qcp2Info = getQCP2Corpus();
 	for(system <- qcp2Info){
 		list[QCP2Info] infoList = qcp2Info[system];
@@ -100,10 +102,17 @@ public void writeQCP2WithProperties(){
 			if(info.hasUnsafeInputs)  unsafe += [info.params];
 		}
 	}
-	iprintToFile(results + "QCP2Concatenation.txt", concat);
-	iprintToFile(results + "QCP2Interpolation.txt", inter);
-	iprintToFile(results + "QCP2Literals.txt", lit);
-	iprintToFile(results + "QCP2FunctionCalls.txt", func);
-	iprintToFile(results + "QCP2Variables.txt", var);
-	iprintToFile(results + "QCP2UnsafeInputs.txt", unsafe);
+	loc detailed = results + "QCP2Detailed/";
+	iprintToFile(detailed + "QCP2Concatenation.txt", concat);
+	iprintToFile(detailed + "QCP2Interpolation.txt", inter);
+	iprintToFile(detailed + "QCP2Literals.txt", lit);
+	iprintToFile(detailed + "QCP2FunctionCalls.txt", func);
+	iprintToFile(detailed + "QCP2Variables.txt", var);
+	iprintToFile(detailed + "QCP2UnsafeInputs.txt", unsafe);
+}
+
+// writes results from the variable analysis module
+public void writeVariableAnalysis(){
+	loc detailed = results + "VariableAnalysis/";
+	iprintToFile(detailed + "QueriesWithVariables.txt", getQWV());
 }

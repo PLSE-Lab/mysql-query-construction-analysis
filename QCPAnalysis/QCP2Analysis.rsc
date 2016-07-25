@@ -20,6 +20,8 @@ import lang::php::util::Utils;
 import lang::php::ast::System;
 import lang::php::ast::AbstractSyntax;
 
+alias Query = list[ActualParameter];
+
 // represents a QCP2 occurrence. Contains the parameters to the mysql_query call as well as
 // boolean variables that answer the questions found at the beginning of this module
 data QCP2Info = QCP2Info(list[ActualParameter] params, bool hasConcatenation, bool hasInterpolation, 
@@ -95,7 +97,7 @@ private QCP2Counts collectQCP2Counts(list[QCP2Info] sysQCP2){
 }
 
 // returns true if this QCP2 occurrence uses string concatenation
-private bool checkConcatenation(list[ActualParameter] params){
+public bool checkConcatenation(list[ActualParameter] params){
 	if([actualParameter(binaryOperation(left,right,concat()),_)] := params
 		|| [actualParameter(binaryOperation(left,right,concat()),_), _] := params){
 		
@@ -105,7 +107,7 @@ private bool checkConcatenation(list[ActualParameter] params){
 }
 
 // returns true if this QCP2 occurrence uses string interpolation
-private bool checkInterpolation(list[ActualParameter] params){
+public bool checkInterpolation(list[ActualParameter] params){
 	if([actualParameter(scalar(encapsed(_)),_)] := params
 		|| [actualParameter(scalar(encapsed(_)), _),_] := params){
 		
@@ -115,7 +117,7 @@ private bool checkInterpolation(list[ActualParameter] params){
 }
 
 // returns true if this QCP2 occurrence contains string literals
-private bool checkLiterals(list[ActualParameter] params){
+public bool checkLiterals(list[ActualParameter] params){
 	top-down visit(params){
 		case scalar(string(t)) : return true;
 	}
@@ -123,7 +125,7 @@ private bool checkLiterals(list[ActualParameter] params){
 }
 
 // returns true if this QCP2 occurrence contains function calls
-private bool checkFunctionCalls(list[ActualParameter] params){
+public bool checkFunctionCalls(list[ActualParameter] params){
 	top-down visit(params){
 		case call(_,_): return true;
 	}
@@ -131,7 +133,7 @@ private bool checkFunctionCalls(list[ActualParameter] params){
 }
 
 // returns true if this QCP2 occurrence contains variables
-private bool checkVariables(list[ActualParameter] params){
+public bool checkVariables(list[ActualParameter] params){
 	top-down visit(params){
 		case var(name(name(n))):{
 			if( n != "_POST" && n != "_GET" && n != "_SESSION")
@@ -142,7 +144,7 @@ private bool checkVariables(list[ActualParameter] params){
 }
 
 // returns true if this QCP2 occurrence contains unsafe inputs
-private bool checkUnsafeInputs(list[ActualParameter] params){
+public bool checkUnsafeInputs(list[ActualParameter] params){
 	top-down visit(params){
 		case var(name(name(n))):{
 			if( n == "_POST" || n == "_GET" || n == "_SESSION")

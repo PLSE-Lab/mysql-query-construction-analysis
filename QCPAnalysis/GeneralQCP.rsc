@@ -27,12 +27,12 @@ data QCPCount = QCP1(int n)
 			  | QCP3(int n)
 			  | unmatched(int n);
 
-alias QCP = list[ActualParameter];
+alias Query = list[ActualParameter];
 
-// returns true if QCP1 matches params
-public bool matchesQCP1(QCP params){
-	if([actualParameter(scalar(string(_)), _)] := params
-		|| [actualParameter(scalar(string(_)), _), _] := params){
+// returns true if QCP1 matches query
+public bool matchesQCP1(Query query){
+	if([actualParameter(scalar(string(_)), _)] := query
+		|| [actualParameter(scalar(string(_)), _), _] := query){
 	
 		return true;	
 	}
@@ -40,12 +40,12 @@ public bool matchesQCP1(QCP params){
 		return false;
 }
 
-// returns true if QCP2 matches params
-public bool matchesQCP2(QCP params){
-	if([actualParameter(scalar(encapsed(_)),_)] := params
-		|| [actualParameter(scalar(encapsed(_)), _),_] := params
-		|| [actualParameter(binaryOperation(left,right,concat()),_)] := params
-		|| [actualParameter(binaryOperation(left,right,concat()),_), _] := params){
+// returns true if QCP2 matches query
+public bool matchesQCP2(Query query){
+	if([actualParameter(scalar(encapsed(_)),_)] := query
+		|| [actualParameter(scalar(encapsed(_)), _),_] := query
+		|| [actualParameter(binaryOperation(left,right,concat()),_)] := query
+		|| [actualParameter(binaryOperation(left,right,concat()),_), _] := query){
 	
 		return true;	
 	}
@@ -53,10 +53,10 @@ public bool matchesQCP2(QCP params){
 		return false;
 }
 
-// returns true if QCP3 matches params
-public bool matchesQCP3(QCP params){
-	if([actualParameter(var(name(name(_))), _)] := params
-		|| [actualParameter(var(name(name(_))), _), _] := params){
+// returns true if QCP3 matches query
+public bool matchesQCP3(Query query){
+	if([actualParameter(var(name(name(_))), _)] := query
+		|| [actualParameter(var(name(name(_))), _), _] := query){
 	
 		return true;	
 	}
@@ -64,9 +64,9 @@ public bool matchesQCP3(QCP params){
 		return false;
 }
 
-// returns true if no QCP matches params
-public bool unmatched(QCP params){
-	if(!matchesQCP1(params) && !matchesQCP2(params) && !matchesQCP3(params)){
+// returns true if no QCP matches query
+public bool unmatched(Query query){
+	if(!matchesQCP1(query) && !matchesQCP2(query) && !matchesQCP3(query)){
 		return true;
 	}
 	else
@@ -127,8 +127,8 @@ public list[QCPCount] countQCPSystem(System system){
 }
 
 // maps all systems in the corpus to a list of QCP occurrences, regardless of case
-public map[str, list[QCP]] getQCPCorpus(){
-	map[str, list[QCP]] qcpMap = ();
+public map[str, list[Query]] getQCPCorpus(){
+	map[str, list[Query]] qcpMap = ();
 	set[str] items = getCorpusItems();
 	for(item <- items){
 		System system = loadBinary(item);
@@ -137,12 +137,12 @@ public map[str, list[QCP]] getQCPCorpus(){
 	return qcpMap;
 }
 
-// maps all systems in the corpus to a list of QCP occurrences based on parameter n
+// maps all systems in the corpus to a list of Query occurrences based on parameter n
 // if n = 1, return all QCP1, if n = 2, return all QCP2, if n = 3
 // return all QCP3. if n = any other number, return all mysql_query
 // calls that do not match any QCP (if any)
-public map[str, list[QCP]] getQCPCorpus(int n){
-	map[str, list[QCP]] qcpMap = ();
+public map[str, list[Query]] getQCPCorpus(int n){
+	map[str, list[Query]] qcpMap = ();
 	set[str] items = getCorpusItems();
 	for(item <- items){
 		System system = loadBinary(item);
@@ -151,9 +151,9 @@ public map[str, list[QCP]] getQCPCorpus(int n){
 	return qcpMap;
 }
 
-// returns a list of all QCP occurrences in a particular system, regardless of case
-public list[QCP] getQCPSystem(System system){
-	list[QCP] qcpList = [];
+// returns a list of all Query occurrences in a particular system, regardless of case
+public list[Query] getQCPSystem(System system){
+	list[Query] qcpList = [];
 	for(location <- system.files){
 		Script scr = system.files[location];
 		top-down visit(scr){
@@ -163,12 +163,12 @@ public list[QCP] getQCPSystem(System system){
 	return qcpList;
 }
 
-// returns a list of all QCP occurrences in a particular system, based on parameter n
+// returns a list of all Query occurrences in a particular system, based on parameter n
 // if n = 1, return all QCP1, if n = 2, return all QCP2, if n = 3
 // return all QCP3. if n = any other number, return all mysql_query
 // calls that do not match any QCP (if any)
-public list[QCP] getQCPSystem(System system, int n){
-	list[QCP] qcpList = [];
+public list[Query] getQCPSystem(System system, int n){
+	list[Query] qcpList = [];
 	switch(n){
 		case 1 : qcpList = getQCP1System(system);
 		case 2 : qcpList = getQCP2System(system);
@@ -179,8 +179,8 @@ public list[QCP] getQCPSystem(System system, int n){
 }
 
 // returns all QCP1 occurrences in a system
-private list[QCP] getQCP1System(System system){
-	list[QCP] qcp1List = [];
+private list[Query] getQCP1System(System system){
+	list[Query] qcp1List = [];
 	for(location <- system.files){
 		Script scr = system.files[location];
 		top-down visit(scr){
@@ -195,8 +195,8 @@ private list[QCP] getQCP1System(System system){
 }
 
 // returns all QCP2 occurrences in a system
-private list[QCP] getQCP2System(System system){
-	list[QCP] qcp2List = [];
+private list[Query] getQCP2System(System system){
+	list[Query] qcp2List = [];
 	for(location <- system.files){
 		Script scr = system.files[location];
 		top-down visit(scr){
@@ -211,8 +211,8 @@ private list[QCP] getQCP2System(System system){
 }
 
 // returns all QCP3 occurrences in a system
-private list[QCP] getQCP3System(System system){
-	list[QCP] qcp3List = [];
+private list[Query] getQCP3System(System system){
+	list[Query] qcp3List = [];
 	for(location <- system.files){
 		Script scr = system.files[location];
 		top-down visit(scr){
@@ -227,8 +227,8 @@ private list[QCP] getQCP3System(System system){
 }
 
 // returns all mysql_query calls in a system whose parameters match no QCP (if any)
-private list[QCP] getUnmatchedSystem(System system){
-	list[QCP] unmatchedList = [];
+private list[Query] getUnmatchedSystem(System system){
+	list[Query] unmatchedList = [];
 	for(location <- system.files){
 		Script scr = system.files[location];
 		top-down visit(scr){
