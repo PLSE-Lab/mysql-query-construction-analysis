@@ -88,18 +88,22 @@ public void writeQCP2WithProperties(){
 	list[Query] inter  = [];
 	list[Query] lit    = [];
 	list[Query] func   = [];
+	list[Query] method = [];
+	list[Query] static = [];
 	list[Query] var    = [];
 	list[Query] unsafe = [];
 	map[str, list[QCP2Info]] qcp2Info = getQCP2Corpus();
 	for(system <- qcp2Info){
 		list[QCP2Info] infoList = qcp2Info[system];
 		for(info <- infoList){
-			if(info.hasConcatenation) concat += [info.params];
-			if(info.hasInterpolation) inter  += [info.params];
-			if(info.hasLiterals)      lit    += [info.params];
-			if(info.hasFunctionCalls) func   += [info.params];
-			if(info.hasVariables)     var    += [info.params];
-			if(info.hasUnsafeInputs)  unsafe += [info.params];
+			if(info.hasConcatenation)     concat += [info.query];
+			if(info.hasInterpolation)     inter  += [info.query];
+			if(info.hasLiterals)          lit    += [info.query];
+			if(info.hasFunctionCalls)     func   += [info.query];
+			if(info.hasMethodCalls)       method += [info.query];
+			if(info.hasStaticMethodCalls) static += [info.query];
+			if(info.hasVariables)         var    += [info.query];
+			if(info.hasUnsafeInputs)      unsafe += [info.query];
 		}
 	}
 	loc detailed = results + "QCP2Detailed/";
@@ -107,6 +111,8 @@ public void writeQCP2WithProperties(){
 	iprintToFile(detailed + "QCP2Interpolation.txt", inter);
 	iprintToFile(detailed + "QCP2Literals.txt", lit);
 	iprintToFile(detailed + "QCP2FunctionCalls.txt", func);
+	iprintToFile(detailed + "QCP2MethodCalls.txt", method);
+	iprintToFile(detailed + "QCP2StaticMethodCalls.txt", static);
 	iprintToFile(detailed + "QCP2Variables.txt", var);
 	iprintToFile(detailed + "QCP2UnsafeInputs.txt", unsafe);
 }

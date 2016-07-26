@@ -5,6 +5,8 @@
  * Does this QCP2 occurrence use string interpolation?
  * Does this QCP2 ocurrence contain string literals?
  * Does this QCP2 occurrence contain function calls?
+ * Does this QCP2 occurrence contain method calls?
+ * Does this QCP2 occurrence contain static method calls?
  * Does this QCP2 occurrence contain variables?
  * Does this QCP2 occurrence conatain unsafe inputs? i.e. 
  * $_POST, $_GET or $_SESSION parameters?
@@ -24,13 +26,14 @@ alias Query = list[ActualParameter];
 
 // represents a QCP2 occurrence. Contains the parameters to the mysql_query call as well as
 // boolean variables that answer the questions found at the beginning of this module
-data QCP2Info = QCP2Info(list[ActualParameter] params, bool hasConcatenation, bool hasInterpolation, 
-			bool hasLiterals, bool hasFunctionCalls, bool hasVariables, bool hasUnsafeInputs);
+data QCP2Info = QCP2Info(Query query, bool hasConcatenation, bool hasInterpolation, 
+			bool hasLiterals, bool hasFunctionCalls, bool hasMethodCalls, bool hasStaticMethodCalls,
+			bool hasVariables, bool hasUnsafeInputs);
 
 // Collection of counts over a particular system. Each int represents the number of QCP2
 // occurrences in the system that answer true to the questions found at the beginning of this module
-data QCP2Counts = QCP2Counts(int numConcat, int numInter, int numLit, int numFunc, int numVar,
-					 int numUnsafe);
+data QCP2Counts = QCP2Counts(int numConcat, int numInter, int numLit, int numFunc, int numMethod,
+							 int numStatic, int numVar,int numUnsafe);
 
 // maps each system in the corpus to a QCP2Counts object				 
 public map[str, QCP2Counts] getQCP2Counts(){
@@ -65,13 +68,15 @@ public list[QCP2Info] getQCP2System(System system){
 		top-down visit(scr){
 			case call(name(name("mysql_query" )), params):{
 				if(matchesQCP2(params)){
-					QCP2Info info = QCP2Info(params, false, false, false, false, false, false);
-					info.hasConcatenation  = checkConcatenation(params);
-					info.hasInterpolation  = checkInterpolation(params);
-					info.hasLiterals 	   = checkLiterals(params);
-					info.hasFunctionCalls  = checkFunctionCalls(params);
-					info.hasVariables 	   = checkVariables(params);
-					info.hasUnsafeInputs   = checkUnsafeInputs(params);
+					QCP2Info info = QCP2Info(params, false, false, false, false, false, false, false, false);
+					info.hasConcatenation     = checkConcatenation(params);
+					info.hasInterpolation     = checkInterpolation(params);
+					info.hasLiterals 	      = checkLiterals(params);
+					info.hasFunctionCalls     = checkFunctionCalls(params);
+					info.hasMethodCalls       = checkMethodCalls(params);
+					info.hasStaticMethodCalls = checkStaticMethodCalls(params);
+					info.hasVariables 	      = checkVariables(params);
+					info.hasUnsafeInputs      = checkUnsafeInputs(params);
 					systemQCP2Info += info;
 				}
 			}
@@ -83,23 +88,25 @@ public list[QCP2Info] getQCP2System(System system){
 // returns a QCP2Counts object that holds the empirical information obtained
 // by analyzing the QCP2 occurrences of a particular system in the corpus
 private QCP2Counts collectQCP2Counts(list[QCP2Info] sysQCP2){
-	QCP2Counts counts = QCP2Counts(0,0,0,0,0,0);
+	QCP2Counts counts = QCP2Counts(0,0,0,0,0,0,0,0);
 	
 	for(qcp2 <- sysQCP2){
-		if(qcp2.hasConcatenation) counts.numConcat += 1;
-		if(qcp2.hasInterpolation) counts.numInter  += 1;
-		if(qcp2.hasLiterals)      counts.numLit    += 1;
-		if(qcp2.hasFunctionCalls) counts.numFunc   += 1;
-		if(qcp2.hasVariables)     counts.numVar    += 1;
-		if(qcp2.hasUnsafeInputs)  counts.numUnsafe += 1;
+		if(qcp2.hasConcatenation)     counts.numConcat += 1;
+		if(qcp2.hasInterpolation)     counts.numInter  += 1;
+		if(qcp2.hasLiterals)          counts.numLit    += 1;
+		if(qcp2.hasFunctionCalls)     counts.numFunc   += 1;
+		if(qcp2.hasMethodCalls)       counts.numMethod += 1;
+		if(qcp2.hasStaticMethodCalls) counts.numStatic += 1;
+		if(qcp2.hasVariables)         counts.numVar    += 1;
+		if(qcp2.hasUnsafeInputs)      counts.numUnsafe += 1;
 	}
 	return counts;
 }
 
 // returns true if this QCP2 occurrence uses string concatenation
-public bool checkConcatenation(list[ActualParameter] params){
-	if([actualParameter(binaryOperation(left,right,concat()),_)] := params
-		|| [actualParameter(binaryOperation(left,right,concat()),_), _] := params){
+public bool checkConcatenation(Query query){
+	if([actualParameter(binaryOperation(left,right,concat()),_)] := query
+		|| [actualParameter(binaryOperation(left,right,concat()),_), _] := query){
 		
 		return true;		
 	}
@@ -107,9 +114,9 @@ public bool checkConcatenation(list[ActualParameter] params){
 }
 
 // returns true if this QCP2 occurrence uses string interpolation
-public bool checkInterpolation(list[ActualParameter] params){
-	if([actualParameter(scalar(encapsed(_)),_)] := params
-		|| [actualParameter(scalar(encapsed(_)), _),_] := params){
+public bool checkInterpolation(Query query){
+	if([actualParameter(scalar(encapsed(_)),_)] := query
+		|| [actualParameter(scalar(encapsed(_)), _),_] := query){
 		
 		return true;		
 	}
@@ -117,24 +124,40 @@ public bool checkInterpolation(list[ActualParameter] params){
 }
 
 // returns true if this QCP2 occurrence contains string literals
-public bool checkLiterals(list[ActualParameter] params){
-	top-down visit(params){
+public bool checkLiterals(Query query){
+	top-down visit(query){
 		case scalar(string(t)) : return true;
 	}
 	return false;
 }
 
 // returns true if this QCP2 occurrence contains function calls
-public bool checkFunctionCalls(list[ActualParameter] params){
-	top-down visit(params){
+public bool checkFunctionCalls(Query query){
+	top-down visit(query){
 		case call(_,_): return true;
 	}
 	return false;
 }
 
+// returns true if this QCP2 occurrence contains method calls
+public bool checkMethodCalls(Query query){
+	top-down visit(query){
+		case methodCall(_,_,_): return true;
+	}
+	return false;
+}
+
+// returns true if this QCP2 occurrence contains static method calls
+public bool checkStaticMethodCalls(Query query){
+	top-down visit(query){
+		case staticCall(_,_,_): return true;
+	}
+	return false;
+}
+
 // returns true if this QCP2 occurrence contains variables
-public bool checkVariables(list[ActualParameter] params){
-	top-down visit(params){
+public bool checkVariables(Query query){
+	top-down visit(query){
 		case var(name(name(n))):{
 			if( n != "_POST" && n != "_GET" && n != "_SESSION")
 				return true;
@@ -144,8 +167,8 @@ public bool checkVariables(list[ActualParameter] params){
 }
 
 // returns true if this QCP2 occurrence contains unsafe inputs
-public bool checkUnsafeInputs(list[ActualParameter] params){
-	top-down visit(params){
+public bool checkUnsafeInputs(Query query){
+	top-down visit(query){
 		case var(name(name(n))):{
 			if( n == "_POST" || n == "_GET" || n == "_SESSION")
 				return true;
