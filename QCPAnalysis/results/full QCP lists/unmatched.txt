@@ -1,6 +1,0 @@
-(
-  "Schoolmate-1.5.4":[],
-  "geccBBlite-0.1":[],
-  "WebChess-0.9.0":[],
-  "faqforge-1.3.2":[]
-)
