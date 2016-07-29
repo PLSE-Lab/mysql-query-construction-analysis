@@ -16,8 +16,8 @@ import lang::php::ast::AbstractSyntax;
 
 alias Query = list[ActualParameter];
 
-loc results = |project://PHPAnalysis/src/QCPAnalysis/results/full%20QCP%20lists/|;
-loc counts =  |project://PHPAnalysis/src/QCPAnalysis/results/counts/|;
+loc results = |project://QCPAnalysis/results/full%20QCP%20lists/|;
+loc counts =  |project://QCPAnalysis/results/counts/|;
 
 // convenience function that performs all other functions in this module
 public void writeResults(){

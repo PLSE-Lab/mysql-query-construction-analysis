@@ -3,6 +3,7 @@
  * the corpus, and to provide functions
  * useful to other modules.
  */
+ // will be removed in the next commit
 module QCPAnalysis::Util
 
 import lang::php::util::Utils;

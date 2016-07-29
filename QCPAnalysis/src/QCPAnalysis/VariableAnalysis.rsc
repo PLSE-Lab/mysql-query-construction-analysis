@@ -5,6 +5,8 @@
  * reported.
  * Note: in function and variable naming, QWV stands with Query With Variable(s)
  */
+ 
+// TODO: modify this module to make use of the functions from QCPCorpus.rsc
 module QCPAnalysis::VariableAnalysis
 
 import QCPAnalysis::Util;

@@ -12,10 +12,13 @@
  * $_POST, $_GET or $_SESSION parameters?
  * 
  */
+ 
+ // TODO: modify this module to make use of the functions from QCPCorpus.rsc
 module QCPAnalysis::QCP2Analysis
 
 import QCPAnalysis::Util;
 import QCPAnalysis::GeneralQCP;
+import QCPAnalysis::QCPCorpus;
 
 import IO;
 import lang::php::util::Utils;

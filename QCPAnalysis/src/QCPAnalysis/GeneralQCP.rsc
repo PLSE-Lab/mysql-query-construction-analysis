@@ -12,11 +12,16 @@
  * While this module is pretty general (hence the name),
  * Other modules provide more in-depth analyses
  */ 
+ 
+ // TODO: modify this module to make use of the functions from QCPCorpus.rsc
 module QCPAnalysis::GeneralQCP
 
 import QCPAnalysis::Util;
+import QCPAnalysis::QCPCorpus;
 
 import IO;
+import List;
+import lang::php::util::Corpus;
 import lang::php::util::Utils;
 import lang::php::ast::System;
 import lang::php::ast::AbstractSyntax;
@@ -28,6 +33,22 @@ data QCPCount = QCP1(int n)
 			  | unmatched(int n);
 
 alias Query = list[ActualParameter];
+
+// returns the number of mysql_query calls in each system in the corpus
+public map[str, int] countMSQCorpus(){
+	Corpus corpus = getCorpus();
+	map[str, int] counts = ();
+	int total = 0;
+	for (p <- corpus, v := corpus[p]){
+		pt = loadBinary(p,v);
+		msq = [q | /q:call(name(name("mysql_query")),_) := pt];
+		int size = size(msq);
+		total += size;
+		counts += ("<p>_<v>" : size);
+	}
+	counts += ("total" : total);
+	return counts;
+}
 
 // returns true if QCP1 matches query
 public bool matchesQCP1(Query query){
