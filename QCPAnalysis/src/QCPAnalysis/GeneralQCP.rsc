@@ -12,18 +12,15 @@
  * While this module is pretty general (hence the name),
  * Other modules provide more in-depth analyses
  */ 
- 
- // TODO: modify this module to make use of the functions from QCPCorpus.rsc
+
 module QCPAnalysis::GeneralQCP
 
 import QCPAnalysis::Util;
 import QCPAnalysis::QCPCorpus;
 
-import IO;
 import List;
 import lang::php::util::Corpus;
 import lang::php::util::Utils;
-import lang::php::ast::System;
 import lang::php::ast::AbstractSyntax;
 
 // represents the count of a particular QCP
@@ -32,28 +29,11 @@ data QCPCount = QCP1(int n)
 			  | QCP3(int n)
 			  | unmatched(int n);
 
-alias Query = list[ActualParameter];
-
-// returns the number of mysql_query calls in each system in the corpus
-public map[str, int] countMSQCorpus(){
-	Corpus corpus = getCorpus();
-	map[str, int] counts = ();
-	int total = 0;
-	for (p <- corpus, v := corpus[p]){
-		pt = loadBinary(p,v);
-		msq = [q | /q:call(name(name("mysql_query")),_) := pt];
-		int size = size(msq);
-		total += size;
-		counts += ("<p>_<v>" : size);
-	}
-	counts += ("total" : total);
-	return counts;
-}
-
-// returns true if QCP1 matches query
-public bool matchesQCP1(Query query){
-	if([actualParameter(scalar(string(_)), _)] := query
-		|| [actualParameter(scalar(string(_)), _), _] := query){
+// returns true if QCP1 matches the parameters to this mysql_query call
+public bool matchesQCP1(Expr call){
+	list[ActualParameter] params = call.parameters;
+	if([actualParameter(scalar(string(_)), _)] := params
+		|| [actualParameter(scalar(string(_)), _), _] := params){
 	
 		return true;	
 	}
@@ -61,12 +41,25 @@ public bool matchesQCP1(Query query){
 		return false;
 }
 
-// returns true if QCP2 matches query
-public bool matchesQCP2(Query query){
-	if([actualParameter(scalar(encapsed(_)),_)] := query
-		|| [actualParameter(scalar(encapsed(_)), _),_] := query
-		|| [actualParameter(binaryOperation(left,right,concat()),_)] := query
-		|| [actualParameter(binaryOperation(left,right,concat()),_), _] := query){
+// returns true if QCP2 matches the parameters to this mysql_query call
+public bool matchesQCP2(Expr call){
+	list[ActualParameter] params = call.parameters;
+	if([actualParameter(scalar(encapsed(_)),_)] := params
+		|| [actualParameter(scalar(encapsed(_)), _),_] := params
+		|| [actualParameter(binaryOperation(left,right,concat()),_)] := params
+		|| [actualParameter(binaryOperation(left,right,concat()),_), _] := params){
+		
+		return true;	
+	}
+	else 
+		return false;
+}
+
+// returns true if QCP3 matches the parameters to this mysql_query call
+public bool matchesQCP3(Expr call){
+	list[ActualParameter] params = call.parameters;
+	if([actualParameter(var(name(name(_))), _)] := params
+		|| [actualParameter(var(name(name(_))), _), _] := params){
 	
 		return true;	
 	}
@@ -74,191 +67,78 @@ public bool matchesQCP2(Query query){
 		return false;
 }
 
-// returns true if QCP3 matches query
-public bool matchesQCP3(Query query){
-	if([actualParameter(var(name(name(_))), _)] := query
-		|| [actualParameter(var(name(name(_))), _), _] := query){
-	
-		return true;	
-	}
-	else 
-		return false;
-}
-
-// returns true if no QCP matches query
-public bool unmatched(Query query){
-	if(!matchesQCP1(query) && !matchesQCP2(query) && !matchesQCP3(query)){
+// returns true if no QCP matches the parameters to this mysql_query call
+public bool unmatched(Expr call){
+	if(!matchesQCP1(call) && !matchesQCP2(call) && !matchesQCP3(call)){
 		return true;
 	}
 	else
 		return false;
 }
 
+// gets all mysql_query calls in the corpus
+public map[str, list[Expr]] getMSQCorpus(){
+	Corpus corpus = getCorpus();
+	map[str, list[Expr]] calls = ();
+	for (p <- corpus, v := corpus[p]){
+		pt = loadBinary(p,v);
+		calls += ("<p>_<v>" : [q | /q:call(name(name("mysql_query")),_) := pt]);
+	}
+	return calls;
+}
+
+// returns the number of mysql_query calls in each system in the corpus
+public map[str, int] countMSQCorpus(){
+	map[str, list[Expr]] calls = getMSQCorpus();
+	map[str, int] counts = ();
+	int total = 0;
+	for(sys <- calls, msq := calls[sys]){
+		int count = size(msq);
+		total += count;
+		counts += (sys : count);
+	}
+	counts += ("total" : total);
+	return counts;
+}
+
+// maps all systems in the corpus to a list of QCP occurrences based on parameter n
+// if n = 1, return all QCP1, if n = 2, return all QCP2, if n = 3
+// return all QCP3. if n = any other number, return all mysql_query
+// calls that do not match any QCP
+public map[str, list[Expr]] getQCP(int n){
+	map[str, list[Expr]] calls = getMSQCorpus();
+	map[str, list[Expr]] qcpMap = ();
+	for(sys <- calls, msq := calls[sys]){
+		list[Expr] qcpList = [];
+		switch(n){
+			case 1 : qcpList = [q | q <- msq, matchesQCP1(q)];
+			case 2 : qcpList = [q | q <- msq, matchesQCP2(q)];
+			case 3 : qcpList = [q | q <- msq, matchesQCP3(q)];
+			default: qcpList = [q | q <- msq, unmatched(q)];
+		}
+		qcpMap += (sys : qcpList);
+	}
+	return qcpMap;
+}
+
 // returns the number of ocurrences of each QCP in each system in the corpus,
 // as well as the corpus-wide totals of each QCP
-public map[str, list[QCPCount]] countQCPCorpus(){
-	set[str] items = getCorpusItems();
-	map[str, list[QCPCount]] corpusItemCounts = ();
-	QCPCount totalQCP1 = QCP1(0);
-	QCPCount totalQCP2 = QCP2(0);
-	QCPCount totalQCP3 = QCP3(0);
-	QCPCount totalUnmatched = unmatched(0);
-	for(item <- items){
-		System system = loadBinary(item);
-		list[QCPCount] systemCounts = countQCPSystem(system);
-		top-down visit(systemCounts){
-			case QCP1(x) : totalQCP1.n += x;
-			case QCP2(x) : totalQCP2.n += x;
-			case QCP3(x) : totalQCP3.n += x;
-			case unmatched(x) : totalUnmatched.n += x;
-		}
-		corpusItemCounts += (item : systemCounts);
+public map[str, set[QCPCount]] countQCP(){
+	map[str, set[QCPCount]] counts = ();
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		counts += ("<p>_<v>" : {});
 	}
-	corpusItemCounts += ("totals" : [totalQCP1, totalQCP2, totalQCP3, totalUnmatched]);
-	return corpusItemCounts;
-}
-
-// returns the number of ocurrences of each QCP in a particular System
-public list[QCPCount] countQCPSystem(System system){
-	QCPCount nQCP1 = QCP1(0);
-	QCPCount nQCP2 = QCP2(0);
-	QCPCount nQCP3 = QCP3(0);
-	QCPCount nUnmatched = unmatched(0);
-	
-	for(location <- system.files){
-		Script scr = system.files[location];	
-		top-down visit (scr) {
-			case call(name(name("mysql_query" )), params):{
-				if(matchesQCP1(params)){
-					nQCP1.n += 1;	
-				}
-				else if(matchesQCP2(params)){
-					nQCP2.n += 1;
-				}
-				else if(matchesQCP3(params)){
-					nQCP3.n += 1;
-				}
-				else{
-					nUnmatched.n += 1;
-				}
+	for(n <- [1..5]){
+		map[str, list[Expr]] qcpMap = getQCP(n);
+		for(sys <- qcpMap, qcpList := qcpMap[sys]){
+			switch(n){
+				case 1 : counts[sys] += QCP1(size(qcpList));
+				case 2 : counts[sys] += QCP2(size(qcpList));
+				case 3 : counts[sys] += QCP3(size(qcpList));
+				case 4 : counts[sys] += unmatched(size(qcpList));
 			}
-		};
+		} 
 	}
-	return [nQCP1, nQCP2, nQCP3, nUnmatched];
-}
-
-// maps all systems in the corpus to a list of QCP occurrences, regardless of case
-public map[str, list[Query]] getQCPCorpus(){
-	map[str, list[Query]] qcpMap = ();
-	set[str] items = getCorpusItems();
-	for(item <- items){
-		System system = loadBinary(item);
-		qcpMap += (item : getQCPSystem(system));
-	}
-	return qcpMap;
-}
-
-// maps all systems in the corpus to a list of Query occurrences based on parameter n
-// if n = 1, return all QCP1, if n = 2, return all QCP2, if n = 3
-// return all QCP3. if n = any other number, return all mysql_query
-// calls that do not match any QCP (if any)
-public map[str, list[Query]] getQCPCorpus(int n){
-	map[str, list[Query]] qcpMap = ();
-	set[str] items = getCorpusItems();
-	for(item <- items){
-		System system = loadBinary(item);
-		qcpMap += (item : getQCPSystem(system, n));
-	}
-	return qcpMap;
-}
-
-// returns a list of all Query occurrences in a particular system, regardless of case
-public list[Query] getQCPSystem(System system){
-	list[Query] qcpList = [];
-	for(location <- system.files){
-		Script scr = system.files[location];
-		top-down visit(scr){
-			case call(name(name("mysql_query" )), params): qcpList += [params];
-		}
-	}
-	return qcpList;
-}
-
-// returns a list of all Query occurrences in a particular system, based on parameter n
-// if n = 1, return all QCP1, if n = 2, return all QCP2, if n = 3
-// return all QCP3. if n = any other number, return all mysql_query
-// calls that do not match any QCP (if any)
-public list[Query] getQCPSystem(System system, int n){
-	list[Query] qcpList = [];
-	switch(n){
-		case 1 : qcpList = getQCP1System(system);
-		case 2 : qcpList = getQCP2System(system);
-		case 3 : qcpList = getQCP3System(system);
-		default: qcpList = getUnmatchedSystem(system);
-	}
-	return qcpList;
-}
-
-// returns all QCP1 occurrences in a system
-private list[Query] getQCP1System(System system){
-	list[Query] qcp1List = [];
-	for(location <- system.files){
-		Script scr = system.files[location];
-		top-down visit(scr){
-			case call(name(name("mysql_query" )), params):{
-				if(matchesQCP1(params)){
-					qcp1List += [params];	
-				}
-			}
-		}
-	}
-	return qcp1List;
-}
-
-// returns all QCP2 occurrences in a system
-private list[Query] getQCP2System(System system){
-	list[Query] qcp2List = [];
-	for(location <- system.files){
-		Script scr = system.files[location];
-		top-down visit(scr){
-			case call(name(name("mysql_query" )), params):{
-				if(matchesQCP2(params)){
-					qcp2List += [params];	
-				}
-			}
-		}
-	}
-	return qcp2List;
-}
-
-// returns all QCP3 occurrences in a system
-private list[Query] getQCP3System(System system){
-	list[Query] qcp3List = [];
-	for(location <- system.files){
-		Script scr = system.files[location];
-		top-down visit(scr){
-			case call(name(name("mysql_query" )), params):{
-				if(matchesQCP3(params)){
-					qcp3List += [params];	
-				}
-			}
-		}
-	}
-	return qcp3List;
-}
-
-// returns all mysql_query calls in a system whose parameters match no QCP (if any)
-private list[Query] getUnmatchedSystem(System system){
-	list[Query] unmatchedList = [];
-	for(location <- system.files){
-		Script scr = system.files[location];
-		top-down visit(scr){
-			case call(name(name("mysql_query" )), params):{
-				if(unmatched(params)){
-					unmatchedList += [params];
-				}
-			}
-		}
-	}
-	return unmatchedList;
+	return counts;
 }

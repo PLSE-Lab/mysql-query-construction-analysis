@@ -1,0 +1,26 @@
+(
+  "geccBBlite_0.1":{
+    QCP1(0),
+    unmatched(0),
+    QCP3(9),
+    QCP2(1)
+  },
+  "WebChess_0.9.0":{
+    QCP1(0),
+    unmatched(0),
+    QCP3(45),
+    QCP2(48)
+  },
+  "faqforge_1.3.2":{
+    QCP1(0),
+    QCP2(0),
+    unmatched(0),
+    QCP3(33)
+  },
+  "Schoolmate_1.5.4":{
+    QCP2(218),
+    QCP1(76),
+    QCP3(0),
+    unmatched(0)
+  }
+)
