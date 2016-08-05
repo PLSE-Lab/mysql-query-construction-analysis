@@ -3,9 +3,10 @@
  * contains variable(s) concatenated or interpolated. Information about
  * the origin of the variable and how its SQL string is built is
  * reported.
+ *
+ * Note: in method and variable naming, CWV stands for "calls with variables",
+ * referring to mysql_query calls whose parameters contain variables
  */
- 
-// to be implemented
 module QCPAnalysis::VariableAnalysis
 
 import QCPAnalysis::QCPCorpus;
@@ -13,16 +14,10 @@ import QCPAnalysis::GeneralQCP;
 import QCPAnalysis::QCP2Analysis;
 
 import lang::php::util::Utils;
-import lang::php::ast::System;
+import lang::php::util::Corpus;
 import lang::php::ast::AbstractSyntax;
+import lang::php::analysis::cfg::CFG;
+import lang::php::analysis::cfg::BuildCFG;
 
-// gets all mysql_query calls in the corpus that contain variables
-public map[str, list[Expr]] getCallsWithVars(){
-	map[str,list[Expr]] qcp2WithVars = getQCP2WithExprType("var");
-	map[str,list[Expr]] qcp3 = getQCP(3);
-	map[str,list[Expr]] callsWithVars = ();
-	for(sys <- qcp2WithVars, qcp2 <- qcp2WithVars[sys]){
-		callsWithVars += (sys : qcp2 + qcp3[sys]);
-	}
-	return callsWithVars;
-}
+import IO;
+import Relation;

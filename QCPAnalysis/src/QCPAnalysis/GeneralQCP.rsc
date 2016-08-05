@@ -15,7 +15,6 @@
 
 module QCPAnalysis::GeneralQCP
 
-import QCPAnalysis::Util;
 import QCPAnalysis::QCPCorpus;
 
 import List;

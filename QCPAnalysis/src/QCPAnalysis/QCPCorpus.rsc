@@ -6,6 +6,7 @@ import lang::php::ast::AbstractSyntax;
 import lang::php::ast::System;
 
 import Node;
+import IO;
 
 private Corpus corpus = ( 
 	"faqforge" : "1.3.2",
@@ -41,3 +42,18 @@ public rel[str exprType, loc useLoc] exprTypesAndLocsInCorpus() {
 }
 
 public set[str] exprTypesInCorpus() = exprTypesAndLocsInCorpus()<0>;
+
+public set[Script] scriptsWithExprType(str exprType){
+	set[Script] res = {};
+	for (p <- corpus, v := corpus[p]){
+		pt = loadBinary(p,v);
+		for(l <- pt.files, scr := pt.files[l]){
+			calls = {c | /c:call(name(name("mysql_query")),_) := scr};
+			params = { pi | c <- calls, pi <- c.parameters};
+			exprTypes = {getName(e) | /Expr e := params};
+			if(exprType in exprTypes)
+				res += scr;
+		}
+	}
+	return res;
+}
