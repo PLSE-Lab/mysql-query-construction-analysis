@@ -4,9 +4,13 @@ import lang::php::util::Corpus;
 import lang::php::util::Utils;
 import lang::php::ast::AbstractSyntax;
 import lang::php::ast::System;
+import lang::php::analysis::cfg::CFG;
+import lang::php::analysis::cfg::BuildCFG;
 
 import Node;
-import IO;
+import ValueIO;
+
+loc cfgLoc = |project://QCPAnalysis/cfgs|;
 
 private Corpus corpus = ( 
 	"faqforge" : "1.3.2",
@@ -56,4 +60,13 @@ public set[Script] scriptsWithExprType(str exprType){
 		}
 	}
 	return res;
+}
+
+public void buildCFGsCorpus(){
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		pt = loadBinary(p, v);
+		cfgs = {m | scr <- pt.files, m := buildCFGs(scr)};
+		writeBinaryValueFile(cfgLoc + "<p>_<v>.cfgmaps", cfgs, compression = false);
+	}
 }

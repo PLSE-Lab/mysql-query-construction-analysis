@@ -11,13 +11,13 @@ module QCPAnalysis::VariableAnalysis
 
 import QCPAnalysis::QCPCorpus;
 import QCPAnalysis::GeneralQCP;
-import QCPAnalysis::QCP2Analysis;
 
 import lang::php::util::Utils;
 import lang::php::util::Corpus;
 import lang::php::ast::AbstractSyntax;
+import lang::php::analysis::NamePaths;
 import lang::php::analysis::cfg::CFG;
 import lang::php::analysis::cfg::BuildCFG;
 
 import IO;
-import Relation;
+import Node;
