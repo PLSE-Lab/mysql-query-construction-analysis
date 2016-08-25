@@ -4,8 +4,6 @@
  * the origin of the variable and how its SQL string is built is
  * reported.
  *
- * Note: in method and variable naming, CWV stands for "calls with variables",
- * referring to mysql_query calls whose parameters contain variables
  */
 module QCPAnalysis::VariableAnalysis
 
@@ -15,9 +13,6 @@ import QCPAnalysis::GeneralQCP;
 import lang::php::util::Utils;
 import lang::php::util::Corpus;
 import lang::php::ast::AbstractSyntax;
-import lang::php::analysis::NamePaths;
-import lang::php::analysis::cfg::CFG;
-import lang::php::analysis::cfg::BuildCFG;
 
-import IO;
-import Node;
+// returns the locations of all variables in the corpus that are paramaters to mysql_query calls
+public set[loc] getQueryVarLocs() = { l | <s, l> <- exprTypesAndLocsInCorpus(), s := "var" };

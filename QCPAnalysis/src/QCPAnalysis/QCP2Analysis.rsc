@@ -23,10 +23,7 @@ public map[str, rel[str, int]] getQCP2Counts(){
 	map[str, rel[str, int]] corpusCounts = ();
 	for(sys <- qcp2Corpus, qcp2System := qcp2Corpus[sys]){
 		rel[str, int] sysCounts = {};
-		for(exprType <- exprTypes){
-			int count = countExprTypeSystem(exprType, qcp2System);
-			sysCounts += <exprType, count>;
-		}
+		sysCounts = { <exprType, count> | exprType <- exprTypes, count := countExprTypeSystem(exprType, qcp2System) };
 		corpusCounts += (sys : sysCounts);
 	}
 	return corpusCounts;
