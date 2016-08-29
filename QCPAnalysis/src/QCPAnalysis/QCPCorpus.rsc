@@ -9,22 +9,45 @@ import lang::php::analysis::cfg::BuildCFG;
 
 import Node;
 import ValueIO;
+import Map;
 
 loc cfgLoc = |project://QCPAnalysis/cfgs|;
 
-private Corpus corpus = ( 
-	"faqforge" : "1.3.2",
-	"geccBBlite" : "0.1",
-	"Schoolmate" : "1.5.4",
-	"WebChess" : "0.9.0"
+private Corpus originalCorpus = (
+	"faqforge" 		: "1.3.2",
+	"geccBBlite" 	: "0.1",
+	"Schoolmate" 	: "1.5.4",
+	"WebChess" 		: "0.9.0"
 	);
 	
+private Corpus newCorpus = (
+	"firesoftboard" : "2.0.5",
+	"MyPHPSchool"	: "0.3.1",
+	"OMS"			: "1.0.1",
+	"OpenClinic" 	: "0.8.2",
+	"UseBB"			: "1.0.16",
+	"web2project"	: "3.3"
+	);
+
+private Corpus corpus = originalCorpus + newCorpus;
+
+
+public Corpus getOriginalCorpus() = originalCorpus();
+public Corpus getNewCorpus() = newCorpus();
 public Corpus getCorpus() = corpus;
 
 public void buildCorpus() {
 	for (p <- corpus, v := corpus[p]) {
 		buildBinaries(p,v);
 	}
+}
+
+public void buildCorpusItem(str p, str v){
+	if(p in corpus, v := corpus[p]){
+		buildBinaries(p,v);
+	}
+	else
+		throw "invalid corpus item or version";
 }
 
 public rel[str exprType, loc useLoc] exprTypesAndLocsInCorpus() {

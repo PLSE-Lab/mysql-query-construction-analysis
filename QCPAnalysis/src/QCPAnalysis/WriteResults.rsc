@@ -4,11 +4,14 @@
 
 module QCPAnalysis::WriteResults
 
+import QCPAnalysis::QCPCorpus;
 import QCPAnalysis::GeneralQCP;
 import QCPAnalysis::QCP2Analysis;
 import QCPAnalysis::VariableAnalysis;
 
 import lang::php::ast::AbstractSyntax;
+import lang::php::util::Corpus;
+
 import IO;
 
 loc lists = |project://QCPAnalysis/results/lists/|;
@@ -32,6 +35,16 @@ public void writeCounts(){
 }
 
 public void writeLists(){
-	loc file = lists + "callsWithVariables.txt";
-	iprintToFile(file, getCallsWithVars());
+	map[str, list[Expr]] qcp1 = getQCP(1);
+	map[str, list[Expr]] qcp2 = getQCP(2);
+	map[str, list[Expr]] qcp3 = getQCP(3);
+	map[str, list[Expr]] unmatched = getQCP(4);
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		loc sys = lists + "<p>_<v>";
+		iprintToFile(sys + "QCP1", qcp1["<p>_<v>"]);
+		iprintToFile(sys + "QCP2", qcp2["<p>_<v>"]);
+		iprintToFile(sys + "QCP3", qcp3["<p>_<v>"]);
+		iprintToFile(sys + "unmatched", unmatched["<p>_<v>"]);
+	}
 }

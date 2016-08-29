@@ -17,10 +17,11 @@ module QCPAnalysis::GeneralQCP
 
 import QCPAnalysis::QCPCorpus;
 
-import List;
 import lang::php::util::Corpus;
 import lang::php::util::Utils;
 import lang::php::ast::AbstractSyntax;
+
+import List;
 
 // represents the count of a particular QCP
 data QCPCount = QCP1(int n)
@@ -28,52 +29,21 @@ data QCPCount = QCP1(int n)
 			  | QCP3(int n)
 			  | unmatched(int n);
 
-// returns true if QCP1 matches the parameters to this mysql_query call
-public bool matchesQCP1(Expr call){
-	list[ActualParameter] params = call.parameters;
-	if([actualParameter(scalar(string(_)), _)] := params
-		|| [actualParameter(scalar(string(_)), _), _] := params){
-	
-		return true;	
-	}
-	else 
-		return false;
-}
+public bool matchesQCP1(call(name(name("mysql_query")), [actualParameter(scalar(string(_)), _)])) = true;
+public bool matchesQCP1(call(name(name("mysql_query")), [actualParameter(scalar(string(_)), _), _])) = true;
+public default bool matchesQCP1(Expr e) = false;
 
-// returns true if QCP2 matches the parameters to this mysql_query call
-public bool matchesQCP2(Expr call){
-	list[ActualParameter] params = call.parameters;
-	if([actualParameter(scalar(encapsed(_)),_)] := params
-		|| [actualParameter(scalar(encapsed(_)), _),_] := params
-		|| [actualParameter(binaryOperation(left,right,concat()),_)] := params
-		|| [actualParameter(binaryOperation(left,right,concat()),_), _] := params){
-		
-		return true;	
-	}
-	else 
-		return false;
-}
+public bool matchesQCP2(call(name(name("mysql_query")), [actualParameter(scalar(encapsed(_)),_)])) = true;
+public bool matchesQCP2(call(name(name("mysql_query")), [actualParameter(scalar(encapsed(_)), _),_])) = true;
+public bool matchesQCP2(call(name(name("mysql_query")), [actualParameter(binaryOperation(left,right,concat()),_)])) = true;
+public bool matchesQCP2(call(name(name("mysql_query")), [actualParameter(binaryOperation(left,right,concat()),_), _])) = true;
+public default bool matchesQCP2(Expr e) = false;
 
-// returns true if QCP3 matches the parameters to this mysql_query call
-public bool matchesQCP3(Expr call){
-	list[ActualParameter] params = call.parameters;
-	if([actualParameter(var(name(name(_))), _)] := params
-		|| [actualParameter(var(name(name(_))), _), _] := params){
-	
-		return true;	
-	}
-	else 
-		return false;
-}
+public bool matchesQCP3(call(name(name("mysql_query")), [actualParameter(var(name(name(_))), _)])) = true;
+public bool matchesQCP3(call(name(name("mysql_query")), [actualParameter(var(name(name(_))), _), _])) = true;
+public default bool matchesQCP3(Expr e) = false;
 
-// returns true if no QCP matches the parameters to this mysql_query call
-public bool unmatched(Expr call){
-	if(!matchesQCP1(call) && !matchesQCP2(call) && !matchesQCP3(call)){
-		return true;
-	}
-	else
-		return false;
-}
+public bool unmatched(Expr e) = !matchesQCP1(e) && !matchesQCP2(e) && !matchesQCP3(e);
 
 // gets all mysql_query calls in the corpus
 public map[str, list[Expr]] getMSQCorpus(){

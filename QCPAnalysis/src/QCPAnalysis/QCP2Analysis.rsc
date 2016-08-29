@@ -15,6 +15,24 @@ import lang::php::ast::AbstractSyntax;
 import Node;
 import Set;
 
+// these functions will identify sub cases of QCP2
+// (which parts of the query string are static and which
+// come from variables, functions, methods, etc.)
+/*
+
+public default bool matchesQCP2A(Expr e) = false;
+
+public default bool matchesQCP2B(Expr e) = false;
+
+public default bool matchesQCP2C(Expr e) = false;
+
+public default bool matchesQCP2D(Expr e) = false;
+
+.....
+
+
+*/
+
 // for each Expr type that occurrs in the corpus, reports how many times that type
 // occurs in all mysql_query calls that match QCP2
 public map[str, rel[str, int]] getQCP2Counts(){
