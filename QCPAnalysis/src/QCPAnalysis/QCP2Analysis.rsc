@@ -14,24 +14,25 @@ import lang::php::ast::AbstractSyntax;
 
 import Node;
 import Set;
+import Map;
 
-// these functions will identify sub cases of QCP2
-// (which parts of the query string are static and which
-// come from variables, functions, methods, etc.)
-/*
+// case where the value of a attribute in a WHERE clause is supplied from a variable, function call, etc.
+public bool whereQCP2(Expr e) = matchesQCP2(e) && /scalar(string(/.*\bWHERE\b\s[a-zA-Z0-9]*\s[=]\s?$/)) := e.parameters;
+public default bool whereQCP2(Expr e) = false;
 
-public default bool matchesQCP2A(Expr e) = false;
+// case where the value of a attribute in an AND clause is supplied from a variable, function call, etc.
+public bool andQCP2(Expr e) = matchesQCP2(e) && /scalar(string(/.*\bAND\b\s[a-zA-Z0-9]*\s[=]\s?$/)) := e.parameters;
+public default bool andQCP2(Expr e) = false;
 
-public default bool matchesQCP2B(Expr e) = false;
+// case where the value of a attribute in an OR clause is supplied from a variable, function call, etc.
+public bool orQCP2(Expr e) = matchesQCP2(e) && /scalar(string(/.*\bOR\b\s[a-zA-Z0-9]*\s[=]\s?$/)) := e.parameters;
+public default bool orQCP2(Expr e) = false;
 
-public default bool matchesQCP2C(Expr e) = false;
+// case where the value of a attribute in a NOT clause is supplied from a variable, function call, etc.
+public bool notQCP2(Expr e) = matchesQCP2(e) && /scalar(string(/.*\bNOT\b\s[a-zA-Z0-9]*\s[=]\s?$/)) := e.parameters;
+public default bool notQCP2(Expr e) = false;
 
-public default bool matchesQCP2D(Expr e) = false;
-
-.....
-
-
-*/
+public bool unmatchedQCP2(Expr e) = !whereQCP2();
 
 // for each Expr type that occurrs in the corpus, reports how many times that type
 // occurs in all mysql_query calls that match QCP2
@@ -77,3 +78,18 @@ public map[str, list[Expr]] getQCP2WithExprType(str exprType){
 	}
 	return qcp2WithExprType;
 }
+
+// returns all QCP2 occurrences that match a particular QCP2 subcase
+public map[str, set[Expr]] getQCP2WithSubcase(str subcase){
+	qcp2 = getQCP(2);
+	switch(subcase){
+		case "where" : return (sys : {e | e <- qcp2[sys], whereQCP2(e)} | sys <- qcp2);
+		case "and"   : return (sys : {e | e <- qcp2[sys], andQCP2(e)} | sys <- qcp2);
+		case "or"    : return (sys : {e | e <- qcp2[sys], orQCP2(e)} | sys <- qcp2);
+		case "not"   : return (sys : {e | e <- qcp2[sys], notQCP2(e)} | sys <- qcp2);
+		default      : throw "invalid QCP2 subtype";
+	}
+}
+
+public map[str, int] countQCP2WithSubcase(str subcase) 
+	= (sys : count | m := getQCP2WithSubcase(subcase), sys <- m, count := size(m[sys]));

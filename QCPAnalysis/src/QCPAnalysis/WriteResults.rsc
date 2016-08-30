@@ -29,9 +29,6 @@ public void writeCounts(){
 	
 	file = counts + "countQCP.txt";
 	iprintToFile(file, countQCP());
-	
-	file = counts + "countQCP2WithExprType.txt";
-	iprintToFile(file, getQCP2Counts());
 }
 
 public void writeLists(){
@@ -46,5 +43,9 @@ public void writeLists(){
 		iprintToFile(sys + "QCP2", qcp2["<p>_<v>"]);
 		iprintToFile(sys + "QCP3", qcp3["<p>_<v>"]);
 		iprintToFile(sys + "unmatched", unmatched["<p>_<v>"]);
+		iprintToFile(sys + "QCP2subcases/whereQCP2", getQCP2WithSubcase("where")["<p>_<v>"]);
+		iprintToFile(sys + "QCP2subcases/andQCP2", getQCP2WithSubcase("and")["<p>_<v>"]);
+		iprintToFile(sys + "QCP2subcases/orQCP2", getQCP2WithSubcase("or")["<p>_<v>"]);
+		iprintToFile(sys + "QCP2subcases/notQCP2", getQCP2WithSubcase("not")["<p>_<v>"]);
 	}
 }
