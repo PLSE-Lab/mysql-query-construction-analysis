@@ -31,7 +31,7 @@ public void writeCounts(){
 	iprintToFile(file, countQCP());
 }
 
-public void writeLists(){
+public void writeQCP(){
 	map[str, list[Expr]] qcp1 = getQCP(1);
 	map[str, list[Expr]] qcp2 = getQCP(2);
 	map[str, list[Expr]] qcp3 = getQCP(3);
@@ -43,9 +43,17 @@ public void writeLists(){
 		iprintToFile(sys + "QCP2", qcp2["<p>_<v>"]);
 		iprintToFile(sys + "QCP3", qcp3["<p>_<v>"]);
 		iprintToFile(sys + "unmatched", unmatched["<p>_<v>"]);
+	}
+}
+
+public void writeQCP2Subcases(){
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		loc sys = lists + "<p>_<v>";
 		iprintToFile(sys + "QCP2subcases/whereQCP2", getQCP2WithSubcase("where")["<p>_<v>"]);
 		iprintToFile(sys + "QCP2subcases/andQCP2", getQCP2WithSubcase("and")["<p>_<v>"]);
 		iprintToFile(sys + "QCP2subcases/orQCP2", getQCP2WithSubcase("or")["<p>_<v>"]);
 		iprintToFile(sys + "QCP2subcases/notQCP2", getQCP2WithSubcase("not")["<p>_<v>"]);
+		iprintToFile(sys + "QCP2subcases/unmatched", getQCP2WithSubcase("unmatched")["<p>_<v>"]);
 	}
 }

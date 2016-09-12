@@ -32,7 +32,11 @@ public default bool orQCP2(Expr e) = false;
 public bool notQCP2(Expr e) = matchesQCP2(e) && /scalar(string(/.*\bNOT\b\s[a-zA-Z0-9]*\s[=]\s?$/)) := e.parameters;
 public default bool notQCP2(Expr e) = false;
 
-public bool unmatchedQCP2(Expr e) = !whereQCP2();
+// case where the value of a attribute in a SET clause is supplied from a variable, function call, etc.
+public bool setQCP2(Expr e) = matchesQCP2(e) && /scalar(string(/.*\bSET\b\s[a-zA-Z0-9]*\s[=]\s?$/)) := e.parameters;
+public default bool notQCP2(Expr e) = false;
+
+public bool unmatchedQCP2(Expr e) = !whereQCP2(e) && !andQCP2(e) && !orQCP2(e) && !notQCP2(e) && !setQCP2(e);
 
 // for each Expr type that occurrs in the corpus, reports how many times that type
 // occurs in all mysql_query calls that match QCP2
@@ -83,10 +87,12 @@ public map[str, list[Expr]] getQCP2WithExprType(str exprType){
 public map[str, set[Expr]] getQCP2WithSubcase(str subcase){
 	qcp2 = getQCP(2);
 	switch(subcase){
-		case "where" : return (sys : {e | e <- qcp2[sys], whereQCP2(e)} | sys <- qcp2);
-		case "and"   : return (sys : {e | e <- qcp2[sys], andQCP2(e)} | sys <- qcp2);
-		case "or"    : return (sys : {e | e <- qcp2[sys], orQCP2(e)} | sys <- qcp2);
-		case "not"   : return (sys : {e | e <- qcp2[sys], notQCP2(e)} | sys <- qcp2);
+		case "where" 	 : return (sys : {e | e <- qcp2[sys], whereQCP2(e)} | sys <- qcp2);
+		case "and"   	 : return (sys : {e | e <- qcp2[sys], andQCP2(e)} | sys <- qcp2);
+		case "or"    	 : return (sys : {e | e <- qcp2[sys], orQCP2(e)} | sys <- qcp2);
+		case "not"   	 : return (sys : {e | e <- qcp2[sys], notQCP2(e)} | sys <- qcp2);
+		case "set"   	 : return (sys : {e | e <- qcp2[sys], setQCP2(e)} | sys <- qcp2);
+		case "unmatched" : return (sys : {e | e <- qcp2[sys], unmatchedQCP2(e)} | sys <- qcp2);
 		default      : throw "invalid QCP2 subtype";
 	}
 }

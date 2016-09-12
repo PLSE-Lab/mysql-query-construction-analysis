@@ -11,8 +11,6 @@ import Node;
 import ValueIO;
 import Map;
 
-loc cfgLoc = |project://QCPAnalysis/cfgs|;
-
 private Corpus originalCorpus = (
 	"faqforge" 		: "1.3.2",
 	"geccBBlite" 	: "0.1",
@@ -21,12 +19,12 @@ private Corpus originalCorpus = (
 	);
 	
 private Corpus newCorpus = (
-	"firesoftboard" : "2.0.5",
+	//"firesoftboard" : "2.0.5", building cfgs for this fails
 	"MyPHPSchool"	: "0.3.1",
 	"OMS"			: "1.0.1",
 	"OpenClinic" 	: "0.8.2",
-	"UseBB"			: "1.0.16",
-	"web2project"	: "3.3"
+	"UseBB"			: "1.0.16"
+	//"web2project"	: "3.3" building cfgs for this fails
 	);
 
 private Corpus corpus = originalCorpus + newCorpus;
@@ -69,12 +67,3 @@ public rel[str exprType, loc useLoc] exprTypesAndLocsInCorpus() {
 }
 
 public set[str] exprTypesInCorpus() = exprTypesAndLocsInCorpus()<0>;
-
-public void buildCFGsCorpus(){
-	Corpus corpus = getCorpus();
-	for(p <- corpus, v := corpus[p]){
-		pt = loadBinary(p, v);
-		cfgs = {m | scr <- pt.files, m := buildCFGs(scr)};
-		writeBinaryValueFile(cfgLoc + "<p>_<v>.cfgmaps", cfgs, compression = false);
-	}
-}
