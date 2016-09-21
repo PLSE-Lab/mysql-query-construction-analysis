@@ -1,11 +1,7 @@
-/* the purpose of this module is to further analyze mysql_query calls
- * whose parameter is a variable (QCP3), or QCP2 calls whose parameter
- * contains variable(s) concatenated or interpolated. Information about
- * the origin of the variable and how its SQL string is built is
- * reported.
- *
+/* the purpose of this module is to build the CFGs that will be
+ * used for analysis in other modules
  */
-module QCPAnalysis::VariableAnalysis
+module QCPAnalysis::CFGCreation
 
 import QCPAnalysis::QCPCorpus;
 import QCPAnalysis::GeneralQCP;
@@ -90,7 +86,6 @@ private set[loc] functionClassMethodCWV(Stmt st)
 	= { e@at | /c:call(name(name("mysql_query")),_) := st, /e:var(name(name(_))) := c.parameters};
 
 // returns the NamePath and Stmt of all functions and methods in a particular script
-// TODO: add support for methods
 public rel[NamePath,Stmt] getPathsAndStmtsScript(Script scr){
 	rel[NamePath,Stmt] ps = {};
 	for (/f:function(fname,_,_,_) := scr){
