@@ -67,3 +67,5 @@ public rel[str exprType, loc useLoc] exprTypesAndLocsInCorpus() {
 }
 
 public set[str] exprTypesInCorpus() = exprTypesAndLocsInCorpus()<0>;
+
+public set[loc] locsExprType(str t) = exprTypesAndLocsInCorpus()[t];

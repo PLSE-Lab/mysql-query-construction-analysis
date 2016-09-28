@@ -7,8 +7,8 @@
  * QCP1: mysql_query calls with string literal parameter
  * QCP2: mysql_query calls with literals, variables, unsafe inputs, 
  *		 function or method calls concatenated or interpolated
- * QCP3: mysql_query calls with variable parameters
- *
+ * QCP3: mysql_query calls with a single variable paramter
+ * QCP4: mysql_query calls whose parameter is an array
  * While this module is pretty general (hence the name),
  * Other modules provide more in-depth analyses
  */ 
@@ -22,11 +22,13 @@ import lang::php::util::Utils;
 import lang::php::ast::AbstractSyntax;
 
 import List;
+import Map;
 
 // represents the count of a particular QCP
 data QCPCount = QCP1(int n)
 			  | QCP2(int n)
 			  | QCP3(int n)
+			  | QCP4(int n)
 			  | unmatched(int n);
 
 public bool matchesQCP1(call(name(name("mysql_query")), [actualParameter(scalar(string(_)), _)])) = true;
@@ -43,7 +45,11 @@ public bool matchesQCP3(call(name(name("mysql_query")), [actualParameter(var(nam
 public bool matchesQCP3(call(name(name("mysql_query")), [actualParameter(var(name(name(_))), _), _])) = true;
 public default bool matchesQCP3(Expr e) = false;
 
-public bool unmatched(Expr e) = !matchesQCP1(e) && !matchesQCP2(e) && !matchesQCP3(e);
+public bool matchesQCP4(call(name(name("mysql_query")), [actualParameter(fetchArrayDim(var(name(name(_))),_),_)])) = true;
+public bool matchesQCP4(call(name(name("mysql_query")), [actualParameter(fetchArrayDim(var(name(name(_))),_),_),_])) = true;
+public default bool matchesQCP4(Expr e) = false;
+
+public bool unmatched(Expr e) = !matchesQCP1(e) && !matchesQCP2(e) && !matchesQCP3(e) && !matchesQCP4(e);
 
 // gets all mysql_query calls in the corpus
 public map[str, list[Expr]] getMSQCorpus(){
@@ -52,6 +58,13 @@ public map[str, list[Expr]] getMSQCorpus(){
 	for (p <- corpus, v := corpus[p]){
 		pt = loadBinary(p,v);
 		calls += ("<p>_<v>" : [q | /q:call(name(name("mysql_query")),_) := pt]);
+	}
+	return calls;
+}
+public list[Expr] getMSQCorpusList(){
+	calls = [];
+	for(l <- range(getMSQCorpus())){
+		calls += l;
 	}
 	return calls;
 }
@@ -83,6 +96,7 @@ public map[str, list[Expr]] getQCP(int n){
 			case 1 : qcpList = [q | q <- msq, matchesQCP1(q)];
 			case 2 : qcpList = [q | q <- msq, matchesQCP2(q)];
 			case 3 : qcpList = [q | q <- msq, matchesQCP3(q)];
+			case 4:  qcpList = [q | q <- msq, matchesQCP4(q)];
 			default: qcpList = [q | q <- msq, unmatched(q)];
 		}
 		qcpMap += (sys : qcpList);
@@ -98,14 +112,15 @@ public map[str, set[QCPCount]] countQCP(){
 	for(p <- corpus, v := corpus[p]){
 		counts += ("<p>_<v>" : {});
 	}
-	for(n <- [1..5]){
+	for(n <- [1..6]){
 		map[str, list[Expr]] qcpMap = getQCP(n);
 		for(sys <- qcpMap, qcpList := qcpMap[sys]){
 			switch(n){
 				case 1 : counts[sys] += QCP1(size(qcpList));
 				case 2 : counts[sys] += QCP2(size(qcpList));
 				case 3 : counts[sys] += QCP3(size(qcpList));
-				case 4 : counts[sys] += unmatched(size(qcpList));
+				case 4 : counts[sys] += QCP4(size(qcpList));
+				case 5 : counts[sys] += unmatched(size(qcpList));
 			}
 		} 
 	}
