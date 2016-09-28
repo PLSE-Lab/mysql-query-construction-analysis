@@ -7,6 +7,7 @@ module QCPAnalysis::WriteResults
 import QCPAnalysis::QCPCorpus;
 import QCPAnalysis::QueryGroups;
 import QCPAnalysis::QG2Analysis;
+import QCPAnalysis::QueryStringAnalysis;
 
 import lang::php::ast::AbstractSyntax;
 import lang::php::util::Corpus;
@@ -15,11 +16,13 @@ import IO;
 
 loc lists = |project://QCPAnalysis/results/lists/|;
 loc counts =  |project://QCPAnalysis/results/counts/|;
+loc strings = |project://QCPAnalysis/results/querystrings.txt|;
 
 // convenience function that performs all other functions in this module
 public void writeResults(){
 	writeCounts();
 	writeQG();
+	writeQueryStrings();
 }
 // writes the counts from all QG analyses to a file in the results folder
 public void writeCounts(){
@@ -43,4 +46,8 @@ public void writeQG(){
 		iprintToFile(sys + "QG3", qcp3["<p>_<v>"]);
 		iprintToFile(sys + "unmatched", unmatched["<p>_<v>"]);
 	}
+}
+
+public void writeQueryStrings(){
+	iprintToFile(strings, buildQueryStrings());
 }
