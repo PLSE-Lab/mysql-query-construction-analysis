@@ -4,7 +4,7 @@
 module QCPAnalysis::CFGCreation
 
 import QCPAnalysis::QCPCorpus;
-import QCPAnalysis::GeneralQCP;
+import QCPAnalysis::QueryGroups;
 
 import lang::php::util::Utils;
 import lang::php::util::Corpus;

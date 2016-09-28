@@ -18,7 +18,7 @@
 module QCPAnalysis::SQLStringAnalysis
 
 import QCPAnalysis::QCPCorpus;
-import QCPAnalysis::GeneralQCP;
+import QCPAnalysis::QueryGroups;
 
 import lang::php::util::Corpus;
 import lang::php::ast::AbstractSyntax;
@@ -44,10 +44,10 @@ public SQLString buildSQLString(c:call(name(name("mysql_query")), params)){
 	switch(params){
 		case [actualParameter(scalar(string(s)), _)]: return sqlstring(c@at, [staticsnippet(s)], true);
 		case [actualParameter(scalar(string(s)), _), _]: return sqlstring(c@at, [staticsnippet(s)], true);
-		case [actualParameter(e:scalar(encapsed(_)),_)]: return sqlstring(c@at, buildQCP2Snippets(e), false);
-		case [actualParameter(e:scalar(encapsed(_)), _),_]: return sqlstring(c@at, buildQCP2Snippets(e), false);
-		case [actualParameter(e:binaryOperation(left,right,concat()),_)]: return sqlstring(c@at, buildQCP2Snippets(e), false);
-		case [actualParameter(e:binaryOperation(left,right,concat()),_), _]: return sqlstring(c@at, buildQCP2Snippets(e), false);
+		case [actualParameter(e:scalar(encapsed(_)),_)]: return sqlstring(c@at, buildQG2Snippets(e), false);
+		case [actualParameter(e:scalar(encapsed(_)), _),_]: return sqlstring(c@at, buildQG2Snippets(e), false);
+		case [actualParameter(e:binaryOperation(left,right,concat()),_)]: return sqlstring(c@at, buildQG2Snippets(e), false);
+		case [actualParameter(e:binaryOperation(left,right,concat()),_), _]: return sqlstring(c@at, buildQG2Snippets(e), false);
 		case [actualParameter(v:var(name(name(_))), _)] : return sqlstring(c@at, [dynamicsnippet(v)], false);
 		case [actualParameter(v:var(name(name(_))), _), _] : return sqlstring(c@at, [dynamicsnippet(v)], false);
 		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_)] : return sqlstring(c@at, [dynamicsnippet(v)], false);
@@ -55,17 +55,18 @@ public SQLString buildSQLString(c:call(name(name("mysql_query")), params)){
 		default: throw "unhandled case";
 	}
 }
+
 // returns snippets for the more complicated case of static sql concatenated with php variables, functions, etc.
-private list[SQLSnippet] buildQCP2Snippets(Expr e){
+private list[SQLSnippet] buildQG2Snippets(Expr e){
 	if(scalar(string(s)) := e) return [staticsnippet(s)];
-	else if(scalar(encapsed(parts)) := e) return buildQCP2Snippets(parts);
-	else if(binaryOperation(left, right, concat()) := e) return buildQCP2Snippets(left) + buildQCP2Snippets(right);
+	else if(scalar(encapsed(parts)) := e) return buildQG2Snippets(parts);
+	else if(binaryOperation(left, right, concat()) := e) return buildQG2Snippets(left) + buildQG2Snippets(right);
 	else return [dynamicsnippet(e)];
 }
-private list[SQLSnippet] buildQCP2Snippets(list[Expr] parts){
+private list[SQLSnippet] buildQG2Snippets(list[Expr] parts){
 	snippets = [];
 	for(p <- parts){
-		snippets += buildQCP2Snippets(p);
+		snippets += buildQG2Snippets(p);
 	}
 	return snippets;
 }
