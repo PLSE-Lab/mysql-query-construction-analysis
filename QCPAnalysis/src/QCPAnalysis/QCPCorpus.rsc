@@ -62,7 +62,6 @@ public rel[str exprType, loc useLoc] exprTypesAndLocsInCorpus() {
 		// Find all the expression node names used in any of the parameters
 		res = res + { < getName(e), e@at > | /Expr e := params };
 	}
-	
 	return res;
 }
 

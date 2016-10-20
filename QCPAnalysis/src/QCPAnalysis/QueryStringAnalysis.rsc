@@ -77,7 +77,7 @@ private list[QuerySnippet] buildQG2Snippets(list[Expr] parts){
 	return snippets;
 }
 
-public void writeCFGs(){
+public void writeCFGsAndQueryStrings(){
 	Corpus corpus = getCorpus();
 	for(p <- corpus, v := corpus[p]){
 		int id = 0;
@@ -91,6 +91,7 @@ public void writeCFGs(){
 					cfgsAndQueryStrings[findContainingCFG(scr, cfgs, qs.callloc)] += qs;
 				}
 				iprintToFile(cfglocp + "/<p>_<v>/<id>", cfgsAndQueryStrings);
+				writeBinaryValueFile(cfglocb + "<p>_<v>/<id>", cfgsAndQueryStrings);
 				id += 1;
 			}
 		}
