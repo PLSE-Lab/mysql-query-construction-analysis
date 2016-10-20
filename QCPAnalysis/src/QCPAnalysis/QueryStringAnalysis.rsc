@@ -16,42 +16,48 @@ import QCPAnalysis::QCPCorpus;
 import QCPAnalysis::QueryGroups;
 
 import lang::php::util::Corpus;
+import lang::php::util::Utils;
 import lang::php::ast::AbstractSyntax;
+import lang::php::ast::System;
+import lang::php::analysis::NamePaths;
+import lang::php::analysis::cfg::BuildCFG;
+import lang::php::analysis::cfg::CFG;
+import lang::php::analysis::cfg::Util;
 
-import List;
+import Set;
 import Map;
 import IO;
+import ValueIO;
 
-loc cfgloc = |project://QCPAnalysis/cfgs/binary|;
+loc cfglocb = |project://QCPAnalysis/cfgs/binary|;
+loc cfglocp = |project://QCPAnalysis/cfgs/plain|;
 
-/*
- * Pattern Classifications
- * allstatic: query string that is completely static and requires no further analysis
- */
+// See the Wiki of this GitHub Repository for more detailed information on pattern classifications
  
 // represents a Query string (parameter to a mysql_query call)
-data QueryString = querystring(loc callloc, list[QuerySnippet] snippets, int querygroup, bool allstatic);
+data QueryString = querystring(loc callloc, list[QuerySnippet] snippets, int querygroup, int querypattern);
 
-// represents a part of a Query snippet
+// represents a part of a SQL query
 data QuerySnippet = staticsnippet(str staticpart)
 				| dynamicsnippet(Expr dynamicpart);
 				
-public list[QueryString] buildQueryStrings() = [s | call <- getMSQCorpusList(), s := buildQueryString(call)];
-			
-// build QueryStrings based on the Query Groups At this point, the only analysis that has been performed
+// builds query string structures for all mysql_query calls in the corpus
+public set[QueryString] buildQueryStrings() = {s | call <- getMSQCorpusList(), s := buildQueryString(call)};
+
+// builds a QueryString based on the Query Groups. At this point, the only analysis that has been performed
 // is looking at the parameter directly. All dynamic snippets will be further analyzed through the CFGs
 public QueryString buildQueryString(c:call(name(name("mysql_query")), params)){
 	switch(params){
-		case [actualParameter(scalar(string(s)), _)]: return querystring(c@at, [staticsnippet(s)], 1, true);
-		case [actualParameter(scalar(string(s)), _), _]: return querystring(c@at, [staticsnippet(s)], 1, true);
-		case [actualParameter(e:scalar(encapsed(_)),_)]: return querystring(c@at, buildQG2Snippets(e), 2, false);
-		case [actualParameter(e:scalar(encapsed(_)), _),_]: return querystring(c@at, buildQG2Snippets(e), 2, false);
-		case [actualParameter(e:binaryOperation(left,right,concat()),_)]: return querystring(c@at, buildQG2Snippets(e), 2, false);
-		case [actualParameter(e:binaryOperation(left,right,concat()),_), _]: return querystring(c@at, buildQG2Snippets(e), 2, false);
-		case [actualParameter(v:var(name(name(_))), _)] : return querystring(c@at, [dynamicsnippet(v)], 3, false);
-		case [actualParameter(v:var(name(name(_))), _), _] : return querystring(c@at, [dynamicsnippet(v)], 3, false);
-		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_)] : return querystring(c@at, [dynamicsnippet(v)], 4, false);
-		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_),_] : return querystring(c@at, [dynamicsnippet(v)], 4, false);
+		case [actualParameter(scalar(string(s)), _)]: return querystring(c@at, [staticsnippet(s)], 1, 1);
+		case [actualParameter(scalar(string(s)), _), _]: return querystring(c@at, [staticsnippet(s)], 1, 1);
+		case [actualParameter(e:scalar(encapsed(_)),_)]: return querystring(c@at, buildQG2Snippets(e), 2, 0);
+		case [actualParameter(e:scalar(encapsed(_)), _),_]: return querystring(c@at, buildQG2Snippets(e), 2, 0);
+		case [actualParameter(e:binaryOperation(left,right,concat()),_)]: return querystring(c@at, buildQG2Snippets(e), 2, 0);
+		case [actualParameter(e:binaryOperation(left,right,concat()),_), _]: return querystring(c@at, buildQG2Snippets(e), 2, 0);
+		case [actualParameter(v:var(name(name(_))), _)] : return querystring(c@at, [dynamicsnippet(v)], 3, 0);
+		case [actualParameter(v:var(name(name(_))), _), _] : return querystring(c@at, [dynamicsnippet(v)], 3, 0);
+		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_)] : return querystring(c@at, [dynamicsnippet(v)], 4, 0);
+		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_),_] : return querystring(c@at, [dynamicsnippet(v)], 4, 0);
 		default: throw "unhandled case";
 	}
 }
@@ -71,7 +77,23 @@ private list[QuerySnippet] buildQG2Snippets(list[Expr] parts){
 	return snippets;
 }
 
-// analyzes all dynamicsnippets by referencing the CFGs
-public void analyzeDynamicSnippets(){
-	// to be implemented
+public void writeCFGs(){
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		int id = 0;
+		pt = loadBinary(p,v);
+		for(l <- pt.files, scr := pt.files[l]){
+			querystrings = {q | /c:call(name(name("mysql_query")),_) := scr, q := buildQueryString(c)};
+			if(size(querystrings) != 0){
+				cfgs = buildCFGs(scr);
+				map[CFG, set[QueryString]] cfgsAndQueryStrings = (cfg : {} | np <- cfgs, cfg := cfgs[np]);
+				for(qs <- querystrings){
+					cfgsAndQueryStrings[findContainingCFG(scr, cfgs, qs.callloc)] += qs;
+				}
+				iprintToFile(cfglocp + "/<p>_<v>/<id>", cfgsAndQueryStrings);
+				id += 1;
+			}
+		}
+	}
 }
+

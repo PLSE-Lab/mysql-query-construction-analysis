@@ -6,7 +6,6 @@ module QCPAnalysis::WriteResults
 
 import QCPAnalysis::QCPCorpus;
 import QCPAnalysis::QueryGroups;
-import QCPAnalysis::QG2Analysis;
 import QCPAnalysis::QueryStringAnalysis;
 
 import lang::php::ast::AbstractSyntax;
@@ -34,16 +33,18 @@ public void writeCounts(){
 }
 
 public void writeQG(){
-	map[str, list[Expr]] qcp1 = getQG(1);
-	map[str, list[Expr]] qcp2 = getQG(2);
-	map[str, list[Expr]] qcp3 = getQG(3);
-	map[str, list[Expr]] unmatched = getQG(4);
+	map[str, list[Expr]] qg1 = getQG(1);
+	map[str, list[Expr]] qg2 = getQG(2);
+	map[str, list[Expr]] qg3 = getQG(3);
+	map[str, list[Expr]] qg4 = getQG(4);
+	map[str, list[Expr]] unmatched = getQG(5);
 	Corpus corpus = getCorpus();
 	for(p <- corpus, v := corpus[p]){
 		loc sys = lists + "<p>_<v>";
-		iprintToFile(sys + "QG1", qcp1["<p>_<v>"]);
-		iprintToFile(sys + "QG2", qcp2["<p>_<v>"]);
-		iprintToFile(sys + "QG3", qcp3["<p>_<v>"]);
+		iprintToFile(sys + "QG1", qg1["<p>_<v>"]);
+		iprintToFile(sys + "QG2", qg2["<p>_<v>"]);
+		iprintToFile(sys + "QG3", qg3["<p>_<v>"]);
+		iprintToFile(sys + "QG4", qg4["<p>_<v>"]);
 		iprintToFile(sys + "unmatched", unmatched["<p>_<v>"]);
 	}
 }
