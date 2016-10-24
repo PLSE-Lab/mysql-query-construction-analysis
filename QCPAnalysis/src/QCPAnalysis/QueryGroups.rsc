@@ -23,6 +23,7 @@ import lang::php::ast::AbstractSyntax;
 
 import List;
 import Map;
+import Set;
 
 // represents the count of a particular Query Group
 data QGCount = QG1(int n)
@@ -62,11 +63,7 @@ public map[str, list[Expr]] getMSQCorpus(){
 	return calls;
 }
 public list[Expr] getMSQCorpusList(){
-	calls = [];
-	for(l <- range(getMSQCorpus())){
-		calls += l;
-	}
-	return calls;
+	return toList(range(getMSQCorpus()));
 }
 
 // returns the number of mysql_query calls in each system in the corpus
