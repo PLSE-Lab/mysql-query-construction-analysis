@@ -31,6 +31,7 @@ import Set;
 import Map;
 import IO;
 import ValueIO;
+import List;
 
 loc cfglocb = |project://QCPAnalysis/cfgs/binary|;
 loc cfglocp = |project://QCPAnalysis/cfgs/plain|;
@@ -129,3 +130,70 @@ public void writeCFGsAndQueryStrings(){
 	}
 }
 
+public void findReachableQueryStrings() {
+	Corpus corpus = getCorpus();
+	for (p <- corpus, v := corpus[p]) {
+		pt = loadBinary(p, v);
+		if (!pt has baseLoc) {
+			println("Skipping system <p>, version <v>, no base loc included");
+			continue;
+		}
+		callsOfInterest = [ c | /c:call(name(name("mysql_query")),[actualParameter(var(name(name(_))),false),_*]) := pt ];
+		println("Calls in system <p>, version <v> (total = <size(callsOfInterest)>):");
+		neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { c@at.top | c <- callsOfInterest } );
+		IncludesInfo iinfo = loadIncludesInfo(p, v);
+		
+		for (c:call(_,[actualParameter(var(name(name(queryVar))),_),_*]) <- callsOfInterest) {
+			containingScript = pt.files[c@at.top];
+			containingCFG = findContainingCFG(containingScript, neededCFGs[c@at.top], c@at);
+			callNode = findNodeForExpr(containingCFG, c);
+			
+			// NOTE: It would be better to have a reaching definitions analysis for this. Since that is still under
+			// development, we instead simulate this for common cases.
+			
+			// If we have a standard literal assignment to the query var, then we can use the assigned value
+			// TODO: This does not handle cascades of .= assignments.
+			bool assignsScalarToQueryVar(CFGNode cn) {
+				if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+					simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+					if (scalar(string(_)) := simplifiedQueryExpr) {
+						return true;
+					}
+				}
+				return false;
+			}
+			
+			// If we have a non-literal assignment to the query var, then we stop looking, that "spoils" any
+			// literal assignment we could find above, e.g., $x = goodValue, $x .= badValue. 
+			bool assignsNonScalarToQueryVar(CFGNode cn) {
+				if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+					simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+					if (scalar(string(_)) !:= simplifiedQueryExpr) {
+						return true;
+					}
+				} else if (exprNode(assignWOp(var(name(name(queryVar))),queryExpr,_),_) := cn) {
+					return true;
+				}
+				return false;			
+			}
+			
+			Expr getAssignedScalar(CFGNode cn) {
+				if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+					simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+					if (ss:scalar(string(_)) := simplifiedQueryExpr) {
+						return ss;
+					}
+				}
+				throw "gather should only be called when pred returns true";
+			}
+			
+			gr = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, assignsScalarToQueryVar, assignsNonScalarToQueryVar, getAssignedScalar);
+			
+			if (gr.trueOnAllPaths) {
+				println("For call at location <c@at>, found <size(gr.results)> literal assignments into the query variable");
+			//} else {
+			//	println("For call at location <c@at>, no assignment of a string literal to the query var was found on at least one reaching path");
+			}
+		} 
+	}
+}
