@@ -6,6 +6,7 @@ import lang::php::ast::AbstractSyntax;
 import lang::php::ast::System;
 import lang::php::analysis::cfg::CFG;
 import lang::php::analysis::cfg::BuildCFG;
+import lang::php::analysis::includes::IncludesInfo;
 
 import Node;
 import ValueIO;
@@ -46,6 +47,17 @@ public void buildCorpusItem(str p, str v){
 	}
 	else
 		throw "invalid corpus item or version";
+}
+
+public void buildCorpusInfo() {
+	for (p <- corpus, v := corpus[p]) {
+		buildCorpusInfo(p,v);
+	}
+}
+
+public void buildCorpusInfo(str p, str v) {
+	pt = loadBinary(p,v);
+	buildIncludesInfo(pt);
 }
 
 public rel[str exprType, loc useLoc] exprTypesAndLocsInCorpus() {
