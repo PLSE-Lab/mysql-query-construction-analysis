@@ -23,6 +23,9 @@ import lang::php::analysis::NamePaths;
 import lang::php::analysis::cfg::BuildCFG;
 import lang::php::analysis::cfg::CFG;
 import lang::php::analysis::cfg::Util;
+import lang::php::analysis::includes::IncludesInfo;
+import lang::php::analysis::evaluators::Simplify;
+import lang::php::analysis::includes::QuickResolve;
 
 import Set;
 import Map;
@@ -60,6 +63,34 @@ public QueryString buildQueryString(c:call(name(name("mysql_query")), params)){
 		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_),_] : return querystring(c@at, [dynamicsnippet(v)], 4, 0);
 		default: throw "unhandled case";
 	}
+}
+
+@doc{Run the simplifier on the parameters being passed to this function}
+private Expr simplifyParams(Expr c:call(NameOrExpr funName, list[ActualParameter] parameters), loc baseLoc, IncludesInfo iinfo) {
+	list[ActualParameter] simplifiedParameters = [];
+	for (p:actualParameter(Expr expr, bool byRef) <- parameters) {
+		simplifiedParameters += p[expr=simplifyExpr(replaceConstants(expr,iinfo), baseLoc)];
+	}
+	return c[parameters=simplifiedParameters];
+}
+
+@doc{Build query string structures for all mysql_query calls in the corpus, simplifying the parameters to each call before building each structure}
+public set[QueryString] buildAndSimplifyQueryStrings() {
+	Corpus corpus = getCorpus();
+	set[QueryString] res = { };
+
+	for (p <- corpus, v := corpus[p]){
+		pt = loadBinary(p,v);
+		if (!(pt has baseLoc)) {
+			println("WARNING: Cannot simplify system <p> at version <v>, rep has no base location");
+			res = res + { buildQueryString(c) | /c:call(name(name("mysql_query")),_) := pt };
+		} else {
+			IncludesInfo iinfo = loadIncludesInfo(p, v);
+			res = res + { buildQueryString(simplifyParams(c, pt.baseLoc, iinfo)) | /c:call(name(name("mysql_query")),_) := pt };
+		}
+	}
+
+	return res;	
 }
 
 // returns snippets for the more complicated case of static sql concatenated with php variables, functions, etc.
