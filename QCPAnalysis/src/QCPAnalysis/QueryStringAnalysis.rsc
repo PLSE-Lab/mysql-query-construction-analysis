@@ -44,6 +44,20 @@ data QueryString = querystring(loc callloc, list[QuerySnippet] snippets, int que
 // represents a part of a SQL query
 data QuerySnippet = staticsnippet(str staticpart)
 				| dynamicsnippet(Expr dynamicpart);
+
+
+data QueryPatternCounts = counts(int qcp0, int qcp1, int qcp2, int qcp3, int qcp4, int qcp5);
+
+public QueryPatternCounts countQueryPatterns(){
+	querystrings = buildAndSimplifyQueryStrings();
+	qcp0 = size({qs | qs <- querystrings, qs.querypattern == 0});
+	qcp1 = size({qs | qs <- querystrings, qs.querypattern == 1});
+	qcp2 = size({qs | qs <- querystrings, qs.querypattern == 2});
+	qcp3 = size({qs | qs <- querystrings, qs.querypattern == 3});
+	qcp4 = size({qs | qs <- querystrings, qs.querypattern == 4});
+	qcp5 = size({qs | qs <- querystrings, qs.querypattern == 5});
+	return counts(qcp0, qcp1, qcp2, qcp3, qcp4, qcp5);
+}
 				
 // builds query string structures for all mysql_query calls in the corpus
 public set[QueryString] buildQueryStrings() = {s | call <- getMSQCorpusList(), s := buildQueryString(call)};

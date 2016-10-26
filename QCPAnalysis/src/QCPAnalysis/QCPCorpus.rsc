@@ -20,12 +20,12 @@ private Corpus originalCorpus = (
 	);
 	
 private Corpus newCorpus = (
-	//"firesoftboard" : "2.0.5",
+	"firesoftboard" : "2.0.5",
 	"MyPHPSchool"	: "0.3.1",
 	"OMS"			: "1.0.1",
 	"OpenClinic" 	: "0.8.2",
-	"UseBB"			: "1.0.16"
-	//"web2project"	: "3.3"
+	"UseBB"			: "1.0.16",
+	"web2project"	: "3.3"
 	);
 
 private Corpus corpus = originalCorpus + newCorpus;
