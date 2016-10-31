@@ -46,7 +46,7 @@ data QuerySnippet = staticsnippet(str staticpart)
 				| dynamicsnippet(Expr dynamicpart);
 
 // collection of boolean flags for each construction pattern
-data PatternFlags = flags(bool qcp0, bool qcp1, bool qcp2, bool qcp3, bool qcp4, bool qcp5);
+data PatternFlags = flags(bool unclassified, bool qcp1, bool qcp2, bool qcp3, bool qcp4, bool qcp5);
 		
 // builds query string structures for all mysql_query calls in the corpus
 public set[QueryString] buildQueryStrings() = {s | call <- getMSQCorpusList(), s := buildQueryString(call)};
@@ -133,19 +133,46 @@ public void writeCFGsAndQueryStrings(){
 	}
 }
 
-// classifies all query strings based on the Query Construction Patterns in the wiki
-public void classifyQueryStrings(){
-	set[QueryString] qs = buildAndSimplifyQueryStrings();
-	//QCP1 is identified when the query string is built, so no recognizer is needed
-	
-	recognizeQCP2(qs);
-	recognizeQCP3(qs);
-	recognizeQCP4(qs);
-	recognizeQCP5(qs);
-	println("counts: <countQueryPatterns()>");
-	for(q <- qs, q.querypattern == 0){
-		println("unmatched query string found at <q.callloc>");
+// builds and classifies all query strings based on the Query Construction Patterns in the wiki
+public set[QueryString] buildAndClassifyQueryStrings(){
+	Corpus corpus = getCorpus();
+	set[QueryString] res = {};
+	for(p <- corpus, v := corpus[p]){
+		set[QueryString] qs = {};
+		pt = loadBinary(p,v);
+		if (!pt has baseLoc) {
+			println("Skipping system <p>, version <v>, no base loc included");
+			continue;
+		}
+		else {
+			IncludesInfo iinfo = loadIncludesInfo(p, v);
+			qs = qs + { buildQueryString(simplifyParams(c, pt.baseLoc, iinfo)) | /c:call(name(name("mysql_query")),_) := pt };
+		}
+		neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { q.callloc.top | q <- qs } );
+		// get all query strings where unclassified flag is true (i.e. ones that need further classification)
+		for(q <- qs, q.flags.unclassified == true){
+			// get containingScript, containingCFG, and callNode for this query string
+			containingScript = pt.files[q.callloc.top];
+			containingCFG = findContainingCFG(containingScript, neededCFGs[q.callloc.top], q.callloc);
+			callNode = findNodeForExpr(containingCFG, q.callloc);
+			
+			// reference recognizers for this query string (no recognizer is needed for QCP1, since it doesnt need any analysis
+			q.flags.qcp2 = recognizeQCP2(q, containingCFG, callNode);
+			q.flags.qcp3 = recognizeQCP3(q, containingCFG, callNode);
+			q.flags.qcp4 = recognizeQCP4(q, containingCFG, callNode);
+			q.flags.qcp5 = recognizeQCP5(q, containingCFG, callNode);
+			
+			bool wasClassified = q.flags.qcp2 || q.flags.qcp3 || q.flags.qcp4 || q.flags.qcp5;
+			if(wasClassified){
+				q.flags.unclassified = false;
+			}
+			else{
+				println("Unclassified query found at <q.callloc>");
+			}
+		}
+		res = res + qs;
 	}
+	return res;
 }
 
 public void findReachableQueryStrings() {
@@ -215,16 +242,21 @@ public void findReachableQueryStrings() {
 	}
 }
 
-public set[QueryString] recognizeQCP2(set[QueryString] qs){
-	
+// case where there is a single literal assignment into the query variable
+public bool recognizeQCP2(QueryString qs, CFG cfg, CFGNode callnode){
+	// to be implemented
+	return false;
+}
+public bool recognizeQCP3(QueryString qs, CFG cfg, CFGNode callnode){
+	// to be implemented
+	return false;
 }
 
-public set[QueryString] recognizeQCP3(set[QueryString] qs){
+public bool recognizeQCP4(QueryString qs, CFG cfg, CFGNode callnode){
 	// to be implemented
+	return false;
 }
-public set[QueryString] recognizeQCP4(set[QueryString] qs){
+public bool recognizeQCP5(QueryString qs, CFG cfg, CFGNode callnode){
 	// to be implemented
-}
-public set[QueryString] recognizeQCP5(set[QueryString] qs){
-	// to be implemented
+	return false;
 }
