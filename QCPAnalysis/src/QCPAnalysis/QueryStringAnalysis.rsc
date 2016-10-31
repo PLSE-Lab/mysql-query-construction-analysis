@@ -39,7 +39,7 @@ loc cfglocp = |project://QCPAnalysis/cfgs/plain|;
 // See the Wiki of this GitHub Repository for more detailed information on pattern classifications
  
 // represents a Query string (parameter to a mysql_query call)
-data QueryString = querystring(loc callloc, list[QuerySnippet] snippets, int querygroup, int querypattern);
+data QueryString = querystring(loc callloc, list[QuerySnippet] snippets, int querypattern);
 
 // represents a part of a SQL query
 data QuerySnippet = staticsnippet(str staticpart)
@@ -66,16 +66,16 @@ public set[QueryString] buildQueryStrings() = {s | call <- getMSQCorpusList(), s
 // is looking at the parameter directly. All dynamic snippets will be further analyzed through the CFGs
 public QueryString buildQueryString(c:call(name(name("mysql_query")), params)){
 	switch(params){
-		case [actualParameter(scalar(string(s)), _)]: return querystring(c@at, [staticsnippet(s)], 1, 1);
-		case [actualParameter(scalar(string(s)), _), _]: return querystring(c@at, [staticsnippet(s)], 1, 1);
-		case [actualParameter(e:scalar(encapsed(_)),_)]: return querystring(c@at, buildQG2Snippets(e), 2, 0);
-		case [actualParameter(e:scalar(encapsed(_)), _),_]: return querystring(c@at, buildQG2Snippets(e), 2, 0);
-		case [actualParameter(e:binaryOperation(left,right,concat()),_)]: return querystring(c@at, buildQG2Snippets(e), 2, 0);
-		case [actualParameter(e:binaryOperation(left,right,concat()),_), _]: return querystring(c@at, buildQG2Snippets(e), 2, 0);
-		case [actualParameter(v:var(name(name(_))), _)] : return querystring(c@at, [dynamicsnippet(v)], 3, 0);
-		case [actualParameter(v:var(name(name(_))), _), _] : return querystring(c@at, [dynamicsnippet(v)], 3, 0);
-		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_)] : return querystring(c@at, [dynamicsnippet(v)], 4, 0);
-		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_),_] : return querystring(c@at, [dynamicsnippet(v)], 4, 0);
+		case [actualParameter(scalar(string(s)), _)]: return querystring(c@at, [staticsnippet(s)], 1);
+		case [actualParameter(scalar(string(s)), _), _]: return querystring(c@at, [staticsnippet(s)], 1);
+		case [actualParameter(e:scalar(encapsed(_)),_)]: return querystring(c@at, buildQG2Snippets(e), 0);
+		case [actualParameter(e:scalar(encapsed(_)), _),_]: return querystring(c@at, buildQG2Snippets(e), 0);
+		case [actualParameter(e:binaryOperation(left,right,concat()),_)]: return querystring(c@at, buildQG2Snippets(e), 0);
+		case [actualParameter(e:binaryOperation(left,right,concat()),_), _]: return querystring(c@at, buildQG2Snippets(e), 0);
+		case [actualParameter(v:var(name(name(_))), _)] : return querystring(c@at, [dynamicsnippet(v)], 0);
+		case [actualParameter(v:var(name(name(_))), _), _] : return querystring(c@at, [dynamicsnippet(v)], 0);
+		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_)] : return querystring(c@at, [dynamicsnippet(v)], 0);
+		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_),_] : return querystring(c@at, [dynamicsnippet(v)], 0);
 		default: throw "unhandled case";
 	}
 }
@@ -144,6 +144,21 @@ public void writeCFGsAndQueryStrings(){
 	}
 }
 
+// classifies all query strings based on the Query Construction Patterns in the wiki
+public void classifyQueryStrings(){
+	set[QueryString] qs = buildAndSimplifyQueryStrings();
+	//QCP1 is identified when the query string is built, so no recognizer is needed
+	
+	recognizeQCP2(qs);
+	recognizeQCP3(qs);
+	recognizeQCP4(qs);
+	recognizeQCP5(qs);
+	println("counts: <countQueryPatterns()>");
+	for(q <- qs, q.querypattern == 0){
+		println("unmatched query string found at <q.callloc>");
+	}
+}
+
 public void findReachableQueryStrings() {
 	Corpus corpus = getCorpus();
 	for (p <- corpus, v := corpus[p]) {
@@ -161,7 +176,6 @@ public void findReachableQueryStrings() {
 			containingScript = pt.files[c@at.top];
 			containingCFG = findContainingCFG(containingScript, neededCFGs[c@at.top], c@at);
 			callNode = findNodeForExpr(containingCFG, c);
-			
 			// NOTE: It would be better to have a reaching definitions analysis for this. Since that is still under
 			// development, we instead simulate this for common cases.
 			
@@ -210,4 +224,17 @@ public void findReachableQueryStrings() {
 			}
 		} 
 	}
+}
+
+public void recognizeQCP2(set[QueryString] qs){
+	// to be implemented
+}
+public void recognizeQCP3(set[QueryString] qs){
+	// to be implemented
+}
+public void recognizeQCP4(set[QueryString] qs){
+	// to be implemented
+}
+public void recognizeQCP5(set[QueryString] qs){
+	// to be implemented
 }
