@@ -138,19 +138,21 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 	Corpus corpus = getCorpus();
 	set[QueryString] corpusres = {};
 	for(p <- corpus, v := corpus[p]){
-		set[QueryString] qs = {};
 		pt = loadBinary(p,v);
 		if (!pt has baseLoc) {
 			println("Skipping system <p>, version <v>, no base loc included");
 			continue;
 		}
 		IncludesInfo iinfo = loadIncludesInfo(p, v);
-		qs = { buildQueryString(simplifyParams(c, pt.baseLoc, iinfo)) | /c:call(name(name("mysql_query")),_) := pt };
-		neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { q.callloc.top | q <- qs } );
-		sysres = {};
-		for(q <- qs){
-			// checks whether analysis is needed on this query string
-			if(q.flags.unclassified == true){
+		callsOfInterest = [ c | /c:call(name(name("mysql_query")),[actualParameter(var(name(name(_))),false),_*]) := pt ];
+		println("Calls in system <p>, version <v> (total = <size(callsOfInterest)>):");
+		neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { c@at.top | c <- callsOfInterest } );
+		set[QueryString] sysres = {};
+		for(c <- callsOfInterest){
+			QueryString qs =  buildQueryString(simplifyParams(c, pt.baseLoc, iinfo));
+			// case of a variable parameter
+			if(call(_,[actualParameter(var(name(name(queryVar))),_),_*]) := c){
+			
 				bool assignsScalarToQueryVar(CFGNode cn) {
 					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
 						simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
@@ -185,31 +187,20 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 					throw "gather should only be called when pred returns true";
 				}
 			
-				// cases where the parameter to the call is a php variable
-				if(size(q.snippets) == 1 && d:dynamicsnippet(var(name(name(_)))) := getOneFrom(q.snippets)){
-					containingScript = pt.files[q.callloc.top];
-					containingCFG = findContainingCFG(containingScript, neededCFGs[q.callloc.top], q.callloc);
-					//callNode = findNodeForExpr(containingCFG, q.callloc);
-					varNode = findNodeForExpr(containingCFG, d.dynamicpart);
-					gr = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), varNode, assignsScalarToQueryVar, assignsNonScalarToQueryVar, getAssignedScalar);
-			
-					// QCP2 recognizer (case where a single string literal is assigned to the query variable)
-					if(gr.trueOnAllPaths && size(gr.results) == 1){
-						q.flags.qcp2 = true;
-						println("QCP2 occurrence found at <q.callloc>");
-					}
+				containingScript = pt.files[c@at.top];
+				containingCFG = findContainingCFG(containingScript, neededCFGs[c@at.top], c@at);
+				callNode = findNodeForExpr(containingCFG, c);
+				gr = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, assignsScalarToQueryVar, assignsNonScalarToQueryVar, getAssignedScalar);
+							
+				// QCP2 recognizer (case where a single string literal is assigned to the query variable)
+				if(gr.trueOnAllPaths && size(gr.results) == 1){
+					qs.flags.unclassified = false;
+					qs.flags.qcp2 = true;
+					println("QCP2 occurrence found at <c@at>");
+				}
 				// TODO: write recognizers for the other Query Construction Patterns
-				}
-			
-				bool wasClassified = q.flags.qcp2 || q.flags.qcp3 || q.flags.qcp4 || q.flags.qcp5;
-				if(wasClassified){
-					q.flags.unclassified = false;
-				//}
-				//else{
-				//	println("Unclassified query found at <q.callloc>");
-				}
 			}
-			sysres += q;
+			sysres += qs;
 		}
 		corpusres = corpusres + sysres;
 	}
@@ -218,7 +209,6 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 
 public void findReachableQueryStrings() {
 	Corpus corpus = getCorpus();
-	int x = 0;
 	for (p <- corpus, v := corpus[p]) {
 		pt = loadBinary(p, v);
 		if (!pt has baseLoc) {
@@ -274,7 +264,6 @@ public void findReachableQueryStrings() {
 			
 			gr = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, assignsScalarToQueryVar, assignsNonScalarToQueryVar, getAssignedScalar);
 			if (gr.trueOnAllPaths) {
-				if(size(gr.results) == 1) x = x + 1;
 				println("For call at location <c@at>, found <size(gr.results)> literal assignments into the query variable");
 			//} else {
 			//	println("For call at location <c@at>, no assignment of a string literal to the query var was found on at least one reaching path");
