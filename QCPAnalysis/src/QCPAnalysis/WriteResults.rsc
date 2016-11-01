@@ -50,5 +50,5 @@ public void writeQG(){
 }
 
 public void writeQueryStrings(){
-	iprintToFile(strings, buildQueryStrings());
+	iprintToFile(strings, {q | q <- buildAndClassifyQueryStrings(), q.flags.qcp2 == true});
 }

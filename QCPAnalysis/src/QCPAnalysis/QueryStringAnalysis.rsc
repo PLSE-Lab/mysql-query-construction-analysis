@@ -136,7 +136,7 @@ public void writeCFGsAndQueryStrings(){
 // builds and classifies all query strings based on the Query Construction Patterns in the wiki
 public set[QueryString] buildAndClassifyQueryStrings(){
 	Corpus corpus = getCorpus();
-	set[QueryString] res = {};
+	set[QueryString] corpusres = {};
 	for(p <- corpus, v := corpus[p]){
 		set[QueryString] qs = {};
 		pt = loadBinary(p,v);
@@ -144,39 +144,81 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 			println("Skipping system <p>, version <v>, no base loc included");
 			continue;
 		}
-		else {
-			IncludesInfo iinfo = loadIncludesInfo(p, v);
-			qs = qs + { buildQueryString(simplifyParams(c, pt.baseLoc, iinfo)) | /c:call(name(name("mysql_query")),_) := pt };
-		}
+		IncludesInfo iinfo = loadIncludesInfo(p, v);
+		qs = { buildQueryString(simplifyParams(c, pt.baseLoc, iinfo)) | /c:call(name(name("mysql_query")),_) := pt };
 		neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { q.callloc.top | q <- qs } );
-		// get all query strings where unclassified flag is true (i.e. ones that need further classification)
-		for(q <- qs, q.flags.unclassified == true){
-			// get containingScript, containingCFG, and callNode for this query string
-			containingScript = pt.files[q.callloc.top];
-			containingCFG = findContainingCFG(containingScript, neededCFGs[q.callloc.top], q.callloc);
-			callNode = findNodeForExpr(containingCFG, q.callloc);
+		sysres = {};
+		for(q <- qs){
+			// checks whether analysis is needed on this query string
+			if(q.flags.unclassified == true){
+				bool assignsScalarToQueryVar(CFGNode cn) {
+					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+						simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+						if (scalar(string(_)) := simplifiedQueryExpr) {
+							return true;
+						}
+					}
+					return false;
+				}
 			
-			// reference recognizers for this query string (no recognizer is needed for QCP1, since it doesnt need any analysis
-			q.flags.qcp2 = recognizeQCP2(q, containingCFG, callNode);
-			q.flags.qcp3 = recognizeQCP3(q, containingCFG, callNode);
-			q.flags.qcp4 = recognizeQCP4(q, containingCFG, callNode);
-			q.flags.qcp5 = recognizeQCP5(q, containingCFG, callNode);
+				// If we have a non-literal assignment to the query var, then we stop looking, that "spoils" any
+				// literal assignment we could find above, e.g., $x = goodValue, $x .= badValue. 
+				bool assignsNonScalarToQueryVar(CFGNode cn) {
+					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+						simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+						if (scalar(string(_)) !:= simplifiedQueryExpr) {
+							return true;
+						}
+					} else if (exprNode(assignWOp(var(name(name(queryVar))),queryExpr,_),_) := cn) {
+						return true;
+					}
+					return false;			
+				}
 			
-			bool wasClassified = q.flags.qcp2 || q.flags.qcp3 || q.flags.qcp4 || q.flags.qcp5;
-			if(wasClassified){
-				q.flags.unclassified = false;
+				Expr getAssignedScalar(CFGNode cn) {
+					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+						simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+						if (ss:scalar(string(_)) := simplifiedQueryExpr) {
+							return ss;
+						}
+					}	
+					throw "gather should only be called when pred returns true";
+				}
+			
+				// cases where the parameter to the call is a php variable
+				if(size(q.snippets) == 1 && d:dynamicsnippet(var(name(name(_)))) := getOneFrom(q.snippets)){
+					containingScript = pt.files[q.callloc.top];
+					containingCFG = findContainingCFG(containingScript, neededCFGs[q.callloc.top], q.callloc);
+					//callNode = findNodeForExpr(containingCFG, q.callloc);
+					varNode = findNodeForExpr(containingCFG, d.dynamicpart);
+					gr = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), varNode, assignsScalarToQueryVar, assignsNonScalarToQueryVar, getAssignedScalar);
+			
+					// QCP2 recognizer (case where a single string literal is assigned to the query variable)
+					if(gr.trueOnAllPaths && size(gr.results) == 1){
+						q.flags.qcp2 = true;
+						println("QCP2 occurrence found at <q.callloc>");
+					}
+				// TODO: write recognizers for the other Query Construction Patterns
+				}
+			
+				bool wasClassified = q.flags.qcp2 || q.flags.qcp3 || q.flags.qcp4 || q.flags.qcp5;
+				if(wasClassified){
+					q.flags.unclassified = false;
+				//}
+				//else{
+				//	println("Unclassified query found at <q.callloc>");
+				}
 			}
-			else{
-				println("Unclassified query found at <q.callloc>");
-			}
+			sysres += q;
 		}
-		res = res + qs;
+		corpusres = corpusres + sysres;
 	}
-	return res;
+	return corpusres;
 }
 
 public void findReachableQueryStrings() {
 	Corpus corpus = getCorpus();
+	int x = 0;
 	for (p <- corpus, v := corpus[p]) {
 		pt = loadBinary(p, v);
 		if (!pt has baseLoc) {
@@ -187,7 +229,6 @@ public void findReachableQueryStrings() {
 		println("Calls in system <p>, version <v> (total = <size(callsOfInterest)>):");
 		neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { c@at.top | c <- callsOfInterest } );
 		IncludesInfo iinfo = loadIncludesInfo(p, v);
-		
 		for (c:call(_,[actualParameter(var(name(name(queryVar))),_),_*]) <- callsOfInterest) {
 			containingScript = pt.files[c@at.top];
 			containingCFG = findContainingCFG(containingScript, neededCFGs[c@at.top], c@at);
@@ -232,31 +273,13 @@ public void findReachableQueryStrings() {
 			}
 			
 			gr = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, assignsScalarToQueryVar, assignsNonScalarToQueryVar, getAssignedScalar);
-			
 			if (gr.trueOnAllPaths) {
+				if(size(gr.results) == 1) x = x + 1;
 				println("For call at location <c@at>, found <size(gr.results)> literal assignments into the query variable");
 			//} else {
 			//	println("For call at location <c@at>, no assignment of a string literal to the query var was found on at least one reaching path");
 			}
 		} 
 	}
-}
-
-// case where there is a single literal assignment into the query variable
-public bool recognizeQCP2(QueryString qs, CFG cfg, CFGNode callnode){
-	// to be implemented
-	return false;
-}
-public bool recognizeQCP3(QueryString qs, CFG cfg, CFGNode callnode){
-	// to be implemented
-	return false;
-}
-
-public bool recognizeQCP4(QueryString qs, CFG cfg, CFGNode callnode){
-	// to be implemented
-	return false;
-}
-public bool recognizeQCP5(QueryString qs, CFG cfg, CFGNode callnode){
-	// to be implemented
-	return false;
+	println(x);
 }
