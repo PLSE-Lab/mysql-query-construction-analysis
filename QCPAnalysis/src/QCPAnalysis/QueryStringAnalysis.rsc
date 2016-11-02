@@ -144,14 +144,15 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 			continue;
 		}
 		IncludesInfo iinfo = loadIncludesInfo(p, v);
-		callsOfInterest = [ c | /c:call(name(name("mysql_query")),[actualParameter(var(name(name(_))),false),_*]) := pt ];
-		println("Calls in system <p>, version <v> (total = <size(callsOfInterest)>):");
-		neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { c@at.top | c <- callsOfInterest } );
+		calls = [ c | /c:call(name(name("mysql_query")),_) := pt ];
+		println("Calls in system <p>, version <v> (total = <size(calls)>):");
+		neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { c@at.top | c <- calls } );
 		set[QueryString] sysres = {};
-		for(c <- callsOfInterest){
+		for(c <- calls){
 			QueryString qs =  buildQueryString(simplifyParams(c, pt.baseLoc, iinfo));
+			
 			// case of a variable parameter
-			if(call(_,[actualParameter(var(name(name(queryVar))),_),_*]) := c){
+			if(call(_,[actualParameter(var(name(name(queryVar))),false),_*]) := c){
 			
 				bool assignsScalarToQueryVar(CFGNode cn) {
 					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
@@ -196,10 +197,17 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 				if(gr.trueOnAllPaths && size(gr.results) == 1){
 					qs.flags.unclassified = false;
 					qs.flags.qcp2 = true;
-					println("QCP2 occurrence found at <c@at>");
+					println("QCP2 occurrence found at <c@at>. Single literal assignment into the query variable: <getOneFrom(qs.snippets)>");
 				}
-				// TODO: write recognizers for the other Query Construction Patterns
 			}
+			
+			// code for Query Group 2 cases here
+			//else if(){
+			
+			//}
+			//else{
+				//println("unclassified query found at c@at");
+			//}
 			sysres += qs;
 		}
 		corpusres = corpusres + sysres;
@@ -270,5 +278,4 @@ public void findReachableQueryStrings() {
 			}
 		} 
 	}
-	println(x);
 }
