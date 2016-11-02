@@ -188,8 +188,8 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 					throw "gather should only be called when pred returns true";
 				}
 			
-				containingScript = pt.files[c@at.top];
-				containingCFG = findContainingCFG(containingScript, neededCFGs[c@at.top], c@at);
+				containingScript = pt.files[qs.callloc.top];
+				containingCFG = findContainingCFG(containingScript, neededCFGs[qs.callloc.top], qs.callloc);
 				callNode = findNodeForExpr(containingCFG, c);
 				gr = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, assignsScalarToQueryVar, assignsNonScalarToQueryVar, getAssignedScalar);
 							
@@ -197,7 +197,21 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 				if(gr.trueOnAllPaths && size(gr.results) == 1){
 					qs.flags.unclassified = false;
 					qs.flags.qcp2 = true;
-					println("QCP2 occurrence found at <c@at>. Single literal assignment into the query variable: <getOneFrom(qs.snippets)>");
+					println("QCP2 occurrence found at <qs.callloc>");
+				}
+				
+				// QCP3 recognizer (cascading literal assignments)
+				else if(matchesQCP3(containingScript, qs)){
+					qs.flags.unclassified = false;
+					qs.flags.qcp3 = true;
+					println("QCP3 occurrence found at <qs.callloc>");
+				}
+				
+				// QCP4 recognizer (assignments distributed over control flow structures
+				else if(matchesQCP4(containingCFG, callNode, qs)){
+					qs.flags.unclassified = false;
+					qs.flags.qcp4 = true;
+					println("QCP3 occurrence found at <qs.callloc>");
 				}
 			}
 			
@@ -278,4 +292,14 @@ public void findReachableQueryStrings() {
 			}
 		} 
 	}
+}
+
+public bool matchesQCP3(Script scr, QueryString qs){
+	// to be implemented
+	return false;
+}
+
+public bool matchesQCP4(CFG cfg, CFGNode callNode, QueryString qs){
+	// to be implemented
+	return false;
 }
