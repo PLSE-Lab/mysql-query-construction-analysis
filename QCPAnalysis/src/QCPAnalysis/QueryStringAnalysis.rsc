@@ -133,6 +133,17 @@ public void writeCFGsAndQueryStrings(){
 	}
 }
 
+
+public void reportQCPCounts(){
+	qs = buildAndClassifyQueryStrings();
+	println("Number of QCP1 cases: <size({q | q <- qs, q.flags.qcp1 == true})>");
+	println("Number of QCP2 cases: <size({q | q <- qs, q.flags.qcp2 == true})>");
+	println("Number of QCP3 cases: <size({q | q <- qs, q.flags.qcp3 == true})>");
+	println("Number of QCP4 cases: <size({q | q <- qs, q.flags.qcp4 == true})>");
+	println("Number of QCP5 cases: <size({q | q <- qs, q.flags.qcp5 == true})>");
+	println("Number of unclassified cases: <size({q | q <- qs, q.flags.unclassified == true})>");
+}
+
 // builds and classifies all query strings based on the Query Construction Patterns in the wiki
 public set[QueryString] buildAndClassifyQueryStrings(){
 	Corpus corpus = getCorpus();
@@ -154,6 +165,8 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 			// case of a variable parameter
 			if(call(_,[actualParameter(var(name(name(queryVar))),false),_*]) := c){
 			
+				// If we have a standard literal assignment to the query var, then we can use the assigned value
+				// TODO: This does not handle cascades of .= assignments.
 				bool assignsScalarToQueryVar(CFGNode cn) {
 					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
 						simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
@@ -177,7 +190,20 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 					}
 					return false;			
 				}
-			
+				
+				// case where the variable is assigned a query string that is a concatenation or interpolation of string literals
+				// and PHP variables, function calls, etc.
+				bool assignsConcatOrEncapsedToQueryVar(CFGNode cn){
+					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+						simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+						if (scalar(encapsed(_)) := simplifiedQueryExpr || binaryOperation(left,right,concat()) := simplifiedQueryExpr) {
+							return true;
+						}
+					} 
+					return false;			
+				}
+				bool notAssignsConcatOrEncapsedToQueryVar(CFGNode cn) = !assignsConcatOrEncapsedToQueryVar(cn);
+				
 				Expr getAssignedScalar(CFGNode cn) {
 					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
 						simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
@@ -187,40 +213,63 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 					}	
 					throw "gather should only be called when pred returns true";
 				}
+				
+				Expr getAssignedConcatOrEncapsed(CFGNode cn){
+					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+						simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+						if (e:scalar(encapsed(_)) := simplifiedQueryExpr) {
+							return e;
+						}
+						else if(e:binaryOperation(left, right, concat()) := simplifiedQueryExpr){
+							return e;
+						}
+					}	
+					throw "gather should only be called when pred returns true";
+				}
 			
 				containingScript = pt.files[qs.callloc.top];
 				containingCFG = findContainingCFG(containingScript, neededCFGs[qs.callloc.top], qs.callloc);
 				callNode = findNodeForExpr(containingCFG, c);
-				gr = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, assignsScalarToQueryVar, assignsNonScalarToQueryVar, getAssignedScalar);
-							
+				literalGR = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, assignsScalarToQueryVar, assignsNonScalarToQueryVar, getAssignedScalar);
+				concatOrEncapsedGR = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, 
+					assignsConcatOrEncapsedToQueryVar, notAssignsConcatOrEncapsedToQueryVar, getAssignedConcatOrEncapsed);
+						
 				// QCP2 recognizer (case where a single string literal is assigned to the query variable)
-				if(gr.trueOnAllPaths && size(gr.results) == 1){
+				if(literalGR.trueOnAllPaths && size(literalGR.results) == 1){
 					qs.flags.unclassified = false;
 					qs.flags.qcp2 = true;
-					println("QCP2 occurrence found at <qs.callloc>");
+					//println("QCP2 occurrence found at <qs.callloc>");
 				}
 				
-				// QCP3 recognizer (cascading literal assignments)
-				else if(matchesQCP3(containingScript, qs)){
+				// QCP4 recognizer (assignments distributed over control flow structures)
+				//else if(...){
+				
+				//}
+				
+				// QCP5 recognizer (variable is assigned query string that contains literals and php variables, functions, etc encapsed or concatenated)
+				else if(concatOrEncapsedGR.trueOnAllPaths && size(concatOrEncapsedGr.results) == 1){
 					qs.flags.unclassified = false;
-					qs.flags.qcp3 = true;
-					println("QCP3 occurrence found at <qs.callloc>");
+					qs.flags.qcp5 = true;
+					println("QCP5 occurrence found at <qs.callloc>");
 				}
 				
-				// QCP4 recognizer (assignments distributed over control flow structures
-				else if(matchesQCP4(containingCFG, callNode, qs)){
-					qs.flags.unclassified = false;
-					qs.flags.qcp4 = true;
-					println("QCP3 occurrence found at <qs.callloc>");
-				}
+				// cascading assignment recognizer. this could either be a case of QCP3 (cascading literal assignments)
+				// or a case of QCP5 (cascading assignments that are a mixture of literals and PHP variables, function calls, etc.)
+				//else{
+				//...
+				//}
+				
 			}
 			
-			// code for Query Group 2 cases here
-			//else if(){
-			
-			//}
+			// QCP5 recognizer where the parameter is literals and php variables, function calls, etc concatenated or encapsed
+			else if(call(_,[actualParameter(scalar(encapsed(_)),false),_*]) := c
+				|| call(_,[actualParameter(binaryOperation(left, right, concat()),false),_*]) := c){
+				qs.flags.unclassified = false;
+				qs.flags.qcp5 = true;
+				println("QCP5 occurrence found at <qs.callloc>");
+			}
 			//else{
-				//println("unclassified query found at c@at");
+				// println("unclassified query found at c@at");
 			//}
 			sysres += qs;
 		}
@@ -292,14 +341,4 @@ public void findReachableQueryStrings() {
 			}
 		} 
 	}
-}
-
-public bool matchesQCP3(Script scr, QueryString qs){
-	// to be implemented
-	return false;
-}
-
-public bool matchesQCP4(CFG cfg, CFGNode callNode, QueryString qs){
-	// to be implemented
-	return false;
 }
