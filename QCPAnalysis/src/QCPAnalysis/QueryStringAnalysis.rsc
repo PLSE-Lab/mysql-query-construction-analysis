@@ -202,7 +202,18 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 					} 
 					return false;			
 				}
-				bool notAssignsConcatOrEncapsedToQueryVar(CFGNode cn) = !assignsConcatOrEncapsedToQueryVar(cn);
+				
+				bool notAssignsConcatOrEncapsedToQueryVar(CFGNode cn) {
+					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+						simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+						if (scalar(encapsed(_)) := simplifiedQueryExpr || binaryOperation(left,right,concat()) := simplifiedQueryExpr) {
+							return false;
+						} else {
+							return true;
+						}
+					} 
+					return false;				
+				}
 				
 				Expr getAssignedScalar(CFGNode cn) {
 					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
@@ -247,7 +258,7 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 				//}
 				
 				// QCP5 recognizer (variable is assigned query string that contains literals and php variables, functions, etc encapsed or concatenated)
-				else if(concatOrEncapsedGR.trueOnAllPaths && size(concatOrEncapsedGr.results) == 1){
+				else if(concatOrEncapsedGR.trueOnAllPaths && size(concatOrEncapsedGR.results) == 1){
 					qs.flags.unclassified = false;
 					qs.flags.qcp5 = true;
 					println("QCP5 occurrence found at <qs.callloc>");
