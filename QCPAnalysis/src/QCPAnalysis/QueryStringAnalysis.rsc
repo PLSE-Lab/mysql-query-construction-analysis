@@ -253,12 +253,11 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 					println("QCP5 occurrence found at <qs.callloc>");
 				}
 				
-				// cascading assignment recognizer. this could either be a case of QCP3 (cascading literal assignments)
+				// check for cascading assignments this could either be a case of QCP3 (cascading literal assignments)
 				// or a case of QCP5 (cascading assignments that are a mixture of literals and PHP variables, function calls, etc.)
-				//else{
-				//...
-				//}
-				
+				else{
+					qs = checkCascading(containingScript, qs);
+				}				
 			}
 			
 			// QCP5 recognizer where the parameter is literals and php variables, function calls, etc concatenated or encapsed
@@ -276,6 +275,13 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 		corpusres = corpusres + sysres;
 	}
 	return corpusres;
+}
+
+public QueryString checkCascading(Script scr, QueryString qs){
+	top-down visit(scr){
+		// to be implemented
+		case false: {};
+	}
 }
 
 public void findReachableQueryStrings() {
