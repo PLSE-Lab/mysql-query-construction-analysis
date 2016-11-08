@@ -144,6 +144,19 @@ public void reportQCPCounts(){
 	println("Number of unclassified cases: <size({q | q <- qs, q.flags.unclassified == true})>");
 }
 
+public set[QueryString] getQCP(int id){
+	qs = buildAndClassifyQueryStrings();
+	switch(id){
+		case 0 : return {q | q <- qs, q.flags.unclassified == true};
+		case 1 : return {q | q <- qs, q.flags.qcp1 == true};
+		case 2 : return {q | q <- qs, q.flags.qcp2 == true};
+		case 3 : return {q | q <- qs, q.flags.qcp3 == true};
+		case 4 : return {q | q <- qs, q.flags.qcp4 == true};
+		case 5 : return {q | q <- qs, q.flags.qcp5 == true};
+		default: throw "Value must be between 0 and 5";
+	}
+}
+
 // builds and classifies all query strings based on the Query Construction Patterns in the wiki
 public set[QueryString] buildAndClassifyQueryStrings(){
 	Corpus corpus = getCorpus();
@@ -293,6 +306,7 @@ public QueryString checkCascading(Script scr, QueryString qs){
 		// to be implemented
 		case false: {};
 	}
+	return qs;
 }
 
 public void findReachableQueryStrings() {
