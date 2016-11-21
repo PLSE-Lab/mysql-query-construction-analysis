@@ -258,23 +258,33 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 				concatOrEncapsedGR = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, 
 					assignsConcatOrEncapsedToQueryVar, notAssignsConcatOrEncapsedToQueryVar, getAssignedConcatOrEncapsed);
 						
-				// QCP2 recognizer (case where a single string literal is assigned to the query variable)
-				if(literalGR.trueOnAllPaths && size(literalGR.results) == 1){
-					qs.flags.unclassified = false;
-					qs.flags.qcp2 = true;
-					//println("QCP2 occurrence found at <qs.callloc>");
+				if(literalGR.trueOnAllPaths){
+					// QCP2 recognizer (case where a single string literal is assigned to the query variable)
+					if(size(literalGR.results) == 1){
+						qs.flags.unclassified = false;
+						qs.flags.qcp2 = true;
+					}
+					
+					// QCP4: multiple possible assignments
+					else{
+						qs.flags.unclassified = false;
+						qs.flags.qcp4 = true;	
+					}
 				}
 				
-				// QCP4 recognizer (assignments distributed over control flow structures)
-				//else if(...){
-				
-				//}
-				
-				// QCP5 recognizer (variable is assigned query string that contains literals and php variables, functions, etc encapsed or concatenated)
-				else if(concatOrEncapsedGR.trueOnAllPaths && size(concatOrEncapsedGR.results) == 1){
-					qs.flags.unclassified = false;
-					qs.flags.qcp5 = true;
-					println("QCP5 occurrence found at <qs.callloc>");
+				else if(concatOrEncapsedGR.trueOnAllPaths){
+					// QCP5 recognizer (variable is assigned query string that contains literals and php variables, functions, etc encapsed or concatenated)
+					if(size(concatOrEncapsedGR.results) == 1){
+						qs.flags.unclassified = false;
+						qs.flags.qcp5 = true;
+						println("QCP5 occurrence found at <qs.callloc>");
+					}
+					
+					// QCP4: multiple possible assignments
+					else{
+						qs.flags.unclassified = false;
+						qs.flags.qcp4 = true;	
+					}
 				}
 				
 				// check for cascading assignments this could either be a case of QCP3 (cascading literal assignments)
@@ -291,9 +301,9 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 				qs.flags.qcp5 = true;
 				println("QCP5 occurrence found at <qs.callloc>");
 			}
-			//else{
-				// println("unclassified query found at c@at");
-			//}
+			else{
+				println("unclassified query found at c@at");
+			}
 			sysres += qs;
 		}
 		corpusres = corpusres + sysres;
@@ -302,10 +312,7 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 }
 
 public QueryString checkCascading(Script scr, QueryString qs){
-	top-down visit(scr){
-		// to be implemented
-		case false: {};
-	}
+	// to be implemneted
 	return qs;
 }
 
