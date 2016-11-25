@@ -369,8 +369,8 @@ public void findReachableQueryStrings() {
 
 data ConcatBuilder = concatBuilder(str varName, list[Expr] queryParts, loc startsAt, Expr queryExpr, loc usedAt);
 
-public set[ConcatBuilder] concatAssignments() {
-	set[ConcatBuilder] res = { };
+public rel[str system, str version, ConcatBuilder occurrence] concatAssignments() {
+	rel[str system, str version, ConcatBuilder occurrence] res = { };
 	corpus = getCorpus();
 
 	cfgsForScripts = ( );
@@ -431,7 +431,7 @@ public set[ConcatBuilder] concatAssignments() {
 							}
 						}
 						allUsingQueries = findAllReachedUntil(neededCFGAsGraph, startNode, foundQueryCall, foundAnotherAssignment, collectQueryCall);
-						res = res + { concatBuilder(varName, queryParts, firstPart@at, queryCallExpr, queryCallLoc) | < queryCallExpr, queryCallLoc > <- allUsingQueries };
+						res = res + { < systemName, systemVersion, concatBuilder(varName, queryParts, firstPart@at, queryCallExpr, queryCallLoc) > | < queryCallExpr, queryCallLoc > <- allUsingQueries };
 					}
 				}
 			}
