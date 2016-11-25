@@ -66,7 +66,7 @@ public QueryString buildQueryString(c:call(name(name("mysql_query")), params)){
 }
 
 // used for rebuilding a string with a variable parameter where we know that 
-// the variable containseither a string literal, a encapsed string, or the result of a concat operation
+// the variable contains either a string literal, a encapsed string, or the result of a concat operation
 public QueryString replaceVar(QueryString qs, Expr e){
 	switch(e){
 		case scalar(string(s)) : return querystring(qs.callloc, [staticsnippet(s)], qs.flags);
@@ -365,4 +365,78 @@ public void findReachableQueryStrings() {
 			}
 		} 
 	}
+}
+
+data ConcatBuilder = concatBuilder(str varName, list[Expr] queryParts, loc startsAt, Expr queryExpr, loc usedAt);
+
+public set[ConcatBuilder] concatAssignments() {
+	set[ConcatBuilder] res = { };
+	corpus = getCorpus();
+
+	cfgsForScripts = ( );
+	
+	for (systemName <- corpus, systemVersion := corpus[systemName]) {
+		theSystem = loadBinary(systemName, systemVersion);
+		
+		for (scriptLoc <- theSystem.files) {
+			Script scr = theSystem.files[scriptLoc];
+			
+			// Find calls to mysql_query in this script that use a variable to store the query. We want to
+			// check to see which queries formed using concatenations reach this query.
+			queryCalls = { < queryCall, varName, queryCall@at > | 
+				/queryCall:call(name(name("mysql_query")), [actualParameter(var(name(name(varName))),_),*_]) := scr };
+			
+			for ( varName <- queryCalls<1>) {
+				// Are there assignments with following appends into the query variable?
+				for ( /[_*,exprstmt(firstPart:assign(var(name(name(varName))),firstQueryPart)),*after] := scr ) {
+					queryParts = [ firstQueryPart ];
+					for (possibleConcat <- after) {
+						if (exprstmt(assignWOp(var(name(name(varName))),queryPart,concat())) := possibleConcat) {
+							queryParts = queryParts + queryPart;
+						} else {
+							break;
+						}
+					}
+					if (size(queryParts) > 1) {
+						//println("Found a concat query starting at <firstPart@at> with <size(queryParts)> parts, for variable <varName>");
+						if (scriptLoc notin cfgsForScripts) {
+							cfgsForScripts[scriptLoc] = buildCFGs(scr, buildBasicBlocks=false);
+						}
+						scriptCFGs = cfgsForScripts[scriptLoc];
+						neededCFG = findContainingCFG(scr, scriptCFGs, queryParts[-1]@at);
+						neededCFGAsGraph = cfgAsGraph(neededCFG);
+						startNode = findNodeForExpr(neededCFG, queryParts[-1]@at);
+						
+						// Now, make sure the query is actually reachable
+						// bool(CFGNode cn) pred, bool(CFGNode cn) stop, &T (CFGNode cn) gather
+						bool foundQueryCall(CFGNode cn) {
+							if (exprNode(call(name(name("mysql_query")), [actualParameter(var(name(name(varName))),_),*_]),_) := cn) {
+								return true;
+							} else {
+								return false;
+							}
+						}
+						tuple[Expr,loc] collectQueryCall(CFGNode cn) {
+							if (exprNode(exprToCollect:call(name(name("mysql_query")), [actualParameter(var(name(name(varName))),_),*_]),_) := cn) {
+								return < exprToCollect, exprToCollect@at >;
+							} else {
+								throw "Given unexpected node: <cn>";
+							}
+						}
+						bool foundAnotherAssignment(CFGNode cn) {
+							if (exprNode(potential:assign(var(name(name(varName))),_),_) := cn && potential@at != firstPart@at) {
+								return true;
+							} else {
+								return false;
+							}
+						}
+						allUsingQueries = findAllReachedUntil(neededCFGAsGraph, startNode, foundQueryCall, foundAnotherAssignment, collectQueryCall);
+						res = res + { concatBuilder(varName, queryParts, firstPart@at, queryCallExpr, queryCallLoc) | < queryCallExpr, queryCallLoc > <- allUsingQueries };
+					}
+				}
+			}
+		}
+	}
+
+	return res;
 }
