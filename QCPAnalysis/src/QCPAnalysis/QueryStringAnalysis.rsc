@@ -42,7 +42,7 @@ data QuerySnippet = staticsnippet(str staticpart)
 				| dynamicsnippet(Expr dynamicpart);
 
 // collection of boolean flags for each construction pattern
-data PatternFlags = flags(bool unclassified, bool qcp1, bool qcp2, bool qcp3a, bool qcp3b, bool qcp4);
+data PatternFlags = flags(bool unclassified, bool qcp1, bool qcp2, bool qcp3a, bool qcp3b, bool qcp4, bool qcp5);
 		
 // builds query string structures for all mysql_query calls in the corpus without classifying them
 public set[QueryString] buildQueryStrings() = {s | call <- getMSQCorpusList(), s := buildQueryString(call)};
@@ -51,16 +51,16 @@ public set[QueryString] buildQueryStrings() = {s | call <- getMSQCorpusList(), s
 // is looking at the parameter directly. All dynamic snippets will be further analyzed through the CFGs
 public QueryString buildQueryString(c:call(name(name("mysql_query")), params)){
 	switch(params){
-		case [actualParameter(scalar(string(s)), _)]: return querystring(c@at, [staticsnippet(s)], flags(false, true, false, false, false, false));
-		case [actualParameter(scalar(string(s)), _), _]: return querystring(c@at, [staticsnippet(s)], flags(false, true, false, false, false, false));
-		case [actualParameter(e:scalar(encapsed(_)),_)]: return querystring(c@at, buildQG2Snippets(e),flags(true, false, false, false, false, false));
-		case [actualParameter(e:scalar(encapsed(_)), _),_]: return querystring(c@at, buildQG2Snippets(e), flags(true, false, false, false, false, false));
-		case [actualParameter(e:binaryOperation(left,right,concat()),_)]: return querystring(c@at, buildQG2Snippets(e), flags(true, false, false, false, false, false));
-		case [actualParameter(e:binaryOperation(left,right,concat()),_), _]: return querystring(c@at, buildQG2Snippets(e), flags(true, false, false, false, false, false));
-		case [actualParameter(v:var(name(name(_))), _)] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false, false));
-		case [actualParameter(v:var(name(name(_))), _), _] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false, false));
-		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_)] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false, false));
-		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_),_] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false, false));
+		case [actualParameter(scalar(string(s)), _)]: return querystring(c@at, [staticsnippet(s)], flags(false, true, false, false, false, false, false));
+		case [actualParameter(scalar(string(s)), _), _]: return querystring(c@at, [staticsnippet(s)], flags(false, true, false, false, false, false, false));
+		case [actualParameter(e:scalar(encapsed(_)),_)]: return querystring(c@at, buildQG2Snippets(e),flags(true, false, false, false, false, false, false));
+		case [actualParameter(e:scalar(encapsed(_)), _),_]: return querystring(c@at, buildQG2Snippets(e), flags(true, false, false, false, false, false, false));
+		case [actualParameter(e:binaryOperation(left,right,concat()),_)]: return querystring(c@at, buildQG2Snippets(e), flags(true, false, false, false, false, false, false));
+		case [actualParameter(e:binaryOperation(left,right,concat()),_), _]: return querystring(c@at, buildQG2Snippets(e), flags(true, false, false, false, false, false, false));
+		case [actualParameter(v:var(name(name(_))), _)] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false, false, false));
+		case [actualParameter(v:var(name(name(_))), _), _] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false, false, false));
+		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_)] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false, false, false));
+		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_),_] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false, false, false));
 		default: throw "unhandled case encountered when building query string";
 	}
 }
@@ -126,21 +126,23 @@ public void reportQCPCounts(){
 	println("Number of QCP3a cases: <size({q | q <- qs, q.flags.qcp3a == true})>");
 	println("Number of QCP3b cases: <size({q | q <- qs, q.flags.qcp3b == true})>");
 	println("Number of QCP4 cases: <size({q | q <- qs, q.flags.qcp4 == true})>");
+	println("Number of QCP5 cases: <size({q | q <- qs, q.flags.qcp5 == true})>");
 	println("Number of unclassified cases: <size({q | q <- qs, q.flags.unclassified == true})>");
 }
 
-public set[QueryString] getQCP(int id){
+public set[QueryString] getQCP(str id){
 	qs = buildAndClassifyQueryStrings();
-	switch(id){
-		case 0 : return {q | q <- qs, q.flags.unclassified == true};
-		case 1 : return {q | q <- qs, q.flags.qcp1 == true};
-		case 2 : return {q | q <- qs, q.flags.qcp2 == true};
-		case 3 : return {q | q <- qs, q.flags.qcp3a == true || q.flags.qcp3b == true};
-		case 4 : return {q | q <- qs, q.flags.qcp4 == true};
+	switch(id){  
+		case "0" : return {q | q <- qs, q.flags.unclassified == true};
+		case "1" : return {q | q <- qs, q.flags.qcp1 == true};
+		case "2" : return {q | q <- qs, q.flags.qcp2 == true};
+		case "3a" : return {q | q <- qs, q.flags.qcp3a == true};
+		case "3b" : return {q | q <- qs, q.flags.qcp3b == true};
+		case "4" : return {q | q <- qs, q.flags.qcp4 == true};
 		default: throw "Value must be between 0 and 4";
 	}
 }
-public set[loc] getQCPLocs(int id) = {q.callloc | q <- getQCP(id)};
+public set[loc] getQCPLocs(str id) = {q.callloc | q <- getQCP(id)};
 
 // builds and classifies all query strings based on the Query Construction Patterns in the wiki
 public set[QueryString] buildAndClassifyQueryStrings(){
@@ -215,7 +217,6 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 					return false;				
 				}
 				
-				
 				Expr getAssignedScalar(CFGNode cn) {
 					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
 						simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
@@ -251,6 +252,9 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 					qs.flags.unclassified = false;
 					qs.flags.qcp2 = true;
 				}
+				
+				// QCP5 check (this query is a function parameter)
+				
 						
 				else if(literalGR.trueOnAllPaths){
 					// QCP1 recognizer (case where a string literal is assigned to the query variable)
@@ -282,7 +286,7 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 						qs.flags.unclassified = false;
 						qs.flags.qcp3b = true;
 					}
-				}		
+				}
 			}
 			
 			// QCP4 recognizer where the parameter is literals and php variables, function calls, etc concatenated or encapsed
