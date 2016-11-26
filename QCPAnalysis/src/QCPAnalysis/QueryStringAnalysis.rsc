@@ -42,7 +42,7 @@ data QuerySnippet = staticsnippet(str staticpart)
 				| dynamicsnippet(Expr dynamicpart);
 
 // collection of boolean flags for each construction pattern
-data PatternFlags = flags(bool unclassified, bool qcp1, bool qcp2, bool qcp3, bool qcp4);
+data PatternFlags = flags(bool unclassified, bool qcp1, bool qcp2, bool qcp3a, bool qcp3b, bool qcp4);
 		
 // builds query string structures for all mysql_query calls in the corpus without classifying them
 public set[QueryString] buildQueryStrings() = {s | call <- getMSQCorpusList(), s := buildQueryString(call)};
@@ -51,16 +51,16 @@ public set[QueryString] buildQueryStrings() = {s | call <- getMSQCorpusList(), s
 // is looking at the parameter directly. All dynamic snippets will be further analyzed through the CFGs
 public QueryString buildQueryString(c:call(name(name("mysql_query")), params)){
 	switch(params){
-		case [actualParameter(scalar(string(s)), _)]: return querystring(c@at, [staticsnippet(s)], flags(false, true, false, false, false));
-		case [actualParameter(scalar(string(s)), _), _]: return querystring(c@at, [staticsnippet(s)], flags(false, true, false, false, false));
-		case [actualParameter(e:scalar(encapsed(_)),_)]: return querystring(c@at, buildQG2Snippets(e),flags(true, false, false, false, false));
-		case [actualParameter(e:scalar(encapsed(_)), _),_]: return querystring(c@at, buildQG2Snippets(e), flags(true, false, false, false, false));
-		case [actualParameter(e:binaryOperation(left,right,concat()),_)]: return querystring(c@at, buildQG2Snippets(e), flags(true, false, false, false, false));
-		case [actualParameter(e:binaryOperation(left,right,concat()),_), _]: return querystring(c@at, buildQG2Snippets(e), flags(true, false, false, false, false));
-		case [actualParameter(v:var(name(name(_))), _)] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false));
-		case [actualParameter(v:var(name(name(_))), _), _] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false));
-		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_)] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false));
-		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_),_] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false));
+		case [actualParameter(scalar(string(s)), _)]: return querystring(c@at, [staticsnippet(s)], flags(false, true, false, false, false, false));
+		case [actualParameter(scalar(string(s)), _), _]: return querystring(c@at, [staticsnippet(s)], flags(false, true, false, false, false, false));
+		case [actualParameter(e:scalar(encapsed(_)),_)]: return querystring(c@at, buildQG2Snippets(e),flags(true, false, false, false, false, false));
+		case [actualParameter(e:scalar(encapsed(_)), _),_]: return querystring(c@at, buildQG2Snippets(e), flags(true, false, false, false, false, false));
+		case [actualParameter(e:binaryOperation(left,right,concat()),_)]: return querystring(c@at, buildQG2Snippets(e), flags(true, false, false, false, false, false));
+		case [actualParameter(e:binaryOperation(left,right,concat()),_), _]: return querystring(c@at, buildQG2Snippets(e), flags(true, false, false, false, false, false));
+		case [actualParameter(v:var(name(name(_))), _)] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false, false));
+		case [actualParameter(v:var(name(name(_))), _), _] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false, false));
+		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_)] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false, false));
+		case [actualParameter(v:fetchArrayDim(var(name(name(_))),_),_),_] : return querystring(c@at, [dynamicsnippet(v)], flags(true, false, false, false, false, false));
 		default: throw "unhandled case encountered when building query string";
 	}
 }
@@ -123,7 +123,8 @@ public void reportQCPCounts(){
 	qs = buildAndClassifyQueryStrings();
 	println("Number of QCP1 cases: <size({q | q <- qs, q.flags.qcp1 == true})>");
 	println("Number of QCP2 cases: <size({q | q <- qs, q.flags.qcp2 == true})>");
-	println("Number of QCP3 cases: <size({q | q <- qs, q.flags.qcp3 == true})>");
+	println("Number of QCP3a cases: <size({q | q <- qs, q.flags.qcp3a == true})>");
+	println("Number of QCP3b cases: <size({q | q <- qs, q.flags.qcp3b == true})>");
 	println("Number of QCP4 cases: <size({q | q <- qs, q.flags.qcp4 == true})>");
 	println("Number of unclassified cases: <size({q | q <- qs, q.flags.unclassified == true})>");
 }
@@ -134,7 +135,7 @@ public set[QueryString] getQCP(int id){
 		case 0 : return {q | q <- qs, q.flags.unclassified == true};
 		case 1 : return {q | q <- qs, q.flags.qcp1 == true};
 		case 2 : return {q | q <- qs, q.flags.qcp2 == true};
-		case 3 : return {q | q <- qs, q.flags.qcp3 == true};
+		case 3 : return {q | q <- qs, q.flags.qcp3a == true || q.flags.qcp3b == true};
 		case 4 : return {q | q <- qs, q.flags.qcp4 == true};
 		default: throw "Value must be between 0 and 4";
 	}
@@ -145,6 +146,8 @@ public set[loc] getQCPLocs(int id) = {q.callloc | q <- getQCP(id)};
 public set[QueryString] buildAndClassifyQueryStrings(){
 	Corpus corpus = getCorpus();
 	set[QueryString] corpusres = {};
+	// get all QCP2 occurrences (cascading assignments)
+	cascadingLocs = {c.usedAt | c <- concatAssignments()<2>};
 	for(p <- corpus, v := corpus[p]){
 		pt = loadBinary(p,v);
 		if (!pt has baseLoc) {
@@ -212,6 +215,7 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 					return false;				
 				}
 				
+				
 				Expr getAssignedScalar(CFGNode cn) {
 					if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
 						simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
@@ -241,8 +245,14 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 				literalGR = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, assignsScalarToQueryVar, assignsNonScalarToQueryVar, getAssignedScalar);
 				concatOrEncapsedGR = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, 
 					assignsConcatOrEncapsedToQueryVar, notAssignsConcatOrEncapsedToQueryVar, getAssignedConcatOrEncapsed);
+				
+				// check if this query string is already found by the cascading assignment checker
+				if(qs.callloc in cascadingLocs){
+					qs.flags.unclassified = false;
+					qs.flags.qcp2 = true;
+				}
 						
-				if(literalGR.trueOnAllPaths){
+				else if(literalGR.trueOnAllPaths){
 					// QCP1 recognizer (case where a string literal is assigned to the query variable)
 					if(size(literalGR.results) == 1){
 						qs.flags.unclassified = false;
@@ -251,10 +261,10 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 						qs = replaceVar(qs, getOneFrom(literalGR.results));
 					}
 					
-					// QCP3: multiple possible assignments
-					else{
+					// QCP3A: multiple possible literal assignments distributed over control flow structures
+					else if(size(literalGR.results) > 1){
 						qs.flags.unclassified = false;
-						qs.flags.qcp3 = true;	
+						qs.flags.qcp3a = true;
 					}
 				}
 				
@@ -267,18 +277,12 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 						qs = replaceVar(qs, getOneFrom(concatOrEncapsedGR.results));
 					}
 					
-					// QCP3: multiple possible assignments
-					else{
+					//QCP3B: multiple possible QCP4 occurrences distributed over control flow structures
+					else if(size(concatOrEncapsedGR.results) > 1){
 						qs.flags.unclassified = false;
-						qs.flags.qcp3 = true;	
+						qs.flags.qcp3b = true;
 					}
-				}
-				
-				// check for cascading assignments this could either be a case of QCP2 (cascading literal assignments)
-				// or a case of QCP4 (cascading assignments that are a mixture of literals and PHP variables, function calls, etc.)
-				else{
-					qs = checkCascading(containingScript, qs);
-				}				
+				}		
 			}
 			
 			// QCP4 recognizer where the parameter is literals and php variables, function calls, etc concatenated or encapsed
@@ -288,18 +292,13 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 				qs.flags.qcp4 = true;
 			}
 			else{
-				println("unclassified query found at c@at");
+				println("unclassified query found at <qs.callloc>");
 			}
 			sysres += qs;
 		}
 		corpusres = corpusres + sysres;
 	}
 	return corpusres;
-}
-
-public QueryString checkCascading(Script scr, QueryString qs){
-	// to be implemneted
-	return qs;
 }
 
 public void findReachableQueryStrings() {
