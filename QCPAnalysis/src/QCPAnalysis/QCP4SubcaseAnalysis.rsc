@@ -39,7 +39,7 @@ public void analyzeQCP4(){
 	println("Types of dynamic snippets: <types>");
 	println("Counts for each type:\n <(n : size(d) | n <- groupDynamicSnippetsByType(ds), d := groupDynamicSnippetsByType(ds)[n])>");
 	println("Counts for each role:\n <(n : size(d) | n <- groupQCP4ByRole(qcp4), d := groupQCP4ByRole(qcp4)[n])>");
-	//for(x <- groupQCP4ByRole(qcp4)["not param"]) println(x);
+	//for(x <- groupQCP4ByRole(qcp4)["not param"]) {println(x); println("\n");}
 }
 
 private map[str, list[QuerySnippet]] groupDynamicSnippetsByType(list[QuerySnippet] ds){
@@ -74,7 +74,7 @@ private map[str, list[QueryString]] groupQCP4ByRole(set[QueryString] qs){
 	for(q <- qs){
 		indexes = getDynamicSnippetIndexes(q);
 		
-		// returns true if a dynamic snippet is used as a parameter
+		// returns true if this dynamic snippet is used as a parameter
 		bool parameterSnippet(int i){
 			// get previous static snippet
 			if(staticsnippet(ss) := q.snippets[i - 1]){
@@ -91,11 +91,67 @@ private map[str, list[QueryString]] groupQCP4ByRole(set[QueryString] qs){
 				else if(/^.*NOT\s[\w\.\`]+\s?\=\s?[^\w\.\`]*$/i := ss){
 					return true;
 				}
-				else if(/^.*SET\s[\w\.\`]+\s?\=\s?[^\w\.\`]*$/i := ss){
+
+				else if(/^.*FROM\s[^\w\.\`]*$/i := ss){
 					return true;
 				}
+			}
+			return false;
+		}
+		
+		bool valuesParamSnippet(int index){
+			boundaries = <-1,-1>;
+			for(i <- [0..size(q.snippets)]){
+				if(staticsnippet(ss1) := q.snippets[i] && /^.*VALUES\([^\)]*/i := ss1){
+					boundaries[0] = i;
+					break;
+				}
+			}
+			if(boundaries[0] != -1){
+				for(i <- [boundaries[0]..size(q.snippets)]){
+					//find right paren
+					if(staticsnippet(ss2) := q.snippets[i] && /\)$/i := ss2){
+						boundaries[1] = i;
+						break;
+					}
+				}
+			}	
+			if(boundaries[0] == -1 || boundaries[1] == -1){
+				return false;
+			}
+			// values clause found, is the dynamic snippet at index inside its boundaries?
+			else if(index > boundaries[0] && index < boundaries[1]){
+				return true;
+			}
+			else{
+				return false;
+			}
+		}
+		
+		// returns true if this dynamic snippet is the parameter to a SET clause
+		bool setParamSnippet(int index){
+			//finds the beginning of the SET clause of q, if it exists
+			setBegin = -1;
+			for(i <- [0..size(q.snippets)]){
+				if(staticsnippet(ss) := q.snippets[i] && /^.*SET\s[\w\.\`]+\s?\=\s?[^\w\.\`]*$/i := ss){
+					setBegin = i;
+					break;
+				}
+			}
+			if(setBegin != -1){
+				// check for the easy case of the dynamic snippet at index being the first assignment after the SET clause
+				if(index == setBegin + 1 && dynamicsnippet(_) := q.snippets[setBegin + 1]){
+					return true;
+				}
+				// starting at the next snippet, look for <staticsnippet, dynamicsnippet> pairs of the form:
+				// atributename = $dynamicsnippet
 				else{
-					return false;
+					setBegin = setBegin + 2;
+					for(i <- [setBegin..size(q.snippets) - 1]){
+						if(index == i + 1 && staticsnippet(s) := q.snippets[i] && /^\'?\\?\s?\,\s?[\w\.\`]+\s?\=\s?\\?\'?$/ := s){
+							return true;
+						}
+					}
 				}
 			}
 			return false;
@@ -104,7 +160,7 @@ private map[str, list[QueryString]] groupQCP4ByRole(set[QueryString] qs){
 		// test if all dynamic snippets in q are parameter snippets
 		bool allParam = true;
 		for(i <- indexes){
-			allParam = allParam && parameterSnippet(i);
+			allParam = allParam && (parameterSnippet(i) || valuesParamSnippet(i) || setParamSnippet(i));
 		}
 		if(allParam){
 			res["param"] += q;
