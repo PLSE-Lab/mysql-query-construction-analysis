@@ -38,7 +38,7 @@ public void analyzeQCP4(){
 	types = getQCP4DynamicSnippetTypes(ds) + "superglobal";
 	println("Types of dynamic snippets: <types>");
 	println("Counts for each type:\n <(n : size(d) | n <- groupDynamicSnippetsByType(ds), d := groupDynamicSnippetsByType(ds)[n])>");
-	println("Counts for each role:\n <(n : size(d) | n <- groupDynamicSnippetsByRole(qcp4), d := groupDynamicSnippetsByRole(qcp4)[n])>");
+	println("Counts for each role:\n <(n : size(d) | n <- groupQCP4ByRole(qcp4), d := groupQCP4ByRole(qcp4)[n])>");
 }
 
 private map[str, list[QuerySnippet]] groupDynamicSnippetsByType(list[QuerySnippet] ds){
@@ -78,19 +78,19 @@ private map[str, list[QueryString]] groupQCP4ByRole(set[QueryString] qs){
 			// get previous static snippet
 			if(staticsnippet(ss) := q.snippets[i - 1]){
 				// perform regex matching on the static snippet to determine if the dynamic snippet is used as a parameter
-				if(/^.*WHERE\s[\w\.\`]+\s?\=\s?[^\w\.\`]/i := ss){
+				if(/^.*WHERE\s[\w\.\`]+\s?\=\s?[^\w\.\`]*/i := ss){
 					return true;
 				}
-				else if(/^.*AND\s[\w\.\`]+\s?\=\s?[^\w\.\`]/i := ss){
+				else if(/^.*AND\s[\w\.\`]+\s?\=\s?[^\w\.\`]*/i := ss){
 					return true;
 				}
-				else if(/^.*OR\s[\w\.\`]+\s?\=\s?[^\w\.\`]/i := ss){
+				else if(/^.*OR\s[\w\.\`]+\s?\=\s?[^\w\.\`]*/i := ss){
 					return true;
 				}
-				else if(/^.*NOT\s[\w\.\`]+\s?\=\s?[^\w\.\`]/i := ss){
+				else if(/^.*NOT\s[\w\.\`]+\s?\=\s?[^\w\.\`]*/i := ss){
 					return true;
 				}
-				else if(/^.*SET\s[\w\.\`]+\s?\=\s?[^\w\.\`]/i := ss){
+				else if(/^.*SET\s[\w\.\`]+\s?\=\s?[^\w\.\`]*/i := ss){
 					return true;
 				}
 				else{
