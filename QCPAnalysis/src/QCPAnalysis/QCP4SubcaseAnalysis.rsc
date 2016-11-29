@@ -39,7 +39,7 @@ public void analyzeQCP4(){
 	println("Types of dynamic snippets: <types>");
 	println("Counts for each type:\n <(n : size(d) | n <- groupDynamicSnippetsByType(ds), d := groupDynamicSnippetsByType(ds)[n])>");
 	println("Counts for each role:\n <(n : size(d) | n <- groupQCP4ByRole(qcp4), d := groupQCP4ByRole(qcp4)[n])>");
-	//for(x <- groupQCP4ByRole(qcp4)["not param"]) {println(x); println("\n");}
+	//for(x <- groupQCP4ByRole(qcp4)["not param"]) println(queryStringToString(x));
 }
 
 private map[str, list[QuerySnippet]] groupDynamicSnippetsByType(list[QuerySnippet] ds){

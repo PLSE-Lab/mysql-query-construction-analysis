@@ -43,6 +43,19 @@ data QuerySnippet = staticsnippet(str staticpart)
 
 // collection of boolean flags for each construction pattern
 data PatternFlags = flags(bool unclassified, bool qcp1, bool qcp2, bool qcp3a, bool qcp3b, bool qcp4, bool qcp5);
+
+public str queryStringToString(QueryString qs){
+	res = "";
+	for(s <- qs.snippets){
+		if(staticsnippet(_) := s){
+			res += s.staticpart;
+		}
+		else{
+			res += "ø";
+		}
+	}
+	return res;
+}
 		
 // builds query string structures for all mysql_query calls in the corpus without classifying them
 public set[QueryString] buildQueryStrings() = {s | call <- getMSQCorpusList(), s := buildQueryString(call)};
