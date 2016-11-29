@@ -10,8 +10,11 @@ import QCPAnalysis::QueryStringAnalysis;
 
 import lang::php::ast::AbstractSyntax;
 import lang::php::util::Corpus;
+import lang::php::util::Utils;
 
 import IO;
+import List;
+import String;
 
 loc lists = |project://QCPAnalysis/results/lists/|;
 loc counts =  |project://QCPAnalysis/results/counts/|;
@@ -51,4 +54,45 @@ public void writeQG(){
 
 public void writeQueryStrings(){
 	iprintToFile(strings, {q | q <- buildAndClassifyQueryStrings(), q.flags.qcp5 == true});
+}
+
+public str corpusAsLatexTable() {
+	Corpus corpus = getCorpus();
+	corpusCounts = getSortedCountsCaseInsensitive();
+	pForSort = [ < toUpperCase(p), p > | p <- corpus ];
+	pForSort = sort(pForSort, bool(tuple[str,str] t1, tuple[str,str] t2) { return t1[0] < t2[0]; });
+	
+	str getLine(str p, str v) = "<getSensibleName(p)> & <v> & <getOneFrom(corpusCounts[p,v]<1>)> & <getOneFrom(corpusCounts[p,v]<0>)>";
+	str res =
+		"\\npaddmissingzero
+		'\\npfourdigitsep
+		'\\begin{table}
+		'\\centering
+		'\\caption{The Corpus.\\label{tbl:php-corpus}}
+		'\\ra{1.2}
+		'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
+		'System & Version & File Count & SLOC \\\\ \\midrule
+		'<for(<_,p> <- pForSort, v := corpus[p]){><getLine(p,v)> \\\\
+		'<}>
+		'\\bottomrule
+		'\\end{tabularx}
+		'\\end{table}
+		'\\npfourdigitnosep
+		'\\npnoaddmissingzero
+		";
+	return res;
+}
+
+public int totalCorpusFiles() {
+	Corpus corpus = getCorpus();
+	corpusCounts = { < p, v, lc, fc > | < p, v, lc, fc > <- getSortedCounts(), p in corpus<0>, v := corpus[p] };
+	corpusFileCounts = corpusCounts<3>;
+	return ( 0 | it + fc | fc <- corpusFileCounts );
+}
+
+public int totalCorpusLines() {
+	Corpus corpus = getCorpus();
+	corpusCounts = { < p, v, lc, fc > | < p, v, lc, fc > <- getSortedCounts(), p in corpus<0>, v := corpus[p] };
+	corpusLineCounts = corpusCounts<2>;
+	return ( 0 | it + fc | fc <- corpusLineCounts );
 }

@@ -28,6 +28,10 @@ private Corpus newCorpus = (
 	"web2project"	: "3.3"
 	);
 
+public str getSensibleName("faqforge") = "FAQ Forge";
+public str getSensibleName("firesoftboard") = "Fire-Soft-Board";
+public default str getSensibleName(str p) = p;
+
 private Corpus corpus = originalCorpus + newCorpus;
 
 
