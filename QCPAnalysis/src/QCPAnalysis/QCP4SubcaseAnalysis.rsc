@@ -38,8 +38,7 @@ public void analyzeQCP4(){
 	types = getQCP4DynamicSnippetTypes(ds) + "superglobal";
 	println("Types of dynamic snippets: <types>");
 	println("Counts for each type:\n <(n : size(d) | n <- groupDynamicSnippetsByType(ds), d := groupDynamicSnippetsByType(ds)[n])>");
-	println("Counts for each role:\n <(n : size(d) | n <- groupQCP4ByRole(qcp4), d := groupQCP4ByRole(qcp4)[n])>");
-	//for(x <- groupQCP4ByRole(qcp4)["not param"]) println(queryStringToString(x));
+	println("Counts for each role:\n <(n : size(d) | n <- groupDynamicSnippetsByRole(qcp4), d := groupDynamicSnippetsByRole(qcp4)[n])>");
 }
 
 private map[str, list[QuerySnippet]] groupDynamicSnippetsByType(list[QuerySnippet] ds){
@@ -69,13 +68,13 @@ private map[str, list[QuerySnippet]] groupDynamicSnippetsByType(list[QuerySnippe
 }
 
 // groups all QCP4 occurrences based on what role their dynamic snippets take on
-private map[str, list[QueryString]] groupQCP4ByRole(set[QueryString] qs){
-	res = ("param" : [], "not param" : []);
+private map[str, list[QuerySnippet]] groupDynamicSnippetsByRole(set[QueryString] qs){
+	res = ("param" : [], "name" : [], "other" : []);
 	for(q <- qs){
 		indexes = getDynamicSnippetIndexes(q);
 		
 		// returns true if this dynamic snippet is used as a parameter
-		bool parameterSnippet(int i){
+		bool paramSnippet(int i){
 			// get previous static snippet
 			if(staticsnippet(ss) := q.snippets[i - 1]){
 				// perform regex matching on the static snippet to determine if the dynamic snippet is used as a parameter
@@ -153,16 +152,13 @@ private map[str, list[QueryString]] groupQCP4ByRole(set[QueryString] qs){
 			return false;
 		}
 		
-		// test if all dynamic snippets in q are parameter snippets
-		bool allParam = true;
-		for(i <- indexes){
-			allParam = allParam && (parameterSnippet(i) || valuesParamSnippet(i) || setParamSnippet(i));
-		}
-		if(allParam){
-			res["param"] += q;
-		}
-		else{
-			res["not param"] += q;
+		for(i <- indexes, ds := q.snippets[i]){
+			if(paramSnippet(i) || setParamSnippet(i) || valuesParamSnippet(i)){
+				res["param"] += ds;
+			}
+			else{
+				res["other"] += ds;
+			}
 		}
 	}
 	return res;
