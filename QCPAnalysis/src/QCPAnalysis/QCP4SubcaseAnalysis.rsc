@@ -91,10 +91,6 @@ private map[str, list[QueryString]] groupQCP4ByRole(set[QueryString] qs){
 				else if(/^.*NOT\s[\w\.\`]+\s?\=\s?[^\w\.\`]*$/i := ss){
 					return true;
 				}
-
-				else if(/^.*FROM\s[^\w\.\`]*$/i := ss){
-					return true;
-				}
 			}
 			return false;
 		}
