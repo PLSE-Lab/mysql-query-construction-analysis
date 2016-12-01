@@ -7,6 +7,7 @@ module QCPAnalysis::WriteResults
 import QCPAnalysis::QCPCorpus;
 import QCPAnalysis::QueryGroups;
 import QCPAnalysis::QueryStringAnalysis;
+import QCPAnalysis::QCP4SubcaseAnalysis;
 
 import lang::php::ast::AbstractSyntax;
 import lang::php::util::Corpus;
@@ -15,45 +16,57 @@ import lang::php::util::Utils;
 import IO;
 import List;
 import String;
+import Set;
 
-loc lists = |project://QCPAnalysis/results/lists/|;
-loc counts =  |project://QCPAnalysis/results/counts/|;
-loc strings = |project://QCPAnalysis/results/querystrings.txt|;
+loc tables = |project://QCPAnalysis/results/tables/|;
 
-// convenience function that performs all other functions in this module
-public void writeResults(){
-	writeCounts();
-	writeQG();
-	writeQueryStrings();
-}
-// writes the counts from all QG analyses to a file in the results folder
-public void writeCounts(){
-	loc file = counts + "countMysqlQuery.txt";
-	iprintToFile(file, countMSQCorpus());
-	
-	file = counts + "countQG.txt";
-	iprintToFile(file, countQG());
-}
-
-public void writeQG(){
-	map[str, list[Expr]] qg1 = getQG(1);
-	map[str, list[Expr]] qg2 = getQG(2);
-	map[str, list[Expr]] qg3 = getQG(3);
-	map[str, list[Expr]] qg4 = getQG(4);
-	map[str, list[Expr]] unmatched = getQG(5);
-	Corpus corpus = getCorpus();
-	for(p <- corpus, v := corpus[p]){
-		loc sys = lists + "<p>_<v>";
-		iprintToFile(sys + "QG1", qg1["<p>_<v>"]);
-		iprintToFile(sys + "QG2", qg2["<p>_<v>"]);
-		iprintToFile(sys + "QG3", qg3["<p>_<v>"]);
-		iprintToFile(sys + "QG4", qg4["<p>_<v>"]);
-		iprintToFile(sys + "unmatched", unmatched["<p>_<v>"]);
-	}
+public str qcpCountsAsLatexTable(){
+	str getLine(str pattern, int count) = "<pattern> & <count>";
+	str res =
+	"\\npaddmissingzero
+	'\\npfourdigitsep
+	'\\begin{table}
+	'\\centering
+	'\\caption{Counts of Each Query Construction Pattern\\label{tbl:php-corpus}}
+	'\\ra{1.2}
+	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
+	'Query Construction Pattern & Number of Occurrences\\\\ \\midrule
+	'<for(<p,c> <- reportQCPCounts()){><getLine(p,c)> \\\\
+	'<}>
+	'\\bottomrule
+	'\\end{tabularx}
+	'\\end{table}
+	'\\npfourdigitnosep
+	'\\npnoaddmissingzero
+	";
+	return res;
 }
 
-public void writeQueryStrings(){
-	iprintToFile(strings, {q | q <- buildAndClassifyQueryStrings(), q.flags.qcp5 == true});
+public str qcp4TypesAsLatexTable(){
+	typeGroups = groupDynamicSnippetsByType(getDynamicSnippets(getQCP("4")));
+	str getLine(str t, int c) = "<t> & <c>";
+	str res =
+	"\\npaddmissingzero
+	'\\npfourdigitsep
+	'\\begin{table}
+	'\\centering
+	'\\caption{Counts of Each Type of Dynamic Query Part in QCP4 Occurrences\\label{tbl:php-qcp4-types}}
+	'\\ra{1.2}
+	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
+	'Type & Number of Occurrences\\\\ \\midrule
+	'<for(p <- typeGroups, c := typeGroups[p]){><getLine(p,size(c))> \\\\
+	'<}>
+	'\\bottomrule
+	'\\end{tabularx}
+	'\\end{table}
+	'\\npfourdigitnosep
+	'\\npnoaddmissingzero
+	";
+	return res;
+}
+
+public str qcp4RolesAsLatexTable(){
+
 }
 
 public str corpusAsLatexTable() {

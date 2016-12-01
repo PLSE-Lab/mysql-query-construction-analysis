@@ -132,15 +132,17 @@ private list[QuerySnippet] buildQG2Snippets(list[Expr] parts){
 	return snippets;
 }
 
-public void reportQCPCounts(){
+public lrel[str,int] reportQCPCounts(){
 	qs = buildAndClassifyQueryStrings();
-	println("Number of QCP1 cases: <size({q | q <- qs, q.flags.qcp1 == true})>");
-	println("Number of QCP2 cases: <size({q | q <- qs, q.flags.qcp2 == true})>");
-	println("Number of QCP3a cases: <size({q | q <- qs, q.flags.qcp3a == true})>");
-	println("Number of QCP3b cases: <size({q | q <- qs, q.flags.qcp3b == true})>");
-	println("Number of QCP4 cases: <size({q | q <- qs, q.flags.qcp4 == true})>");
-	println("Number of QCP5 cases: <size({q | q <- qs, q.flags.qcp5 == true})>");
-	println("Number of unclassified cases: <size({q | q <- qs, q.flags.unclassified == true})>");
+	return [
+		<"QCP1", size({q | q <- qs, q.flags.qcp1 == true})>,
+		<"QCP2", size({q | q <- qs, q.flags.qcp2 == true})>,
+		<"QCP3a", size({q | q <- qs, q.flags.qcp3a == true})>,
+		<"QCP3b", size({q | q <- qs, q.flags.qcp3b == true})>,
+		<"QCP4", size({q | q <- qs, q.flags.qcp4 == true})>,
+		<"QCP5", size({q | q <- qs, q.flags.qcp5 == true})>,
+		<"other", size({q | q <- qs, q.flags.unclassified == true})>
+	];
 }
 
 public set[QueryString] getQCP(str id){
