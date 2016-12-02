@@ -19,6 +19,13 @@ import String;
 import Set;
 
 loc tables = |project://QCPAnalysis/results/tables/|;
+public void writeTables(){
+	qs = getQCP("4");
+	ds = getDynamicSnippets(qs);
+	writeFile(tables + "qcpCounts.txt", qcpCountsAsLatexTable());
+	writeFile(tables + "qcp4Types.txt", qcp4TypesAsLatexTable(ds));
+	writeFile(tables + "qcp4Roles.txt", qcp4RolesAsLatexTable(qs));
+}
 
 public str qcpCountsAsLatexTable(){
 	str getLine(str pattern, int count) = "<pattern> & <count>";
@@ -42,8 +49,8 @@ public str qcpCountsAsLatexTable(){
 	return res;
 }
 
-public str qcp4TypesAsLatexTable(){
-	typeGroups = groupDynamicSnippetsByType(getDynamicSnippets(getQCP("4")));
+public str qcp4TypesAsLatexTable(list[QuerySnippet] qs){
+	typeGroups = groupDynamicSnippetsByType(qs);
 	str getLine(str t, int c) = "<t> & <c>";
 	str res =
 	"\\npaddmissingzero
@@ -65,8 +72,27 @@ public str qcp4TypesAsLatexTable(){
 	return res;
 }
 
-public str qcp4RolesAsLatexTable(){
-
+public str qcp4RolesAsLatexTable(set[QueryString] qs){
+	roleGroups = groupDynamicSnippetsByRole(qs);
+	str getLine(str r, int c) = "<r> & <c>";
+	str res =
+	"\\npaddmissingzero
+	'\\npfourdigitsep
+	'\\begin{table}
+	'\\centering
+	'\\caption{Counts of Each QCP4 Dynamic Part Grouped by Role\\label{tbl:php-qcp4-roles}}
+	'\\ra{1.2}
+	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
+	'Role & Number of Occurrences\\\\ \\midrule
+	'<for(p <- roleGroups, c := roleGroups[p]){><getLine(p,size(c))> \\\\
+	'<}>
+	'\\bottomrule
+	'\\end{tabularx}
+	'\\end{table}
+	'\\npfourdigitnosep
+	'\\npnoaddmissingzero
+	";
+	return res;
 }
 
 public str corpusAsLatexTable() {

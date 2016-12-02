@@ -39,7 +39,7 @@ public void analyzeQCP4(){
 	println("Types of dynamic snippets: <types>");
 	println("Counts for each type:\n <(n : size(d) | n <- groupDynamicSnippetsByType(ds), d := groupDynamicSnippetsByType(ds)[n])>");
 	println("Counts for each role:\n <(n : size(d) | n <- groupDynamicSnippetsByRole(qcp4), d := groupDynamicSnippetsByRole(qcp4)[n])>");
-	for(q <- groupDynamicSnippetsByRole(qcp4)["Other"]) println(q.dynamicpart@at);
+	//for(q <- groupDynamicSnippetsByRole(qcp4)["Other"]) println(q.dynamicpart@at);
 }
 
 public map[str, list[QuerySnippet]] groupDynamicSnippetsByType(list[QuerySnippet] ds){
@@ -71,8 +71,8 @@ public map[str, list[QuerySnippet]] groupDynamicSnippetsByType(list[QuerySnippet
 }
 
 // groups all QCP4 occurrences based on what role their dynamic snippets take on
-private map[str, list[QuerySnippet]] groupDynamicSnippetsByRole(set[QueryString] qs){
-	res = ("Parameter" : [], "Name" : [], "Other" : []);
+public map[str, list[QuerySnippet]] groupDynamicSnippetsByRole(set[QueryString] qs){
+	res = ("Parameter" : [], "Column, Table, or Database Name" : [], "Other" : []);
 	for(q <- qs){
 		indexes = getDynamicSnippetIndexes(q);
 		
@@ -173,7 +173,7 @@ private map[str, list[QuerySnippet]] groupDynamicSnippetsByRole(set[QueryString]
 				res["Parameter"] += ds;
 			}
 			else if(nameSnippet(i)){
-				res["Name"] += ds;
+				res["Column, Table, or Database Name"] += ds;
 			}
 			else{
 				res["Other"] += ds;
