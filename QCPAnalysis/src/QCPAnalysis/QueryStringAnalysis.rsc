@@ -31,8 +31,6 @@ import List;
 
 loc cfglocb = |project://QCPAnalysis/cfgs/binary|;
 loc cfglocp = |project://QCPAnalysis/cfgs/plain|;
-
-// See the Wiki of this GitHub Repository for more detailed information on pattern classifications
  
 // represents a Query string (parameter to a mysql_query call)
 data QueryString = querystring(loc callloc, list[QuerySnippet] snippets, PatternFlags flags);
@@ -196,7 +194,7 @@ public set[QueryString] getQCP(str id){
 }
 public set[loc] getQCPLocs(str id) = {q.callloc | q <- getQCP(id)};
 
-// builds and classifies all query strings based on the Query Construction Patterns in the wiki
+// builds and classifies all query strings based on the Query Construction Patterns
 public set[QueryString] buildAndClassifyQueryStrings(){
 	Corpus corpus = getCorpus();
 	set[QueryString] corpusres = {};
