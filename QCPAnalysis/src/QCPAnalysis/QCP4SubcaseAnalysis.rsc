@@ -50,7 +50,7 @@ public void analyzeQCP4(){
 		}
 		sublist += p.dynamicpart@at;
 	}
-	for(q <- sublist) println(q.dynamicpart@at);*/ 
+	for(q <- sublist) println(q);*/
 	
 	// for validation of column, table, and database name grouping
 	//for(q <- groupDynamicSnippetsByRole(qcp4)["Column, Table, or Database Name"]) println(q.dynamicpart@at);
