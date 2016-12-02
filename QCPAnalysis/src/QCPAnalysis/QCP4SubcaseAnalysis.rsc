@@ -23,7 +23,7 @@ import ValueIO;
 set[str] superglobals = {"_SERVER", "_REQUEST", "_POST", "_GET", "_FILES",
 	"_ENV", "_COOKIE", "_SESSION"};
 
-// write QCP4 list to file since function takes a long time to execute
+// write QCP4 list to file since the getQCP function takes a long time to execute
 public void writeQCP4(){
 	qcp4 = getQCP("4");
 	writeBinaryValueFile(|project://QCPAnalysis/results/lists/qcp4|, qcp4);
@@ -39,7 +39,24 @@ public void analyzeQCP4(){
 	println("Types of dynamic snippets: <types>");
 	println("Counts for each type:\n <(n : size(d) | n <- groupDynamicSnippetsByType(ds), d := groupDynamicSnippetsByType(ds)[n])>");
 	println("Counts for each role:\n <(n : size(d) | n <- groupDynamicSnippetsByRole(qcp4), d := groupDynamicSnippetsByRole(qcp4)[n])>");
-	//for(q <- groupDynamicSnippetsByRole(qcp4)["Other"]) println(q.dynamicpart@at);
+	
+	// for validation of param grouiping
+	/*params = groupDynamicSnippetsByRole(qcp4)["Parameter"];
+	sublist = [];
+	for(i <- [0..100]){
+		p = getOneFrom(params);
+		while(p in sublist){
+			p = getOneFrom(params);
+		}
+		sublist += p.dynamicpart@at;
+	}
+	for(q <- sublist) println(q.dynamicpart@at);*/ 
+	
+	// for validation of column, table, and database name grouping
+	for(q <- groupDynamicSnippetsByRole(qcp4)["Column, Table, or Database Name"]) println(q.dynamicpart@at);
+	
+	// for validation of other grouping
+	//for(q <- groupDynamicSnippetsByRole(qcp4)["Column, Table, or Database Name"]) println(q.dynamicpart@at);
 }
 
 public map[str, list[QuerySnippet]] groupDynamicSnippetsByType(list[QuerySnippet] ds){

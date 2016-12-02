@@ -132,17 +132,54 @@ private list[QuerySnippet] buildQG2Snippets(list[Expr] parts){
 	return snippets;
 }
 
-public lrel[str,int] reportQCPCounts(){
+public lrel[str,int] reportQCPCounts(bool subcases){
 	qs = buildAndClassifyQueryStrings();
-	return [
-		<"QCP1", size({q | q <- qs, q.flags.qcp1 == true})>,
-		<"QCP2", size({q | q <- qs, q.flags.qcp2 == true})>,
-		<"QCP3a", size({q | q <- qs, q.flags.qcp3a == true})>,
-		<"QCP3b", size({q | q <- qs, q.flags.qcp3b == true})>,
-		<"QCP4", size({q | q <- qs, q.flags.qcp4 == true})>,
-		<"QCP5", size({q | q <- qs, q.flags.qcp5 == true})>,
-		<"other", size({q | q <- qs, q.flags.unclassified == true})>
-	];
+	if(!subcases){
+		return [
+			<"QCP1", size({q | q <- qs, q.flags.qcp1 == true})>,
+			<"QCP2", size({q | q <- qs, q.flags.qcp2 == true})>,
+			<"QCP3a", size({q | q <- qs, q.flags.qcp3a == true})>,
+			<"QCP3b", size({q | q <- qs, q.flags.qcp3b == true})>,
+			<"QCP4", size({q | q <- qs, q.flags.qcp4 == true})>,
+			<"other", size({q | q <- qs, q.flags.unclassified == true})>
+		];
+	}
+	else{
+		return [
+			<"QCP1", size({q | q <- qs, q.flags.qcp1 == true})>,
+			<"QCP2", size({q | q <- qs, q.flags.qcp2 == true})>,
+			<"QCP3a", size({q | q <- qs, q.flags.qcp3a == true})>,
+			<"QCP3b", size({q | q <- qs, q.flags.qcp3b == true})>
+			
+		] + getQCP4SubcaseCounts() + [<"other", size({q | q <- qs, q.flags.unclassified == true})>];
+	}
+}
+
+private lrel[str, int] getQCP4SubcaseCounts(){
+	Corpus corpus = getCorpus();
+	qcp4 = readBinaryValueFile(#set[QueryString], |project://QCPAnalysis/results/lists/qcp4|);
+	locs = [q.callloc | q <- qcp4];
+	queriesRel = [];
+	for (p <- corpus, v := corpus[p]) {
+		pt = loadBinary(p,v);
+		// Get all the calls to mysql_query
+		queriesRel += [ <c, params> | /c:call(name(name("mysql_query")),params) := pt, c@at in locs];
+	}
+	
+	
+	res = [<"QCP4a", 0>, <"QCP4b" , 0>, <"QCP4c", 0>];
+	for(<q, params> <- queriesRel){
+			switch(params){
+				case [actualParameter(scalar(encapsed(_)),_)]: res[0][1] += 1;
+				case [actualParameter(scalar(encapsed(_)), _),_]: res[0][1] += 1;
+				case [actualParameter(binaryOperation(left,right,concat()),_)]: res[1][1] += 1;
+				case [actualParameter(binaryOperation(left,right,concat()),_), _]: res[1][1] += 1;
+				case [actualParameter(var(name(name(_))), _)] : res[2][1] += 1;
+				case [actualParameter(var(name(name(_))), _), _] : res[2][1] += 1;
+				default: println("this is broken");
+			}
+	}
+	return res;
 }
 
 public set[QueryString] getQCP(str id){

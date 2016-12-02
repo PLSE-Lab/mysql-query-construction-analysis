@@ -14,17 +14,18 @@ import lang::php::util::Corpus;
 import lang::php::util::Utils;
 
 import IO;
+import ValueIO;
 import List;
 import String;
 import Set;
 
 loc tables = |project://QCPAnalysis/results/tables/|;
 public void writeTables(){
-	qs = getQCP("4");
-	ds = getDynamicSnippets(qs);
+	qcp4 = readBinaryValueFile(#set[QueryString], |project://QCPAnalysis/results/lists/qcp4|);
+	ds = getDynamicSnippets(qcp4);
 	writeFile(tables + "qcpCounts.txt", qcpCountsAsLatexTable());
 	writeFile(tables + "qcp4Types.txt", qcp4TypesAsLatexTable(ds));
-	writeFile(tables + "qcp4Roles.txt", qcp4RolesAsLatexTable(qs));
+	writeFile(tables + "qcp4Roles.txt", qcp4RolesAsLatexTable(qcp4));
 }
 
 public str qcpCountsAsLatexTable(){
@@ -34,11 +35,11 @@ public str qcpCountsAsLatexTable(){
 	'\\npfourdigitsep
 	'\\begin{table}
 	'\\centering
-	'\\caption{Counts of Each Query Construction Pattern\\label{tbl:php-corpus}}
+	'\\caption{Counts of Each Query Construction Pattern\\label{tbl:qcp-counts}}
 	'\\ra{1.2}
 	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
 	'Query Construction Pattern & Number of Occurrences\\\\ \\midrule
-	'<for(<p,c> <- reportQCPCounts()){><getLine(p,c)> \\\\
+	'<for(<p,c> <- reportQCPCounts(true)){><getLine(p,c)> \\\\
 	'<}>
 	'\\bottomrule
 	'\\end{tabularx}
@@ -57,7 +58,7 @@ public str qcp4TypesAsLatexTable(list[QuerySnippet] qs){
 	'\\npfourdigitsep
 	'\\begin{table}
 	'\\centering
-	'\\caption{Counts of Each Type of Dynamic Query Part in QCP4 Occurrences\\label{tbl:php-qcp4-types}}
+	'\\caption{Counts of Each Type of Dynamic Query Part in QCP4 Occurrences\\label{tbl:qcp4-types}}
 	'\\ra{1.2}
 	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
 	'Type & Number of Occurrences\\\\ \\midrule
@@ -80,7 +81,7 @@ public str qcp4RolesAsLatexTable(set[QueryString] qs){
 	'\\npfourdigitsep
 	'\\begin{table}
 	'\\centering
-	'\\caption{Counts of Each QCP4 Dynamic Part Grouped by Role\\label{tbl:php-qcp4-roles}}
+	'\\caption{Counts of Each QCP4 Dynamic Part Grouped by Role\\label{qcp4-roles}}
 	'\\ra{1.2}
 	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
 	'Role & Number of Occurrences\\\\ \\midrule
