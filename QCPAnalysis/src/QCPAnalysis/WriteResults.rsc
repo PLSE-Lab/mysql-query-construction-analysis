@@ -81,7 +81,7 @@ public str qcp4RolesAsLatexTable(set[QueryString] qs){
 	'\\npfourdigitsep
 	'\\begin{table}
 	'\\centering
-	'\\caption{Counts of Each QCP4 Dynamic Part Grouped by Role\\label{qcp4-roles}}
+	'\\caption{Counts of Each QCP4 Dynamic Part Grouped by Role\\label{tbl:qcp4-roles}}
 	'\\ra{1.2}
 	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
 	'Role & Number of Occurrences\\\\ \\midrule

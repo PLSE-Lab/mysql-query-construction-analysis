@@ -347,7 +347,8 @@ public set[QueryString] buildAndClassifyQueryStrings(){
 				qs.flags.unclassified = false;
 				qs.flags.qcp4 = true;
 			}
-			else{
+			
+			else if(call(_,[actualParameter(scalar(string(_)),false),_*]) !:= c){
 				println("unclassified query found at <qs.callloc>");
 			}
 			sysres += qs;
