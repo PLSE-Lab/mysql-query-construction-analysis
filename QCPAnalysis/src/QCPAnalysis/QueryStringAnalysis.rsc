@@ -2,9 +2,6 @@
  * The purpose of this module is to analyze all mysql_query calls in the system
  * and figure out which parts of the Query String are static and which come from
  * dynamic sources.
- * After initial creation of QueryString data structures for each call, each dynamic
- * Snippet will be analyzed in the CFGs and pattern flags will be set for that QueryString
- * structure based on defined query construction patterns
  */
 module QCPAnalysis::QueryStringAnalysis
 
@@ -49,7 +46,7 @@ public str queryStringToString(QueryString qs){
 			res += s.staticpart;
 		}
 		else{
-			res += "ø";
+			res += "ï¿½";
 		}
 	}
 	return res;
