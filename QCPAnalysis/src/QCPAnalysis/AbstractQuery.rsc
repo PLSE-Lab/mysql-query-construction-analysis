@@ -3,8 +3,8 @@ module QCPAnalysis::AbstractQuery
 import lang::php::ast::AbstractSyntax;
 
 /*
- * QCP1: a) param to mysql_query is a literal string or a variable containing a literal string
- * QCP
+ * QCP1: a) param to mysql_query is a literal string
+ * 		 b) param to mysql_query is a variable containing a literal string
  * QCP2: param to mysql_query is built using cascading .= assignments
  * QCP3: a) param to mysql_query is a variable that can take on multiple possible literal queries distributed
  		    over control flow
