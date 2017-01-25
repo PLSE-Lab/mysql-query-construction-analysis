@@ -29,8 +29,8 @@ public data Query = QCP1a(loc callloc, str sql)
 				  | unclassified(loc callloc);
 
 public data QuerySnippet = staticsnippet(str sql)
-					  | dynamicParams(DynamicParams params)
-					  | dynamicName(DynamicName name)
+					  | dynamicParams(DynamicParams params) // dynamic snippet used as a parameter
+					  | dynamicName(DynamicName name) // dynamic snippet provides database, table, or column name
 					  | dynamicsnippet(Expr expr); // truly dynamic, i.e. query structure depends on a variable
 
 						
@@ -41,6 +41,6 @@ public data DynamicParams = whereParam(str attribute, Expr equals)
 						 | setParam(rel[str, Expr] pairs)
 						 | valuesParam(list[Expr] values);
 						 
-public data DynamicName = databaseName(str name)
-						| tableName(str name)
-						| columnName(str name);
+public data DynamicName = databaseName(Expr name)
+						| tableName(Expr name)
+						| columnName(Expr name);

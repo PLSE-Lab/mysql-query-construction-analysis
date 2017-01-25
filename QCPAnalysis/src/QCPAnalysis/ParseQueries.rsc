@@ -22,21 +22,56 @@ import ValueIO;
 import List;
 // along with AbstractQuery.rsc, will replace QueryStringAnalysis, QueryGroups, and QCP4SubcaseAnalysis
 
-public void printCounts(){
+public map[str, map[str, int]] countsBySystem(){
 	queryMap = buildQueriesCorpus();
+	res = ();
 	for(sys <- queryMap, queries := queryMap[sys]){
-		println("counts for <sys>");
-		println("QCP1a: <size({q | q <- queries, QCP1a(_,_) := q})>");
-		println("QCP1b: <size({q | q <- queries, QCP1b(_,_) := q})>");
-		println("QCP2: <size({q | q <- queries, QCP2(_,_) := q})>");
-		println("QCP3a: <size({q | q <- queries, QCP3a(_,_) := q})>");
-		println("QCP3b: <size({q | q <- queries, QCP3b(_,_) := q})>");
-		println("QCP4a: <size({q | q <- queries, QCP4a(_,_) := q})>");
-		println("QCP4b: <size({q | q <- queries, QCP4b(_,_) := q})>");
-		println("QCP4c: <size({q | q <- queries, QCP4c(_,_) := q})>");
-		println("QCP5: <size({q | q <- queries, QCP5(_,_) := q})>");
-		println("unclassified: <size({q | q <- queries, unclassified(_) := q})>");
+		counts = ("total" : size(queries),
+				  "QCP1a" : size([q | q <- queries, QCP1a(_,_) := q]),
+				  "QCP1b" : size([q | q <- queries, QCP1b(_,_) := q]), 
+				  "QCP2" : size([q | q <- queries, QCP2(_,_) := q]),
+				  "QCP3a" : size([q | q <- queries, QCP3a(_,_) := q]),
+				  "QCP3b" : size([q | q <- queries, QCP3b(_,_) := q]),
+				  "QCP4a" : size([q | q <- queries, QCP4a(_,_) := q]),
+				  "QCP4b" : size([q | q <- queries, QCP4b(_,_) := q]),
+				  "QCP4c" : size([q | q <- queries, QCP4c(_,_) := q]),
+				  "QCP5" : size([q | q <- queries, QCP5(_,_) := q]),
+				  "unclassified" : size([q | q <- queries, unclassified(_) := q])
+		);
+		res += (sys : counts);
 	}
+	return res;
+}
+
+public map[str, int] countsByPattern(){
+	sysCounts = countsBySystem();
+	res = (
+		"total" : 0,
+		"QCP1a" : 0,
+		"QCP1b" : 0,
+		"QCP2" : 0,
+		"QCP3a" : 0,
+		"QCP3b" : 0,
+		"QCP4a" : 0,
+		"QCP4b" : 0,
+		"QCP4c" : 0,
+		"QCP5" : 0,
+		"unclassified" : 0
+	);
+	for(sys <- sysCounts, counts := sysCounts[sys]){
+		res["total"] += counts["total"];
+		res["QCP1a"] += counts["QCP1a"];
+		res["QCP1b"] += counts["QCP1b"];
+		res["QCP2"] += counts["QCP2"];
+		res["QCP3a"] += counts["QCP3a"];
+		res["QCP3b"] += counts["QCP3b"];
+		res["QCP4a"] += counts["QCP4a"];
+		res["QCP4b"] += counts["QCP4b"];
+		res["QCP4c"] += counts["QCP4c"];
+		res["QCP5"] += counts["QCP5"];
+		res["unclassified"] += counts["unclassified"];
+	}
+	return res;
 }
 
 public map[str, list[Query]] buildQueriesCorpus(){
@@ -61,87 +96,208 @@ public map[str, list[Query]] buildQueriesCorpus(){
 
 public list[Query] buildQueriesSystem(System pt, list[Expr] calls, IncludesInfo iinfo, map[loc, map[NamePath,CFG]] cfgs){
 	res = [];
-	classifiedCalls = [];
 	
-	// build Query structures for the easy cases
-	easy = buildEasyQueries(calls);
-	res += easy.queries;
-	classifiedCalls += easy.classified;
+	// get calls already found by the concat assignment checker
+	ca = concatAssignments()[pt.name, pt.version];
 	
-	// build Query structures for QCP2
-	qcp2 = buildQCP2Queries(calls - classifiedCalls);
-	res += qcp2.queries;
-	classifiedCalls += qcp2.classified;
+	for(c:call(name(name("mysql_query")), params) <- calls){
 	
-	// build Query structures for variable cases
-	varQueries = buildVariableQueries(pt, calls, iinfo, cfgs);
-	res += varQueries.queries;
-	classifiedCalls += varQueries.classified;
-	
-	// build Query structures for unknown cases
-	unknowns = buildUnknownQueries(calls - classifiedCalls);
-	res += unknowns.queries;
-	classifiedCalls += unknowns.classified;
-	
-	// make sure all calls were characterized
-	if(size(calls) != size(classifiedCalls)) 
-		throw "not all calls were classified";
+		// check if this call was already found by the QCP2 checker
+		if(c@at in [a.usedAt | a <- ca]){
+			queryParts = getOneFrom([a.queryParts | a <- ca, c@at == a.usedAt]);
+			res += QCP2(c@at, buildMixedSnippets(queryParts));
+			continue;
+		}
 		
+		//check for easy cases QCP1a, QCP4a, and QCP4b
+		query = buildEasyCaseQuery(c);
+		if(unclassified(_) !:= query){
+			res += query;
+			continue;	
+		}
+		
+		// check for QCP1b and QCP3a
+		query = buildLiteralVariableQuery(pt, c, iinfo, cfgs);
+		if(unclassified(_) !:= query){
+			res += query;
+			continue;	
+		}
+		
+		// check for QCP4a and QCP3b
+		query = buildMixedVariableQuery(pt, c, iinfo, cfgs);
+		if(unclassified(_) !:= query){
+			res += query;
+			continue;	
+		}
+		
+		// check for QCP5
+		query = buildQCP5Query(pt, c, iinfo, cfgs);
+		if(unclassified(_) !:= query){
+			res += query;
+			continue;	
+		}
+		
+		// nothing classified this query, add it as an unclassified query
+		res += unclassified(c@at);
+	}
 	return res;
 }
 
-@doc{builds Query structures for cases where we can classifty the query just by looking at the parameter (QCP1a,  QCP4a, or QCPb)}
-public tuple[list[Query] queries, list[Expr] classified] buildEasyQueries(list[Expr] calls){
-	res = [];
-	classifiedCalls = [];
-	for(c:call(name(name("mysql_query")), params) <- calls){
+@doc{builds a Query structure for easy case (QCP1a,  QCP4a, or QCPb), if the query matches these cases. Otherwise, returns an unclassified query}
+public Query buildEasyCaseQuery(Expr c){
+
+	if(call(name(name("mysql_query")), params) := c){
 		if(actualParameter(scalar(string(s)),false) := head(params)){
-			res += QCP1a(c@at, s);
-			classifiedCalls += c;
+			return QCP1a(c@at, s);
 		}
 		// check for QCP4a (encapsed string)
 		else if(actualParameter(scalar(encapsed(parts)), false) := head(params)){
-			res += QCP4a(c@at, buildMixedSnippets(parts));
-			classifiedCalls += c;
+			return QCP4a(c@at, buildMixedSnippets(parts));
 		}
 		
 		// check for QCP4b (concatenation)
 		else if(actualParameter(b:binaryOperation(left, right, concat()), false) := head(params)){
-			res += QCP4b(c@at, buildMixedSnippets(b));
-			classifiedCalls += c;
+			return QCP4b(c@at, buildMixedSnippets(b));
 		}
 		else{
-			continue;
-		}	
+			return unclassified(c@at);
+		}
 	}
-	return <res, classifiedCalls>;
-}
-
-@doc{builds Query Structures for cases found by the QCP2 checker}
-public tuple[list[Query] queries, list[Expr] classified] buildQCP2Queries(list[Expr] calls){
-	// TO BE IMPLEMENTED
-	return <[],[]>;
-}
-
-@doc{builds Query Structures for other cases where the param to mysql_query is a variable}
-public tuple[list[Query] queries, list[Expr] classified] buildVariableQueries(System pt, list[Expr] calls, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs){
-	// TO BE IMPLEMENTED
-	return <[],[]>;
-}
-
-@doc{builds queries that we arent able to classify yet}
-public tuple[list[Query] queries, list[Expr] classified] buildUnknownQueries(list[Expr] calls){
-	res = [];
-	classifiedCalls = [];
-	for(c:call(name(name("mysql_query")), params) <- calls){
-		res += unclassified(c@at);
-		classifiedCalls += c;
+	else{
+		throw "error: buildEasyCase should only be called on calls to mysql_query";
 	}
-	return <res, classifiedCalls>;
+}
+
+@doc{builds Query Structures for QCP1b or QCP3a if the query matches these cases. Otherwise, returns an unclassified query}
+public Query buildLiteralVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs){
+	if(call(_,[actualParameter(var(name(name(queryVar))),false),_*]) := c){
+	
+		containingScript = pt.files[c@at.top];
+		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
+		callNode = findNodeForExpr(containingCFG, c);
+			
+		// If we have a standard literal assignment to the query var, then we can use the assigned value
+		bool assignsScalarToQueryVar(CFGNode cn) {
+			if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+				if (scalar(string(_)) := simplifiedQueryExpr) {
+					return true;
+				}
+			}
+			return false;
+		}
+				
+		// If we have a non-literal assignment to the query var, then we stop looking, that "spoils" any
+		// literal assignment we could find above, e.g., $x = goodValue, $x .= badValue. 
+		bool assignsNonScalarToQueryVar(CFGNode cn) {
+			if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+				if (scalar(string(_)) !:= simplifiedQueryExpr) {
+					return true;
+				}
+			} else if (exprNode(assignWOp(var(name(name(queryVar))),queryExpr,_),_) := cn) {
+				return true;
+			}
+			return false;			
+		}
+				
+		Expr getAssignedScalar(CFGNode cn) {
+			if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+				if (ss:scalar(string(_)) := simplifiedQueryExpr) {
+					return ss;
+				}
+			}	
+			throw "gather should only be called when pred returns true";
+		}
+			
+		literalGR = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, assignsScalarToQueryVar, assignsNonScalarToQueryVar, getAssignedScalar);
+		if(literalGR.trueOnAllPaths){
+			// QCP1b (single literal assignment into the query variable)
+			if(size(literalGR.results) == 1){
+				return QCP1b(c@at, getOneFrom(literalGR.results).scalarVal.strVal);
+			}
+				
+			// QCP3a (literal assignments distributed over control flow)
+			if(size(literalGR.results) > 1){
+				return  QCP3a(c@at, [r.scalarVal.strVal | r <- literalGR.results]);
+			}
+		}
+	}
+	return unclassified(c@at);
+}
+@doc{builds a Query Structue for QCP4c or QCP3b if the query matches these cases. Otherwise, returns an unclassified query}
+public Query buildMixedVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs){
+
+	if(call(_,[actualParameter(var(name(name(queryVar))),false),_*]) := c){
+		containingScript = pt.files[c@at.top];
+		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
+		callNode = findNodeForExpr(containingCFG, c);
+		bool assignsConcatOrEncapsedToQueryVar(CFGNode cn){
+			if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+				if (scalar(encapsed(_)) := simplifiedQueryExpr || binaryOperation(left,right,concat()) := simplifiedQueryExpr) {
+					return true;
+				}
+			} 
+			return false;			
+		}
+				
+		bool notAssignsConcatOrEncapsedToQueryVar(CFGNode cn) {
+			if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+				if (scalar(encapsed(_)) := simplifiedQueryExpr || binaryOperation(left,right,concat()) := simplifiedQueryExpr) {
+					return false;
+				} else {
+					return true;
+				}
+			} 
+			return false;				
+		}
+		
+		Expr getAssignedConcatOrEncapsed(CFGNode cn){
+			if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
+				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+				if (e:scalar(encapsed(_)) := simplifiedQueryExpr) {
+					return e;
+				}
+				else if(e:binaryOperation(left, right, concat()) := simplifiedQueryExpr){
+					return e;
+				}
+			}	
+			throw "gather should only be called when pred returns true";
+		}
+		
+		concatOrEncapsedGR = gatherOnAllReachingPaths(cfgAsGraph(containingCFG), callNode, 
+			assignsConcatOrEncapsedToQueryVar, notAssignsConcatOrEncapsedToQueryVar, getAssignedConcatOrEncapsed);
+		
+		if(concatOrEncapsedGR.trueOnAllPaths){
+			// QCP4c check (QCP4a or QCP4b query assigned to a variable)
+			if(size(concatOrEncapsedGR.results) == 1){
+				return  QCP4c(c@at, buildMixedSnippets(toList(concatOrEncapsedGR.results)));
+			}
+			
+			// QCP3b check (QCP4 queries distributed over control flow)
+			if(size(concatOrEncapsedGR.results) > 1){
+				queries = [];
+				for(r <- concatOrEncapsedGR.results){
+					queries += [buildMixedSnippets(r)];
+				}
+				return QCP3b(c@at, queries);
+			}
+		}
+	}
+	return unclassified(c@at);
+}
+
+@doc{builds a query if it is classified as QCP5, otherwise returns an unclassified query}
+public Query buildQCP5Query(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs){
+	// TO BE IMPLEMENTED
+	return unclassified(c@at);
 }
 
 // placeholder, will be replaced with code that classifies dynamic snippets based on what role they play in the query
-@doc{builds Query structures for QCP2 and QCP4 where there is a mixture of static and dynamic query parts}
+@doc{builds Query Snippets for QCP2 and QCP4 where there is a mixture of static and dynamic query parts}
 private list[QuerySnippet] buildMixedSnippets(Expr e){
 	if(scalar(string(s)) := e) return [staticsnippet(s)];
 	else if(scalar(encapsed(parts)) := e) return buildMixedSnippets(parts);
