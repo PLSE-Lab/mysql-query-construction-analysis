@@ -1,4 +1,4 @@
-module QCPAnalysis::ParseQueries
+module QCPAnalysis::BuildQueries
 
 import QCPAnalysis::AbstractQuery;
 import QCPAnalysis::QCPCorpus;
@@ -20,58 +20,33 @@ import Map;
 import IO;
 import ValueIO;
 import List;
-// along with AbstractQuery.rsc, will replace QueryStringAnalysis, QueryGroups, and QCP4SubcaseAnalysis
 
-public map[str, map[str, int]] countsBySystem(){
-	queryMap = buildQueriesCorpus();
-	res = ();
-	for(sys <- queryMap, queries := queryMap[sys]){
-		counts = ("total" : size(queries),
-				  "QCP1a" : size([q | q <- queries, QCP1a(_,_) := q]),
-				  "QCP1b" : size([q | q <- queries, QCP1b(_,_) := q]), 
-				  "QCP2" : size([q | q <- queries, QCP2(_,_) := q]),
-				  "QCP3a" : size([q | q <- queries, QCP3a(_,_) := q]),
-				  "QCP3b" : size([q | q <- queries, QCP3b(_,_) := q]),
-				  "QCP4a" : size([q | q <- queries, QCP4a(_,_) := q]),
-				  "QCP4b" : size([q | q <- queries, QCP4b(_,_) := q]),
-				  "QCP4c" : size([q | q <- queries, QCP4c(_,_) := q]),
-				  "QCP5" : size([q | q <- queries, QCP5(_,_) := q]),
-				  "unclassified" : size([q | q <- queries, unclassified(_) := q])
-		);
-		res += (sys : counts);
+@doc{gets all queries of a particulat pattern. Note: run writeQueries() before this}
+public list[Query] getQCP(str pattern){
+	queryMap = readBinaryValueFile(#map[str, list[Query]], |project://QCPAnalysis/results/lists/queryMap|);
+	queries = [q | sys <- queryMap, queries := queryMap[sys], q <- queries];
+	switch(pattern){
+		case "unclassified" : return [ q <- queries, unclassified(_) := q];
+		case "QCP1" : return [q | q <- queries, QCP1a(_,_) := q || QCP1b(_,_) := q];
+		case "QCP1a" : return [q | q <- queries, QCP1a(_,_) := q];
+		case "QCP1b" : return [q | q <- queries, QCP1b(_,_) := q];
+		case "QCP2" : return [q | q <- queries, QCP2(_,_) := q];
+		case "QCP3" : return [q | q <- queries, QCP3a(_,_) := q || QCP3b(_,_) := q];
+		case "QCP3a" : return [q | q <- queries, QCP3a(_,_) := q || QCP3a(_,_) := q];
+		case "QCP3b" : return [q | q <- queries, QCP3a(_,_) := q || QCP3b(_,_) := q];
+		case "QCP4" : return [q | q <- queries, QCP4a(_,_) := q || QCP4b(_,_) := q || QCP4c(_*) := q];
+		case "QCP4a" : return [q | q <- queries, QCP4a(_,_) := q || QCP3b(_,_) := q];
+		case "QCP4b" : return [q | q <- queries, QCP4b(_,_) := q || QCP3b(_,_) := q];
+		case "QCP4c" : return [q | q <- queries, QCP4c(_,_) := q || QCP3b(_,_) := q];
+		case "QCP5" : return [q | q <- queries, QCP5(_,_) := q || QCP3b(_,_) := q];
+		default : throw "unexpected pattern name entered";
 	}
-	return res;
 }
 
-public map[str, int] countsByPattern(){
-	sysCounts = countsBySystem();
-	res = (
-		"total" : 0,
-		"QCP1a" : 0,
-		"QCP1b" : 0,
-		"QCP2" : 0,
-		"QCP3a" : 0,
-		"QCP3b" : 0,
-		"QCP4a" : 0,
-		"QCP4b" : 0,
-		"QCP4c" : 0,
-		"QCP5" : 0,
-		"unclassified" : 0
-	);
-	for(sys <- sysCounts, counts := sysCounts[sys]){
-		res["total"] += counts["total"];
-		res["QCP1a"] += counts["QCP1a"];
-		res["QCP1b"] += counts["QCP1b"];
-		res["QCP2"] += counts["QCP2"];
-		res["QCP3a"] += counts["QCP3a"];
-		res["QCP3b"] += counts["QCP3b"];
-		res["QCP4a"] += counts["QCP4a"];
-		res["QCP4b"] += counts["QCP4b"];
-		res["QCP4c"] += counts["QCP4c"];
-		res["QCP5"] += counts["QCP5"];
-		res["unclassified"] += counts["unclassified"];
-	}
-	return res;
+@doc{since buildQueriesCorpus takes a long time to run, this function writes the results of it to a file for quick reference}
+public void writeQueries(){
+	queries = buildQueriesCorpus();
+	writeBinaryValueFile(|project://QCPAnalysis/results/lists/queryMap|, queries);
 }
 
 public map[str, list[Query]] buildQueriesCorpus(){
