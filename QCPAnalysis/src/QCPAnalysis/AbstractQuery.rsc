@@ -16,7 +16,6 @@ import lang::php::ast::AbstractSyntax;
  * QCP5: param to mysql_query comes from a function, method, or static method parameter
  */
  
-// along with ParseQueries.rsc will replace QueryStringAnalysis, QueryGroups, and QCP4SubcaseAnalysis
 public data Query = QCP1a(loc callloc, str sql)
 				  | QCP1b(loc callloc, str sql)
 				  | QCP2(loc callloc, list[QuerySnippet] assignments)
@@ -33,7 +32,8 @@ public data QuerySnippet = staticsnippet(str sql)
 					  | dynamicName(DynamicName name) // dynamic snippet provides database, table, or column name
 					  | dynamicsnippet(Expr expr); // truly dynamic, i.e. query structure depends on a variable
 
-						
+
+// DynamicParams and DynamicName are just placeholders for something better in the future					
 public data DynamicParams = whereParam(str attribute, Expr equals)
 						 | andParam(str attribute, Expr equals)
 						 | orParam(str attribute, Expr equals)

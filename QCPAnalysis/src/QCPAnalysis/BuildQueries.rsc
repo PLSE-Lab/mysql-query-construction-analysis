@@ -21,7 +21,7 @@ import IO;
 import ValueIO;
 import List;
 
-@doc{gets all queries of a particulat pattern. Note: run writeQueries() before this}
+@doc{gets all queries of a particular pattern. Note: run writeQueries() before this}
 public list[Query] getQCP(str pattern){
 	queryMap = readBinaryValueFile(#map[str, list[Query]], |project://QCPAnalysis/results/lists/queryMap|);
 	queries = [q | sys <- queryMap, queries := queryMap[sys], q <- queries];

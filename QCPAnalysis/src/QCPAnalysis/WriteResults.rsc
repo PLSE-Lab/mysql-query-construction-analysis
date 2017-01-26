@@ -21,11 +21,7 @@ import Set;
 
 loc tables = |project://QCPAnalysis/results/tables/|;
 public void writeTables(){
-	qcp4 = readBinaryValueFile(#set[QueryString], |project://QCPAnalysis/results/lists/qcp4|);
-	ds = getDynamicSnippets(qcp4);
-	writeFile(tables + "qcpCounts.txt", qcpCountsAsLatexTable());
-	writeFile(tables + "qcp4Types.txt", qcp4TypesAsLatexTable(ds));
-	writeFile(tables + "qcp4Roles.txt", qcp4RolesAsLatexTable(qcp4));
+	writeFile(tables + "qcpCounts.txt", qcpCountsAsLatexTable(queryMap));
 }
 
 public str qcpCountsAsLatexTable(){
@@ -40,52 +36,6 @@ public str qcpCountsAsLatexTable(){
 	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
 	'Query Construction Pattern & Number of Occurrences\\\\ \\midrule
 	'<for(<p,c> <- reportQCPCounts(true)){><getLine(p,c)> \\\\
-	'<}>
-	'\\bottomrule
-	'\\end{tabularx}
-	'\\end{table}
-	'\\npfourdigitnosep
-	'\\npnoaddmissingzero
-	";
-	return res;
-}
-
-public str qcp4TypesAsLatexTable(list[QuerySnippet] qs){
-	typeGroups = groupDynamicSnippetsByType(qs);
-	str getLine(str t, int c) = "<t> & <c>";
-	str res =
-	"\\npaddmissingzero
-	'\\npfourdigitsep
-	'\\begin{table}
-	'\\centering
-	'\\caption{Counts of Each Type of Dynamic Query Part in QCP4 Occurrences\\label{tbl:qcp4-types}}
-	'\\ra{1.2}
-	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
-	'Type & Number of Occurrences\\\\ \\midrule
-	'<for(p <- typeGroups, c := typeGroups[p]){><getLine(p,size(c))> \\\\
-	'<}>
-	'\\bottomrule
-	'\\end{tabularx}
-	'\\end{table}
-	'\\npfourdigitnosep
-	'\\npnoaddmissingzero
-	";
-	return res;
-}
-
-public str qcp4RolesAsLatexTable(set[QueryString] qs){
-	roleGroups = groupDynamicSnippetsByRole(qs);
-	str getLine(str r, int c) = "<r> & <c>";
-	str res =
-	"\\npaddmissingzero
-	'\\npfourdigitsep
-	'\\begin{table}
-	'\\centering
-	'\\caption{Counts of Each QCP4 Dynamic Part Grouped by Role\\label{tbl:qcp4-roles}}
-	'\\ra{1.2}
-	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
-	'Role & Number of Occurrences\\\\ \\midrule
-	'<for(p <- roleGroups, c := roleGroups[p]){><getLine(p,size(c))> \\\\
 	'<}>
 	'\\bottomrule
 	'\\end{tabularx}
