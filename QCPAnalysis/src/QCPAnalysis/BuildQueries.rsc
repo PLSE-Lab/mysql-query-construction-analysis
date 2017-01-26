@@ -273,18 +273,18 @@ public Query buildQCP5Query(System pt, Expr c, IncludesInfo iinfo, map[loc, map[
 
 // placeholder, will be replaced with code that classifies dynamic snippets based on what role they play in the query
 @doc{builds Query Snippets for QCP2 and QCP4 where there is a mixture of static and dynamic query parts}
-private list[QuerySnippet] buildMixedSnippets(Expr e){
-	if(scalar(string(s)) := e) return [staticsnippet(s)];
+private str buildMixedSnippets(Expr e){
+	if(scalar(string(s)) := e) return s;
 	else if(scalar(encapsed(parts)) := e) return buildMixedSnippets(parts);
 	else if(binaryOperation(left, right, concat()) := e) return buildMixedSnippets(left) + buildMixedSnippets(right);
-	else return [dynamicsnippet(e)];
+	else return "Ø";//symbol for query hole
 }
-private list[QuerySnippet] buildMixedSnippets(list[Expr] parts){
-	snippets = [];
+private str buildMixedSnippets(list[Expr] parts){
+	res = "";
 	for(p <- parts){
-		snippets += buildMixedSnippets(p);
+		res += buildMixedSnippets(p);
 	}
-	return snippets;
+	return res;
 }
 			
 @doc{Run the simplifier on the parameters being passed to this function}
