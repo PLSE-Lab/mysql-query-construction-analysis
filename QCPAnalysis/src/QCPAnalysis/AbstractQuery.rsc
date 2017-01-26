@@ -16,6 +16,7 @@ import lang::php::ast::AbstractSyntax;
  * QCP5: param to mysql_query comes from a function, method, or static method parameter
  */
  
+// TODO: modify QCP2 and QCP4 to have a list of Expr corresponding to the dynamic holes in the query
 public data Query = QCP1a(loc callloc, str sql)
 				  | QCP1b(loc callloc, str sql)
 				  | QCP2(loc callloc, str mixedQuery)
