@@ -4,10 +4,10 @@ extend lang::std::Layout;
 
 
 syntax Name = name: [a-zA-Z0-9_.]+
-			  | hole: "Ø";
+			  | dynamicName: "Ø";
 			  
 syntax Param = param: [a-zA-Z0-9_.]+
-			  | hole: "Ø";
+			  | dynamicParam: "Ø";
 
 start syntax Query
 	= selectQuery: "SELECT" Name From Join Where Boolean;
