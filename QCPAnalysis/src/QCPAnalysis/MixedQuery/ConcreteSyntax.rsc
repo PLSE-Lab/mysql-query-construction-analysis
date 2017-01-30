@@ -3,7 +3,7 @@ module QCPAnalysis::MixedQuery::ConcreteSyntax
 extend lang::std::Layout;
 
 
-syntax Name = name: [a-zA-Z0-9_.]+
+syntax Name = name: [a-zA-Z0-9_.*]+
 			  | dynamicName: "Ø";
 			  
 syntax Param = param: [a-zA-Z0-9_.]+
