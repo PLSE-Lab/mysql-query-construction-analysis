@@ -5,9 +5,7 @@
 module QCPAnalysis::WriteResults
 
 import QCPAnalysis::QCPCorpus;
-import QCPAnalysis::QueryGroups;
-import QCPAnalysis::QueryStringAnalysis;
-import QCPAnalysis::QCP4SubcaseAnalysis;
+import QCPAnalysis::BuildQueries;
 
 import lang::php::ast::AbstractSyntax;
 import lang::php::util::Corpus;

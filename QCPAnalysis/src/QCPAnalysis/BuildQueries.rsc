@@ -26,7 +26,7 @@ public list[Query] getQCP(str pattern){
 	queryMap = readBinaryValueFile(#map[str, list[Query]], |project://QCPAnalysis/results/lists/queryMap|);
 	queries = [q | sys <- queryMap, queries := queryMap[sys], q <- queries];
 	switch(pattern){
-		case "unclassified" : return [ q <- queries, unclassified(_) := q];
+		case "unclassified" : return [ q | q <- queries, q is unclassified ];
 		case "QCP1" : return [q | q <- queries, q is QCP1a || q is QCP1b ];
 		case "QCP1a" : return [q | q <- queries, q is QCP1a ];
 		case "QCP1b" : return [q | q <- queries, q is QCP1b ];
@@ -34,7 +34,7 @@ public list[Query] getQCP(str pattern){
 		case "QCP3" : return [q | q <- queries, q is QCP3a || q is QCP3b ];
 		case "QCP3a" : return [q | q <- queries, q is QCP3a ];
 		case "QCP3b" : return [q | q <- queries, q is QCP3b ];
-		case "QCP4" : return [q | q <- queries, q is QCP4a || q is QCP4b || q is QCP4c(_,_) ];
+		case "QCP4" : return [q | q <- queries, q is QCP4a || q is QCP4b || q is QCP4c ];
 		case "QCP4a" : return [q | q <- queries, q is QCP4a ];
 		case "QCP4b" : return [q | q <- queries, q is QCP4b ];
 		case "QCP4c" : return [q | q <- queries, q is QCP4c ];
@@ -71,6 +71,7 @@ public map[str, list[Query]] buildQueriesCorpus(){
 
 public list[Query] buildQueriesSystem(System pt, list[Expr] calls, IncludesInfo iinfo, map[loc, map[NamePath,CFG]] cfgs){
 	res = [];
+	int i = 0;
 	
 	// get calls already found by the concat assignment checker
 	ca = concatAssignments()[pt.name, pt.version];
@@ -114,6 +115,12 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, IncludesInfo 
 		
 		// nothing classified this query, add it as an unclassified query
 		res += unclassified(c@at);
+		
+		// write the CFG of this unclasified query to a text file, for manual inspection to support future classification
+		containingScript = pt.files[c@at.top];
+		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
+		iprintToFile(|project://QCPAnalysis/results/cfgs/| + "<pt.name>" + "<i>", containingCFG);
+		i = i + 1;
 	}
 	return res;
 }
@@ -267,7 +274,33 @@ public Query buildMixedVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[
 
 @doc{builds a query if it is classified as QCP5, otherwise returns an unclassified query}
 public Query buildQCP5Query(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs){
-	// TO BE IMPLEMENTED
+
+	if(call(_,[actualParameter(var(name(name(queryVar))),false),_*]) := c){
+	
+		containingScript = pt.files[c@at.top];
+		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
+		callNode = findNodeForExpr(containingCFG, c);
+		entryNode = getEntryNode(containingCFG);
+		
+		if(functionEntry(functionName) := entryNode){
+			//find the function in the script matching the entryNode and see if queryVar is in its parameters
+			containingFunction = getOneFrom({s | s <- containingScript.body, function(functionName, _,_,_) := s});
+			paramNames = {p.paramName | p <- contaningFunction.params};
+			if(queryVar in paramNames){
+				return QCP5(c@at, containingFunction@at);
+			}
+		}
+		
+		if(methodEntry(className, methodName) := entryNode){
+			// find the method in the script matching the entryNode and see if queryVar is in its parameters
+			containingClass = getOneFrom({cl | /Stmt cl <- containingScript.body, classDef(class(className,_,_,_,_)) := cl});
+			containingMethod = getOneFrom({m | m <- containingClass.classDef.members, method(methodName,_,_,_,_) := m});
+			paramNames = {p.paramName | p <- containingMethod.params};
+			if(queryVar in paramNames){				
+				return QCP5(c@at, containingMethod@at);
+			}
+		}
+	}
 	return unclassified(c@at);
 }
 

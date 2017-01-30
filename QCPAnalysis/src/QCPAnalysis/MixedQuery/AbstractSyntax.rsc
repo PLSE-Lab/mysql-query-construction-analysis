@@ -1,7 +1,6 @@
 module QCPAnalysis::MixedQuery::AbstractSyntax
 
-public data Query = selectQuery(Name columnname, From fc, Join jc, Where wc, Boolean bc);
-
+public data Query = selectQuery(Name columnname, From fc, Join jc, Where wc, Boolean bc);				  
 public data Name = name(str name)
 				 | dynamicName();
 
@@ -19,9 +18,10 @@ public data Join = inner(Name tablename, Name on1, Name on2)
 public data On = on(Name left, Name right);
 
 public data Where = where(Name columnname, Param param)
-						| noWhere();
+				   | noWhere();
 
 public data Boolean = and(Name columnname, Param param, Boolean next)
 					| or(Name columnname, Param param, Boolean next)
 					| not(Name columnname, Param param, Boolean next)
-					| noBoolean();
+		 			| noBoolean();
+		 			
