@@ -27,18 +27,18 @@ public list[Query] getQCP(str pattern){
 	queries = [q | sys <- queryMap, queries := queryMap[sys], q <- queries];
 	switch(pattern){
 		case "unclassified" : return [ q <- queries, unclassified(_) := q];
-		case "QCP1" : return [q | q <- queries, QCP1a(_,_) := q || QCP1b(_,_) := q];
-		case "QCP1a" : return [q | q <- queries, QCP1a(_,_) := q];
-		case "QCP1b" : return [q | q <- queries, QCP1b(_,_) := q];
-		case "QCP2" : return [q | q <- queries, QCP2(_,_) := q];
-		case "QCP3" : return [q | q <- queries, QCP3a(_,_) := q || QCP3b(_,_) := q];
-		case "QCP3a" : return [q | q <- queries, QCP3a(_,_) := q];
-		case "QCP3b" : return [q | q <- queries, QCP3b(_,_) := q];
-		case "QCP4" : return [q | q <- queries, QCP4a(_,_) := q || QCP4b(_,_) := q || QCP4c(_,_) := q];
-		case "QCP4a" : return [q | q <- queries, QCP4a(_,_) := q];
-		case "QCP4b" : return [q | q <- queries, QCP4b(_,_) := q];
-		case "QCP4c" : return [q | q <- queries, QCP4c(_,_) := q];
-		case "QCP5" : return [q | q <- queries, QCP5(_,_) := q];
+		case "QCP1" : return [q | q <- queries, q is QCP1a || q is QCP1b ];
+		case "QCP1a" : return [q | q <- queries, q is QCP1a ];
+		case "QCP1b" : return [q | q <- queries, q is QCP1b ];
+		case "QCP2" : return [q | q <- queries, q is QCP2 ];
+		case "QCP3" : return [q | q <- queries, q is QCP3a || q is QCP3b ];
+		case "QCP3a" : return [q | q <- queries, q is QCP3a ];
+		case "QCP3b" : return [q | q <- queries, q is QCP3b ];
+		case "QCP4" : return [q | q <- queries, q is QCP4a || q is QCP4b || q is QCP4c(_,_) ];
+		case "QCP4a" : return [q | q <- queries, q is QCP4a ];
+		case "QCP4b" : return [q | q <- queries, q is QCP4b ];
+		case "QCP4c" : return [q | q <- queries, q is QCP4c ];
+		case "QCP5" : return [q | q <- queries, q is QCP5 ];
 		default : throw "unexpected pattern name entered";
 	}
 }
