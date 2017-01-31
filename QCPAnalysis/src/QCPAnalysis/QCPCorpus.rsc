@@ -25,7 +25,10 @@ private Corpus newCorpus = (
 	"OMS"			: "1.0.1",
 	"OpenClinic" 	: "0.8.2",
 	"UseBB"			: "1.0.16",
-	"web2project"	: "3.3"
+	"web2project"	: "3.3",
+	// 2017 additions below
+	"inoERP" 		: "0.5.1",
+	"PHPFusion"		: "7.02.07"
 	);
 
 public str getSensibleName("faqforge") = "FAQ Forge";

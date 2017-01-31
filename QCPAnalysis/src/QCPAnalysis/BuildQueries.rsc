@@ -21,34 +21,6 @@ import IO;
 import ValueIO;
 import List;
 
-@doc{gets all queries of a particular pattern. Note: run writeQueries() before this}
-public list[Query] getQCP(str pattern){
-	queryMap = readBinaryValueFile(#map[str, list[Query]], |project://QCPAnalysis/results/lists/queryMap|);
-	queries = [q | sys <- queryMap, queries := queryMap[sys], q <- queries];
-	switch(pattern){
-		case "unclassified" : return [ q | q <- queries, q is unclassified ];
-		case "QCP1" : return [q | q <- queries, q is QCP1a || q is QCP1b ];
-		case "QCP1a" : return [q | q <- queries, q is QCP1a ];
-		case "QCP1b" : return [q | q <- queries, q is QCP1b ];
-		case "QCP2" : return [q | q <- queries, q is QCP2 ];
-		case "QCP3" : return [q | q <- queries, q is QCP3a || q is QCP3b ];
-		case "QCP3a" : return [q | q <- queries, q is QCP3a ];
-		case "QCP3b" : return [q | q <- queries, q is QCP3b ];
-		case "QCP4" : return [q | q <- queries, q is QCP4a || q is QCP4b || q is QCP4c ];
-		case "QCP4a" : return [q | q <- queries, q is QCP4a ];
-		case "QCP4b" : return [q | q <- queries, q is QCP4b ];
-		case "QCP4c" : return [q | q <- queries, q is QCP4c ];
-		case "QCP5" : return [q | q <- queries, q is QCP5 ];
-		default : throw "unexpected pattern name entered";
-	}
-}
-
-@doc{since buildQueriesCorpus takes a long time to run, this function writes the results of it to a file for quick reference}
-public void writeQueries(){
-	queries = buildQueriesCorpus();
-	writeBinaryValueFile(|project://QCPAnalysis/results/lists/queryMap|, queries);
-}
-
 public map[str, list[Query]] buildQueriesCorpus(){
 	Corpus corpus = getCorpus();
 	res = ();
@@ -285,7 +257,7 @@ public Query buildQCP5Query(System pt, Expr c, IncludesInfo iinfo, map[loc, map[
 		if(functionEntry(functionName) := entryNode){
 			//find the function in the script matching the entryNode and see if queryVar is in its parameters
 			containingFunction = getOneFrom({s | s <- containingScript.body, function(functionName, _,_,_) := s});
-			paramNames = {p.paramName | p <- contaningFunction.params};
+			paramNames = {p.paramName | p <- containingFunction.params};
 			if(queryVar in paramNames){
 				return QCP5(c@at, containingFunction@at);
 			}
