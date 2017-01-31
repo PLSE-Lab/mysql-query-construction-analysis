@@ -29,7 +29,11 @@ private Corpus newCorpus = (
 	// 2017 additions below
 	"inoERP" 		: "0.5.1",
 	"PHPFusion"		: "7.02.07",
-	"LinPHA"		: "1.3.4"
+	"LinPHA"		: "1.3.4",
+	"Timeclock"		: "1.04",
+	"PHPAgenda" 	: "2.2.12",
+	"AddressBook"   : "8.2.5.2",
+	"OcoMon"		: "2.0RC6"
 	);
 
 public str getSensibleName("faqforge") = "FAQ Forge";

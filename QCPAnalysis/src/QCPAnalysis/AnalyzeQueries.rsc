@@ -1,10 +1,29 @@
 module QCPAnalysis::AnalyzeQueries
 
+import lang::php::util::Corpus;
+import lang::php::util::Utils;
+
 import QCPAnalysis::BuildQueries;
 import QCPAnalysis::AbstractQuery;
+import QCPAnalysis::QCPCorpus;
 
 import List;
 import ValueIO;
+
+@doc{counts the calls to mysql_query in each system}
+public lrel[str, int] countCallsSystem(){
+	Corpus corpus = getCorpus();
+	res = [];
+	total = 0;
+	for(p <- corpus, v := corpus[p]){
+		pt = loadBinary(p,v);
+		calls = [ c | /c:call(name(name("mysql_query")),_) := pt ];
+		total += size(calls);
+		res += <"<p>_<v>", size(calls)>;
+	}
+	
+	return res + <"total", total>;
+}
 
 @doc{gets all queries of a particular pattern. Note: run writeQueries() before this}
 public list[Query] getQCP(str pattern){
