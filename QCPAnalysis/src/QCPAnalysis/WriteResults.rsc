@@ -33,7 +33,7 @@ public str qcpCountsAsLatexTable(){
 	'\\ra{1.2}
 	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
 	'Query Construction Pattern & Number of Occurrences\\\\ \\midrule
-	'<for(<p,c> <- reportQCPCounts(true)){><getLine(p,c)> \\\\
+	'<for(<p,c> <- getQCPCounts(true)){><getLine(p,c)> \\\\
 	'<}>
 	'\\bottomrule
 	'\\end{tabularx}
