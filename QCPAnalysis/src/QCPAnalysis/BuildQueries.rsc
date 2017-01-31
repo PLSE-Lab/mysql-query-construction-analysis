@@ -24,29 +24,28 @@ import List;
 public map[str, list[Query]] buildQueriesCorpus(){
 	Corpus corpus = getCorpus();
 	res = ();
+	ca = concatAssignments();
 	for(p <- corpus, v := corpus[p]){
 		pt = loadBinary(p,v);
 		if (!pt has baseLoc) {
 			println("Skipping system <p>, version <v>, no base loc included");
 			continue;
 		}
+		sysCA = ca[p, v];
 		IncludesInfo iinfo = loadIncludesInfo(p, v);
 		calls = [ c | /c:call(name(name("mysql_query")),_) := pt ];
 		simplified = [s | c <- calls, s := simplifyParams(c, pt.baseLoc, iinfo)];
 		println("Calls in system <p>, version <v> (total = <size(calls)>):");
 		neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { c@at.top | c <- calls } );
-		queries = buildQueriesSystem(pt, simplified, iinfo, neededCFGs);
+		queries = buildQueriesSystem(pt, simplified, iinfo, neededCFGs, sysCA);
 		res += ("<p>_<v>" : queries);
 	}
 	return res;
 }
 
-public list[Query] buildQueriesSystem(System pt, list[Expr] calls, IncludesInfo iinfo, map[loc, map[NamePath,CFG]] cfgs){
+public list[Query] buildQueriesSystem(System pt, list[Expr] calls, IncludesInfo iinfo, map[loc, map[NamePath,CFG]] cfgs, set[ConcatBuilder] ca){
 	res = [];
 	int i = 0;
-	
-	// get calls already found by the concat assignment checker
-	ca = concatAssignments()[pt.name, pt.version];
 	
 	for(c:call(name(name("mysql_query")), params) <- calls){
 	

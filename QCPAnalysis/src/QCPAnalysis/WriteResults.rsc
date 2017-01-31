@@ -19,8 +19,10 @@ import String;
 import Set;
 
 loc tables = |project://QCPAnalysis/results/tables/|;
+
 public void writeTables(){
-	writeFile(tables + "qcpCounts.txt", qcpCountsAsLatexTable());
+	writeFile(tables + "qcpCounts.tex", qcpCountsAsLatexTable());
+	writeFile(tables + "qcpCountsBySystem.tex", qcpCountsBySystemAsLatexTable());
 }
 
 public str qcpCountsAsLatexTable(){
