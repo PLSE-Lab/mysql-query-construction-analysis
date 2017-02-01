@@ -45,14 +45,13 @@ public map[str, list[Query]] buildQueriesCorpus(){
 
 public list[Query] buildQueriesSystem(System pt, list[Expr] calls, IncludesInfo iinfo, map[loc, map[NamePath,CFG]] cfgs, set[ConcatBuilder] ca){
 	res = [];
-	int i = 0;
-	
+
 	for(c:call(name(name("mysql_query")), params) <- calls){
 	
-		// check if this call was already found by the QCP2 checker
+		// check if this call was already found by the QCP2a checker
 		if(c@at in [a.usedAt | a <- ca]){
 			queryParts = getOneFrom([a.queryParts | a <- ca, c@at == a.usedAt]);
-			res += QCP2(c@at, buildMixedSnippets(queryParts));
+			res += QCP2a(c@at, buildMixedSnippets(queryParts));
 			continue;
 		}
 		
@@ -86,12 +85,6 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, IncludesInfo 
 		
 		// nothing classified this query, add it as an unclassified query
 		res += unclassified(c@at);
-		
-		// write the CFG of this unclasified query to a text file, for manual inspection to support future classification
-		containingScript = pt.files[c@at.top];
-		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
-		iprintToFile(|project://QCPAnalysis/results/cfgs/| + "<pt.name>" + "<i>", containingCFG);
-		i = i + 1;
 	}
 	return res;
 }
@@ -275,13 +268,12 @@ public Query buildQCP5Query(System pt, Expr c, IncludesInfo iinfo, map[loc, map[
 	return unclassified(c@at);
 }
 
-// placeholder, will be replaced with code that classifies dynamic snippets based on what role they play in the query
-@doc{builds Query Snippets for QCP2 and QCP4 where there is a mixture of static and dynamic query parts}
+@doc{builds Query Snippets for QCP2a and QCP4 where there is a mixture of static and dynamic query parts}
 private str buildMixedSnippets(Expr e){
 	if(scalar(string(s)) := e) return s;
 	else if(scalar(encapsed(parts)) := e) return buildMixedSnippets(parts);
 	else if(binaryOperation(left, right, concat()) := e) return buildMixedSnippets(left) + buildMixedSnippets(right);
-	else return "Ø";//symbol for query hole
+	else return "Ø";//symbol for dynamic query part
 }
 private str buildMixedSnippets(list[Expr] parts){
 	res = "";
@@ -303,7 +295,7 @@ private Expr simplifyParams(Expr c:call(NameOrExpr funName, list[ActualParameter
 
 data ConcatBuilder = concatBuilder(str varName, list[Expr] queryParts, loc startsAt, Expr queryExpr, loc usedAt);
 
-@doc {checks for QCP2 occurrences (cascading .= assignments)}
+@doc {checks for QCP2a occurrences (cascading .= assignments)}
 public rel[str system, str version, ConcatBuilder occurrence] concatAssignments() {
 	rel[str system, str version, ConcatBuilder occurrence] res = { };
 	corpus = getCorpus();
