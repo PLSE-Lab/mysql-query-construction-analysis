@@ -50,28 +50,28 @@ syntax Identifier = identifier: Word
 syntax SelectExpr = columnName: Identifier 
 				  | wildcard: "*";
 			  
-syntax Expr = orExpr: Expr "OR" Expr
+syntax Expr = orExpr: Expr 'OR' Expr
 			| orExpr: Expr "||" Expr
-			| xorExpr: Expr "XOR" Expr
-			| andExpr: Expr "AND" Expr
+			| xorExpr: Expr 'XOR' Expr
+			| andExpr: Expr 'AND' Expr
 			| andExpr: Expr "&&" Expr
-			| notExpr: "NOT" Expr
+			| notExpr: 'NOT' Expr
 			| notExpr: "!" Expr
-			| booleanExprWithExpected: BooleanPrimary "IS" "NOT"? ("TRUE" | "FALSE" | "UNKNOWN")
+			| booleanExprWithExpected: BooleanPrimary 'IS' 'NOT'? ('TRUE' | 'FALSE' | 'UNKNOWN')
 			| booleanExpr: BooleanPrimary;
 
-syntax BooleanPrimary = nullTest: BooleanPrimary "IS" "NOT"? "NULL"
+syntax BooleanPrimary = nullTest: BooleanPrimary 'IS' 'NOT'? 'NULL'
 					  | spaceShip: BooleanPrimary "\<=\>" Predicate
 					  | comparison: BooleanPrimary ComparisonOperator Predicate
-					  | comparisonWithSubQuery: BooleanPrimary ComparisonOperator ("ALL" | "ANY") SubQuery
+					  | comparisonWithSubQuery: BooleanPrimary ComparisonOperator ('ALL' | 'ANY') SubQuery
 					  | predicate: Predicate;
 
-syntax Predicate = predSubQuery: BitExpr "NOT"? "IN" SubQuery
-				 | predExprList: BitExpr "NOT"? "IN" "(" Expr {"," Expr}* ")"
-				 | predBetween: BitExpr "NOT"? "BETWEEN" BitExpr "AND" Predicate
-				 | predSoundsLike: BitExpr "SOUNDS LIKE" BitExpr
-				 | predLike: BitExpr "NOT"? "LIKE" SimpleExpr ("ESCAPE" SimpleExpr)?
-				 | predRegex: BitExpr "NOT"? "REGEXP" BitExpr
+syntax Predicate = predSubQuery: BitExpr 'NOT'? 'IN' SubQuery
+				 | predExprList: BitExpr 'NOT'? 'IN' "(" Expr {"," Expr}* ")"
+				 | predBetween: BitExpr 'NOT'? 'BETWEEN' BitExpr 'AND' Predicate
+				 | predSoundsLike: BitExpr 'SOUNDS LIKE' BitExpr
+				 | predLike: BitExpr 'NOT'? 'LIKE' SimpleExpr ('ESCAPE' SimpleExpr)?
+				 | predRegex: BitExpr 'NOT'? 'REGEXP' BitExpr
 				 | bitExpr: BitExpr;
 
 syntax BitExpr = bitOr: BitExpr "|" BitExpr
@@ -83,8 +83,8 @@ syntax BitExpr = bitOr: BitExpr "|" BitExpr
 			   | subtraction: BitExpr "-" BitExpr
 			   | multiplication: BitExpr "*" BitExpr
 			   | division: BitExpr "/" BitExpr
-			   | intDivision: BitExpr "DIV" BitExpr
-			   | modulo: BitExpr "MOD" BitExpr
+			   | intDivision: BitExpr 'DIV' BitExpr
+			   | modulo: BitExpr 'MOD' BitExpr
 			   | modulo: BitExpr "%" BitExpr
 			   //| BitExpr "+" IntervalExpr
 			   //| BitExpr "-" IntervalExpr
@@ -93,7 +93,7 @@ syntax BitExpr = bitOr: BitExpr "|" BitExpr
 syntax SimpleExpr = Literal
 				  | Identifier
 				  //| FunctionCall
-				  | SimpleExpr "COLLATE" Word
+				  | SimpleExpr 'COLLATE' Word
 				  | ParamMarker
 				  | Variable
 				  | SimpleExpr "||" SimpleExpr
@@ -101,35 +101,35 @@ syntax SimpleExpr = Literal
 				  | "-" SimpleExpr
 				  | "~" SimpleExpr
 				  | "!" SimpleExpr
-				  | "BINARY" SimpleExpr
+				  | 'BINARY' SimpleExpr
 				  | "(" Expr {"," Expr}* ")"
-				  | "ROW" "(" Expr "," Expr {"," Expr}* ")"
+				  | 'ROW' "(" Expr "," Expr {"," Expr}* ")"
 				  |  SubQuery 
-				  | "EXISTS"  SubQuery 
+				  | 'EXISTS'  SubQuery 
 				  | "{" Identifier Expr "}";
 				  //| MatchExpr
 				  //| CaseExpr
 				  //| IntervalExpr
-				  
+	  
 start syntax SQLQuery = SelectQuery;
 				   //| InsertQuery
 				   //| UpdateQuery
 				   //| DeleteQuery;
 				   
 syntax SelectQuery =
-	"SELECT" ("ALL" | "DISTINCT" | "DISTINCTROW")?
-	"HIGH_PRIORITY"?
-	("MAX_STATEMENT_TIME =" Number)?
-	"STRAIGHT_JOIN"?
-	"SQL_SMALL_RESULT"? "SQL_BIG_RESULT"? "SQL_BUFFER_RESULT"?
-	("SQL_CACHE" | "SQL_NO_CACHE")? "SQL_CALC_FOUND_ROWS"?
+	'SELECT' ('ALL' | 'DISTINCT' | 'DISTINCTROW')?
+	'HIGH_PRIORITY'?
+	('MAX_STATEMENT_TIME =' Number)?
+	'STRAIGHT_JOIN'?
+	'SQL_SMALL_RESULT'? 'SQL_BIG_RESULT'? 'SQL_BUFFER_RESULT'?
+	('SQL_CACHE' | 'SQL_NO_CACHE')? 'SQL_CALC_FOUND_ROWS'?
 	SelectExpr {"," SelectExpr}*
-	("FROM" TableReferences ("PARTITION" PartitionList)?)?//PartitionList needs to be defined
-	("WHERE" Expr)?
-	("GROUP BY" {(Identifier | Expr | Number) ("ASC" | "DESC")?}+ "WITH ROLLUP"?)?
-	("HAVING" Expr)?
-	("ORDER BY" {(Identifier | Expr | Number) ("ASC" | "DESC")?}+)?
-	("LIMIT" (Number | (Number "OFFSET" Number)))?;
+	('FROM' TableReferences ('PARTITION' PartitionList)?)?//PartitionList needs to be defined
+	('WHERE' Expr)?
+	('GROUP BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+ 'WITH ROLLUP'?)?
+	('HAVING' Expr)?
+	('ORDER BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+)?
+	('LIMIT' (Number | (Number 'OFFSET' Number)))?;
 	//add rest of defininition from MySQL grammar (PROCEDURE, INTO, etc.)
 
 syntax SubQuery = "(" SelectQuery ")";
@@ -137,29 +137,29 @@ syntax SubQuery = "(" SelectQuery ")";
 syntax TableReferences = EscapedTableReference {"," EscapedTableReference}*;
 
 syntax EscapedTableReference = TableReference
-							 | "{" "OJ" TableReference "}";
+							 | "{" 'OJ' TableReference "}";
 							 
 syntax TableReference = TableFactor
 					  | JoinTable;
 					  
-syntax TableFactor = Identifier ("PARTITION" Identifier {"," Identifier}*)?
-					 	("AS"? Identifier)? IndexHintList?
-					| SubQuery "AS"? Identifier
+syntax TableFactor = Identifier ('PARTITION' Identifier {"," Identifier}*)?
+					 	('AS'? Identifier)? IndexHintList?
+					| SubQuery 'AS'? Identifier
 					| "(" TableReferences ")";
 					
-syntax JoinTable = TableReference ("INNER" | "CROSS") "JOIN" TableFactor JoinCondition?
-		         | TableReference "STRAIGHT_JOIN" TableFactor ("ON" Expr)?
-		         | TableReference ("LEFT" | "RIGHT") "OUTER"? "JOIN" TableReferences JoinCondition
-		         | TableReference "NATURAL" (("LEFT" | "RIGHT") "OUTER"?)? "JOIN" TableFactor;
+syntax JoinTable = TableReference ('INNER' | 'CROSS') 'JOIN' TableFactor JoinCondition?
+		         | TableReference 'STRAIGHT_JOIN' TableFactor ('ON' Expr)?
+		         | TableReference ('LEFT' | 'RIGHT') 'OUTER'? 'JOIN' TableReferences JoinCondition
+		         | TableReference 'NATURAL' (('LEFT' | 'RIGHT') 'OUTER'?)? 'JOIN' TableFactor;
 		         
-syntax JoinCondition = "ON" Expr
-					 | "USING" "(" Identifier {"," Identifier}* ")";
+syntax JoinCondition = 'ON' Expr
+					 | 'USING' "(" Identifier {"," Identifier}* ")";
 					 
 syntax IndexHintList = IndexHint {"," IndexHint}*;
 
-syntax IndexHint = "USE" ("INDEX" | "KEY") ("FOR" ("JOIN" | "ORDER BY" | "GROUP BY"))? "("IndexList")"
-				 | "IGNORE" ("INDEX" | "KEY") ("FOR" ("JOIN" | "ORDER BY" | "GROUP BY"))? "("IndexList")"
-				 | "FORCE" ("INDEX" | "KEY") ("FOR" ("JOIN" | "ORDER BY" | "GROUP BY"))? "("IndexList")";
+syntax IndexHint = 'USE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("IndexList")"
+				 | 'IGNORE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("IndexList")"
+				 | 'FORCE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("IndexList")";
 				 
 syntax Index_list = Identifier {"," Identifier}*;
 	
