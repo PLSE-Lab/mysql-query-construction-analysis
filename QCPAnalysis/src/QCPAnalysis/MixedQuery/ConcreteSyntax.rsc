@@ -110,28 +110,45 @@ syntax SimpleExpr = lit: Literal
 				  //| CaseExpr
 				  //| IntervalExpr
 	  
-start syntax SQLQuery = SelectQuery;
-				   //| InsertQuery
+start syntax SQLQuery = SelectQuery
+				   	  | InsertQuery;
 				   //| UpdateQuery
 				   //| DeleteQuery;
 				   
-syntax SelectQuery =
-	selectQuery: 'SELECT' ('ALL' | 'DISTINCT' | 'DISTINCTROW')?
-	'HIGH_PRIORITY'?
-	('MAX_STATEMENT_TIME =' Number)?
-	'STRAIGHT_JOIN'?
-	'SQL_SMALL_RESULT'? 'SQL_BIG_RESULT'? 'SQL_BUFFER_RESULT'?
-	('SQL_CACHE' | 'SQL_NO_CACHE')? 'SQL_CALC_FOUND_ROWS'?
-	SelectExpr {"," SelectExpr}*
-	('FROM' TableReferences ('PARTITION' PartitionList)?)?//PartitionList needs to be defined
-	('WHERE' Expr)?
-	('GROUP BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+ 'WITH ROLLUP'?)?
-	('HAVING' Expr)?
-	('ORDER BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+)?
-	('LIMIT' (Number | (Number 'OFFSET' Number)))?;
-	//add rest of defininition from MySQL grammar (PROCEDURE, INTO, etc.)
+syntax SelectQuery = selectQuery: 'SELECT' ('ALL' | 'DISTINCT' | 'DISTINCTROW')?
+									'HIGH_PRIORITY'?
+									('MAX_STATEMENT_TIME =' Number)?
+									'STRAIGHT_JOIN'?
+									'SQL_SMALL_RESULT'? 'SQL_BIG_RESULT'? 'SQL_BUFFER_RESULT'?
+									('SQL_CACHE' | 'SQL_NO_CACHE')? 'SQL_CALC_FOUND_ROWS'?
+									SelectExpr {"," SelectExpr}*
+									('FROM' TableReferences ('PARTITION' IdentifierList)?)?
+									('WHERE' Expr)?
+									('GROUP BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+ 'WITH ROLLUP'?)?
+									('HAVING' Expr)?
+									('ORDER BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+)?
+									('LIMIT' (Number | (Number 'OFFSET' Number)))?;
+									//add rest of defininition from MySQL grammar (PROCEDURE, INTO, etc.)
+	
+syntax InsertQuery = insertValues: "INSERT" ("LOW_PRIORITY" | "DELAYED" | "HIGH_PRIORITY")? "IGNORE"?
+								 	"INTO"? Identifier
+								 	("PARTITION" IdentifierList)?
+								 	("(" IdentifierList ")")?
+								 	(("VALUES" | "VALUE" ) "(" (Expr | "DEFAULT") {"," (Expr | "DEFAULT")}* ")")
+								 	("ON DUPLICATE KEY UPDATE" Identifier "=" Expr {"," (Identifier "=" Expr)}*)?
+								 			 		
+				   | insertSet: "INSERT" ("LOW_PRIORITY" | "DELAYED" | "HIGH_PRIORITY")? "IGNORE"?
+								 "INTO"? Identifier
+								 ("PARTITION" IdentifierList)?
+								 "SET" Identifier "=" (Expr | "DEFAULT") {"," (Identifier "=" (Expr | "DEFAULT"))}*
+								 ("ON DUPLICATE KEY UPDATE" Identifier "=" Expr {"," (Identifier "=" Expr)}*)?;
+								 
+				   //| insertSelect: To be implemented
+				   
 
 syntax SubQuery = "(" SelectQuery ")";
+
+syntax IdentifierList = Identifier {"," Identifier}*;
 	
 syntax TableReferences = EscapedTableReference {"," EscapedTableReference}*;
 
