@@ -31,10 +31,10 @@ public data BooleanPrimary = booleanNullTest(BooleanPrimary boolean, bool includ
 public data Predicate = bitExprSubQuery(BitExpr left, bool includedNot, SubQuery sub)
 					  | bitExprList(BitExpr left, bool includedNot, Expr head, list[Expr] tail)
 					  | bitExprBetween(BitExpr left, bool includedNot, BitExpr bounds1, Predicate bounds2)
-					  | bitExprSoundsLike(BitExpr left, BitExpr right)
-					  | bitExprLike(BitExpr left, bool includedNot, SimpleExpr right, list[SimpleExpr] optionalEscape)//list is empty if no escape provided
-					  | bitExprRegex(BitExpr left, bool includedNot, BitExpr right)
-					  | bitExpr(bitExpr expr);
+					  | bitExprSoundsLike(BitExpr left, BitExpr bitight)
+					  | bitExprLike(BitExpr left, bool includedNot, SimpleExpr simpleRight, list[SimpleExpr] optionalEscape)//list is empty if no escape provided
+					  | bitExprRegex(BitExpr left, bool includedNot, BitExpr bitRight)
+					  | bitExpr(BitExpr expr);
 					  
 public data BitExpr = bitwiseOr(BitExpr left, BitExpr right)
 					| bitwiseAnd(BitExpr left, BitExpr right)
@@ -55,19 +55,24 @@ public data SimpleExpr = lit(Literal literalVal)
 					   | paramMarker()
 					   | var(str sqlvar)
 					   | logicalOr(SimpleExpr left, SimpleExpr right)
-					   | positive(SimpleExpr expr)
-					   | negative(SimpleExpr expr)
-					   | logicalNegation(SimpleExpr expr)
-					   | negation(SimpleExpr expr)
-					   | binary(SimpleExpr expr)
+					   | positive(SimpleExpr simple)
+					   | negative(SimpleExpr sunple)
+					   | logicalNegation(SimpleExpr simple)
+					   | negation(SimpleExpr simple)
+					   | binary(SimpleExpr simple)
 					   | exprList(Expr head, list[Expr] tail)
 					   | rowExpr(list[Expr] exprs)
-					   | subQuery(bool includedExists, Subquery sub)
+					   | subQuery(bool includedExists, SubQuery sub)
 					   | curlyBraces(Identifier id, Expr expr);
 
 public data SubQuery = subQuery(SelectQuery query);
 
+public data SQLQuery = select(SelectQuery query)
+					 | error(); //constructor for queries that could not parse
+					 
 public data SelectQuery = selectQuery();
+
+
 
 
 		 			

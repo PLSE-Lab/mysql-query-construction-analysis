@@ -45,6 +45,7 @@ syntax Literal = string: String
 syntax Identifier = identifier: Word
 				  | identifier:  "`" Word "`"
 				  | identifier: "\"" Word "\""
+				  | identifier: "\'" Word "\'"
 				  | identifierHole : QueryHole;
 
 syntax SelectExpr = columnName: Identifier 
@@ -115,7 +116,7 @@ start syntax SQLQuery = SelectQuery
 				   //| UpdateQuery
 				   //| DeleteQuery;
 				   
-syntax SelectQuery = selectQuery: 'SELECT' ('ALL' | 'DISTINCT' | 'DISTINCTROW')?
+syntax SelectQuery = select: 'SELECT' ('ALL' | 'DISTINCT' | 'DISTINCTROW')?
 									'HIGH_PRIORITY'?
 									('MAX_STATEMENT_TIME =' Number)?
 									'STRAIGHT_JOIN'?
@@ -145,7 +146,6 @@ syntax InsertQuery = insertValues: "INSERT" ("LOW_PRIORITY" | "DELAYED" | "HIGH_
 								 
 				   //| insertSelect: To be implemented
 				   
-
 syntax SubQuery = "(" SelectQuery ")";
 
 syntax IdentifierList = Identifier {"," Identifier}*;
