@@ -19,21 +19,21 @@ public data Expr = orExpr(Expr left, Expr right)
 				 | xorExpr(Expr ledft, Expr right)
 			     | andExpr(Expr left, Expr right)
 			     | notExpr(Expr negated)
-			     | booleanWithExpectedValue(BooleanPrimary boolean, bool includedNot, str expected)
+			     | booleanWithExpectedValue(BooleanPrimary boolean, bool optionalNot, str expected)
 			     | boolean(BooleanPrimary bp);
 
-public data BooleanPrimary = booleanNullTest(BooleanPrimary boolean, bool includedNot)
+public data BooleanPrimary = booleanNullTest(BooleanPrimary boolean, bool optionalNot)
 						   | spaceship(BooleanPrimary left, Predicate right)
 						   | comparison(BooleanPrimary left, str operator, Predicate right)
 						   | comparisonWithSubQuery(BooleanPrimary left, str operator, SubQuery sub)
 						   | predicate(Predicate pred);
 						   
-public data Predicate = bitExprSubQuery(BitExpr left, bool includedNot, SubQuery sub)
-					  | bitExprList(BitExpr left, bool includedNot, Expr head, list[Expr] tail)
-					  | bitExprBetween(BitExpr left, bool includedNot, BitExpr bounds1, Predicate bounds2)
+public data Predicate = bitExprSubQuery(BitExpr left, bool optionalNot, SubQuery sub)
+					  | bitExprList(BitExpr left, bool optionalNot, Expr head, list[Expr] tail)
+					  | bitExprBetween(BitExpr left, bool optionalNot, BitExpr bounds1, Predicate bounds2)
 					  | bitExprSoundsLike(BitExpr left, BitExpr bitight)
-					  | bitExprLike(BitExpr left, bool includedNot, SimpleExpr simpleRight, list[SimpleExpr] optionalEscape)//list is empty if no escape provided
-					  | bitExprRegex(BitExpr left, bool includedNot, BitExpr bitRight)
+					  | bitExprLike(BitExpr left, bool optionalNot, SimpleExpr simpleRight, list[SimpleExpr] optionalEscape)//list is empty if no escape provided
+					  | bitExprRegex(BitExpr left, bool optionalNot, BitExpr bitRight)
 					  | bitExpr(BitExpr expr);
 					  
 public data BitExpr = bitwiseOr(BitExpr left, BitExpr right)
@@ -60,19 +60,45 @@ public data SimpleExpr = lit(Literal literalVal)
 					   | logicalNegation(SimpleExpr simple)
 					   | negation(SimpleExpr simple)
 					   | binary(SimpleExpr simple)
-					   | exprList(Expr head, list[Expr] tail)
+					   | exprList(list[Expr] exprs)
 					   | rowExpr(list[Expr] exprs)
-					   | subQuery(bool includedExists, SubQuery sub)
+					   | subQuery(bool optionalExists, SubQuery sub)
 					   | curlyBraces(Identifier id, Expr expr);
 
 public data SubQuery = subQuery(SelectQuery query);
 
-public data SQLQuery = select(SelectQuery query)
+public data SQLQuery = selectQuery(SelectQuery query)
 					 | error(); //constructor for queries that could not parse
 					 
-public data SelectQuery = selectQuery();
+public data SelectQuery = select(
+	list[str] optionalSelectType, bool highPriority, list[Literal] optionalMaxStatementSize, bool optionalStraightJoin,
+	bool smallResult, bool bigResult, bool bufferResult, list[str] optionalCaching, bool optionalFoundRows,
+	list[SelectExpr] columns, list[tuple[TableReferences references, list[Identifier] optionalPartition]] from,
+	list[Expr] where,
+	list[str] groupBy,//Needs to be updated to not implode into string
+	list[Expr] having,
+	list[str] orderBy,//Needs to be updated to not implode into string
+	list[str] limit //Needs to be updated to not implode into string
+);
 
+public data TableReferences = tableReferences(EscapedTableReference head, list[EscapedTableReference] tail);
 
+public data EscapedTableReference = escaped(TableReference reference);
 
+public data TableReference = tableFactor(TableFactor factor)
+						   | joinTable(JoinTable jt);
 
-		 			
+public data TableFactor = tableFactorPartition(Identifier firstId, list[list[Identifier]] idList, list[Identifier] optionalAs, list[IndexHint] optionalHints)
+						| tableFactorSubQuery(SubQuery subquery, bool includedAsKeyword, Identifier id)
+						| tableFactorReferences(TableReferences references);
+						
+public data JoinTable = join1(TableReference reference, str keywords, TableFactor factor, list[JoinCondition] optionalJoinCondition)
+					  | join2(TableReference reference, str keywords, TableFactor factor, list[JoinCondition] optionalJoinCondition)
+					  | join3(TableReference reference, str keywords, TableReferences references, JoinCondition joinCondition)
+					  | join4(TableReference reference, str keywords, TableFactor factor);
+					  
+public data JoinCondition = joinConditionOn(Expr expr)
+						  | joinConditionUsing(list[Identifier] ids);
+						  
+public data IndexHint = hint(str keywords, list[Identifier] ids);
+					

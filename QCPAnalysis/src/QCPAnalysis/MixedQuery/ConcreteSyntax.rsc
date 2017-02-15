@@ -103,15 +103,15 @@ syntax SimpleExpr = lit: Literal
 				  | logicalNegation: "~" SimpleExpr
 				  | negation: "!" SimpleExpr
 				  | binary: 'BINARY' SimpleExpr
-				  | exprList: "(" Expr {"," Expr}* ")"
-				  | rowExpr: 'ROW' "(" Expr "," Expr {"," Expr}* ")"
+				  | exprList: "(" {Expr ","}* ")"
+				  | rowExpr: 'ROW' "(" Expr "," {Expr ","}* ")"
 				  | subQuery: 'EXISTS'? SubQuery 
 				  | curlyBraces: "{" Identifier Expr "}";
 				  //| MatchExpr
 				  //| CaseExpr
 				  //| IntervalExpr
 	  
-start syntax SQLQuery = SelectQuery
+start syntax SQLQuery = selectQuery:SelectQuery
 				   	  | InsertQuery;
 				   //| UpdateQuery
 				   //| DeleteQuery;
@@ -122,10 +122,10 @@ syntax SelectQuery = select: 'SELECT' ('ALL' | 'DISTINCT' | 'DISTINCTROW')?
 									'STRAIGHT_JOIN'?
 									'SQL_SMALL_RESULT'? 'SQL_BIG_RESULT'? 'SQL_BUFFER_RESULT'?
 									('SQL_CACHE' | 'SQL_NO_CACHE')? 'SQL_CALC_FOUND_ROWS'?
-									SelectExpr {"," SelectExpr}*
-									('FROM' TableReferences ('PARTITION' IdentifierList)?)?
+									{SelectExpr ","}*
+									('FROM' TableReferences ('PARTITION' {Identifier ","}+)?)?
 									('WHERE' Expr)?
-									('GROUP BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+ 'WITH ROLLUP'?)?
+									('GROUP BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+ 'WITH ROLLUP'?)?//HERE
 									('HAVING' Expr)?
 									('ORDER BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+)?
 									('LIMIT' (Number | (Number 'OFFSET' Number)))?;
@@ -133,51 +133,48 @@ syntax SelectQuery = select: 'SELECT' ('ALL' | 'DISTINCT' | 'DISTINCTROW')?
 	
 syntax InsertQuery = insertValues: "INSERT" ("LOW_PRIORITY" | "DELAYED" | "HIGH_PRIORITY")? "IGNORE"?
 								 	"INTO"? Identifier
-								 	("PARTITION" IdentifierList)?
-								 	("(" IdentifierList ")")?
-								 	(("VALUES" | "VALUE" ) "(" (Expr | "DEFAULT") {"," (Expr | "DEFAULT")}* ")")
-								 	("ON DUPLICATE KEY UPDATE" Identifier "=" Expr {"," (Identifier "=" Expr)}*)?
+								 	("PARTITION" {Identifier ","}+)?
+								 	("(" {Identifier ","}+ ")")?
+								 	(("VALUES" | "VALUE" ) "("{(Expr | "DEFAULT") ","}+ ")")
+								 	("ON DUPLICATE KEY UPDATE" {(Identifier "=" Expr) ","}+)?
 								 			 		
 				   | insertSet: "INSERT" ("LOW_PRIORITY" | "DELAYED" | "HIGH_PRIORITY")? "IGNORE"?
 								 "INTO"? Identifier
-								 ("PARTITION" IdentifierList)?
-								 "SET" Identifier "=" (Expr | "DEFAULT") {"," (Identifier "=" (Expr | "DEFAULT"))}*
-								 ("ON DUPLICATE KEY UPDATE" Identifier "=" Expr {"," (Identifier "=" Expr)}*)?;
+								 ("PARTITION" {Identifier ","}+)?
+								 "SET" {(Identifier "=" (Expr | "DEFAULT")) ","}+
+								 ("ON DUPLICATE KEY UPDATE" {(Identifier "=" Expr) ","}+)?;
 								 
 				   //| insertSelect: To be implemented
 				   
-syntax SubQuery = "(" SelectQuery ")";
+syntax SubQuery = subQuery:"(" SelectQuery ")";
 
-syntax IdentifierList = Identifier {"," Identifier}*;
 	
-syntax TableReferences = EscapedTableReference {"," EscapedTableReference}*;
+syntax TableReferences = tableReferences: EscapedTableReference {"," EscapedTableReference}*;
 
-syntax EscapedTableReference = TableReference
-							 | "{" 'OJ' TableReference "}";
+syntax EscapedTableReference = escaped: TableReference
+							 | escaped: "{" 'OJ' TableReference "}";
 							 
-syntax TableReference = TableFactor
-					  | JoinTable;
-					  
-syntax TableFactor = Identifier ('PARTITION' Identifier {"," Identifier}*)?
-					 	('AS'? Identifier)? IndexHintList?
-					| SubQuery 'AS'? Identifier
-					| "(" TableReferences ")";
-					
-syntax JoinTable = TableReference ('INNER' | 'CROSS') 'JOIN' TableFactor JoinCondition?
-		         | TableReference 'STRAIGHT_JOIN' TableFactor ('ON' Expr)?
-		         | TableReference ('LEFT' | 'RIGHT') 'OUTER'? 'JOIN' TableReferences JoinCondition
-		         | TableReference 'NATURAL' (('LEFT' | 'RIGHT') 'OUTER'?)? 'JOIN' TableFactor;
-		         
-syntax JoinCondition = 'ON' Expr
-					 | 'USING' "(" Identifier {"," Identifier}* ")";
-					 
-syntax IndexHintList = IndexHint {"," IndexHint}*;
+syntax TableReference = tableFactor: TableFactor
+					  | joinTable: JoinTable;
+				  
+syntax TableFactor = tableFactorPartition: Identifier ('PARTITION' {Identifier ","}+)?
+					 	('AS'? Identifier)? {IndexHint ","}*
+					| tableFactorSubQuery: SubQuery 'AS'? Identifier
+					| tableFactorReferences: "(" TableReferences ")";
 
-syntax IndexHint = 'USE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("IndexList")"
-				 | 'IGNORE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("IndexList")"
-				 | 'FORCE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("IndexList")";
-				 
-syntax Index_list = Identifier {"," Identifier}*;
+//TODO: meaningful names					
+syntax JoinTable = join1:TableReference ('INNER' | 'CROSS') 'JOIN' TableFactor JoinCondition?
+		         | join2:TableReference 'STRAIGHT_JOIN' TableFactor JoinCondition?
+		         | join3:TableReference ('LEFT' | 'RIGHT') 'OUTER'? 'JOIN' TableReferences JoinCondition
+		         | join4:TableReference 'NATURAL' (('LEFT' | 'RIGHT') 'OUTER'?)? 'JOIN' TableFactor;
+		         
+syntax JoinCondition = joinConditionOn:'ON' Expr
+					 | joinConditionUsing:'USING' "(" {Identifier ","}+ ")";
+					 
+
+syntax IndexHint = hint:'USE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("{Identifier ","}+")"
+				 | hint:'IGNORE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("{Identifier ","}+")"
+				 | hint:'FORCE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("{Identifier ","}+")";
 	
 	
 	
