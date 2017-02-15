@@ -24,6 +24,7 @@ import IO;
 import ValueIO;
 import List;
 import Exception;
+import String;
 
 public map[str, list[Query]] buildQueriesCorpus(){
 	Corpus corpus = getCorpus();
@@ -294,7 +295,11 @@ public Query buildQCP5Query(System pt, Expr c, IncludesInfo iinfo, map[loc, map[
 
 @doc{builds Query Snippets for QCP2a and QCP4 where there is a mixture of static and dynamic query parts}
 private str buildMixedSnippets(Expr e){
-	if(scalar(string(s)) := e) return s;
+	if(scalar(string(s)) := e){
+		res = replaceAll(s,"\n", "");
+		res = replaceAll(res, "\r", "");
+		return res;
+	}
 	else if(scalar(encapsed(parts)) := e) return buildMixedSnippets(parts);
 	else if(binaryOperation(left, right, concat()) := e) return buildMixedSnippets(left) + buildMixedSnippets(right);
 	else return "Ø";//symbol for dynamic query part
