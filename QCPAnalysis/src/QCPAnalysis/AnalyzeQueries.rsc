@@ -34,9 +34,7 @@ public list[Query] getQCP(str pattern){
 		case "QCP1" : return [q | q <- queries, q is QCP1a || q is QCP1b ];
 		case "QCP1a" : return [q | q <- queries, q is QCP1a ];
 		case "QCP1b" : return [q | q <- queries, q is QCP1b ];
-		case "QCP2" : return [q | q <- queries, q is QCP2a || q is QCP2b];
-		case "QCP2a" : return [q | q <- queries, q is QCP2a ];
-		case "QCP2b" : return [q | q <- queries, q is QCP2b ];
+		case "QCP2" : return [q | q <- queries, q is QCP2];
 		case "QCP3" : return [q | q <- queries, q is QCP3a || q is QCP3b ];
 		case "QCP3a" : return [q | q <- queries, q is QCP3a ];
 		case "QCP3b" : return [q | q <- queries, q is QCP3b ];
@@ -58,8 +56,7 @@ public list[Query] getQCPSystem(str p, str v, str pattern){
 		case "QCP1" : return [q | q <- queries, q is QCP1a || q is QCP1b ];
 		case "QCP1a" : return [q | q <- queries, q is QCP1a ];
 		case "QCP1b" : return [q | q <- queries, q is QCP1b ];
-		case "QCP2" : return [q | q <- queries, q is QCP2a || q is QCP2b];
-		case "QCP2a" : return [q | q <- queries, q is QCP2a ];
+		case "QCP2" : return [q | q <- queries, q is QCP2];
 		case "QCP3" : return [q | q <- queries, q is QCP3a || q is QCP3b ];
 		case "QCP3a" : return [q | q <- queries, q is QCP3a ];
 		case "QCP3b" : return [q | q <- queries, q is QCP3b ];
@@ -76,7 +73,7 @@ public list[Query] getQCPSystem(str p, str v, str pattern){
 public lrel[str, int] getQCPCounts(true) = [
 	<"QCP1a", size(getQCP("QCP1a"))>,
 	<"QCP1b", size(getQCP("QCP1b"))>,
-	<"QCP2a", size(getQCP("QCP2a"))>,
+	<"QCP2", size(getQCP("QCP2"))>,
 	<"QCP3a", size(getQCP("QCP3a"))>,
 	<"QCP3b", size(getQCP("QCP3b"))>,
 	<"QCP4a", size(getQCP("QCP4a"))>,

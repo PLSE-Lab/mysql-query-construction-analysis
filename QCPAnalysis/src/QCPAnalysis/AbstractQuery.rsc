@@ -8,7 +8,6 @@ import QCPAnalysis::MixedQuery::AbstractSyntax;
  * QCP1: a) param to mysql_query is a literal string
  * 		 b) param to mysql_query is a variable containing a literal string
  * QCP2  a) param to mysql_query is built using cascading .= assignments
- 		 b) param to mysql_query is build using .= assignments distributed over control flow
  * QCP3: a) param to mysql_query is a variable that can take on multiple possible literal queries distributed
  		    over control flow
  		 b) param to mysql query is a variable that can take on multiple possible QCP4 queries distributed over
@@ -19,19 +18,15 @@ import QCPAnalysis::MixedQuery::AbstractSyntax;
  * QCP5: param to mysql_query comes from a function, method, or static method parameter
  */
  
-// TODO: modify QCP2a and QCP4 to have a list of Expr corresponding to the dynamic holes in the query
-// TODO: add QCP2b model
+
 public data Query = QCP1a(loc callloc, str sql)
 				  | QCP1b(loc callloc, str sql)
-				  | QCP2a(loc callloc, str mixedQuery, SQLQuery parsed)
-				  | QCP2b()//to be implemented
+				  | QCP2(loc callloc, str mixedQuery, SQLQuery parsed)
 				  | QCP3a(loc callloc, list[str] staticqueries)
 				  | QCP3b(loc callloc, rel[str, SQLQuery] mixedAndParsed)
 				  | QCP4a(loc callloc, str mixedQuery, SQLQuery parsed)
 				  | QCP4b(loc callloc, str mixedQuery, SQLQuery parsed)
 				  | QCP4c(loc callloc, str mixedQuery, SQLQuery parsed)
 				  | QCP5(loc callloc, loc paramTo)
-				  | unclassified(loc callloc);				 
-
-
+				  | unclassified(loc callloc);
 

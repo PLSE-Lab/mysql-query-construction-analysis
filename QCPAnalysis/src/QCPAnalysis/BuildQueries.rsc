@@ -53,14 +53,14 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, IncludesInfo 
 
 	for(c:call(name(name("mysql_query")), params) <- calls){
 	
-		// check if this call was already found by the QCP2a checker
+		// check if this call was already found by the QCP2 checker
 		if(c@at in [a.usedAt | a <- ca]){
 			queryParts = getOneFrom([a.queryParts | a <- ca, c@at == a.usedAt]);
 			mixed = buildMixedSnippets(queryParts);
 			SQLQuery parsed;
 			try parsed = load(mixed);
 			catch: parsed = error();
-			res += QCP2a(c@at, mixed, parsed);
+			res += QCP2(c@at, mixed, parsed);
 			continue;
 		}
 		
@@ -293,7 +293,7 @@ public Query buildQCP5Query(System pt, Expr c, IncludesInfo iinfo, map[loc, map[
 	return unclassified(c@at);
 }
 
-@doc{builds Query Snippets for QCP2a and QCP4 where there is a mixture of static and dynamic query parts}
+@doc{builds Query Snippets for QCP2 and QCP4 where there is a mixture of static and dynamic query parts}
 private str buildMixedSnippets(Expr e){
 	if(scalar(string(s)) := e){
 		res = replaceAll(s,"\n", "");
@@ -324,7 +324,7 @@ private Expr simplifyParams(Expr c:call(NameOrExpr funName, list[ActualParameter
 
 data ConcatBuilder = concatBuilder(str varName, list[Expr] queryParts, loc startsAt, Expr queryExpr, loc usedAt);
 
-@doc {checks for QCP2a occurrences (cascading .= assignments)}
+@doc {checks for QCP2 occurrences (cascading .= assignments)}
 public rel[str system, str version, ConcatBuilder occurrence] concatAssignments() {
 	rel[str system, str version, ConcatBuilder occurrence] res = { };
 	corpus = getCorpus();
