@@ -74,11 +74,11 @@ public data SelectQuery = select(
 	list[str] optionalSelectType, bool highPriority, list[Literal] optionalMaxStatementSize, bool optionalStraightJoin,
 	bool smallResult, bool bigResult, bool bufferResult, list[str] optionalCaching, bool optionalFoundRows,
 	list[SelectExpr] columns, list[tuple[TableReferences references, list[Identifier] optionalPartition]] from,
-	list[Expr] where,
-	list[str] groupBy,//Needs to be updated to not implode into string
-	list[Expr] having,
-	list[str] orderBy,//Needs to be updated to not implode into string
-	list[str] limit //Needs to be updated to not implode into string
+	list[Expr] where
+	//list[str] groupBy,//Needs to be updated to not implode into string
+	//list[Expr] having,
+	//list[str] orderBy,//Needs to be updated to not implode into string
+	//list[str] limit //Needs to be updated to not implode into string
 );
 
 public data TableReferences = tableReferences(EscapedTableReference head, list[EscapedTableReference] tail);
