@@ -124,11 +124,11 @@ syntax SelectQuery = select: 'SELECT' ('ALL' | 'DISTINCT' | 'DISTINCTROW')?
 									('SQL_CACHE' | 'SQL_NO_CACHE')? 'SQL_CALC_FOUND_ROWS'?
 									{SelectExpr ","}*
 									('FROM' TableReferences ('PARTITION' {Identifier ","}+)?)?
-									('WHERE' Expr)?
-									('GROUP BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+ 'WITH ROLLUP'?)?//HERE
-									('HAVING' Expr)?
-									('ORDER BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+)?
-									('LIMIT' (Number | (Number 'OFFSET' Number)))?;
+									('WHERE' Expr)?;
+									//('GROUP BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+ 'WITH ROLLUP'?)?//HERE
+									//('HAVING' Expr)?
+									//('ORDER BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+)?
+									//('LIMIT' (Number | (Number 'OFFSET' Number)))?
 									//add rest of defininition from MySQL grammar (PROCEDURE, INTO, etc.)
 	
 syntax InsertQuery = insertValues: "INSERT" ("LOW_PRIORITY" | "DELAYED" | "HIGH_PRIORITY")? "IGNORE"?
