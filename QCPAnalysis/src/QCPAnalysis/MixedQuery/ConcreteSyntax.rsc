@@ -33,6 +33,20 @@ lexical Variable = "@"Word;
 
 lexical QueryHole =  "Ø";
 
+keyword MYSQLKeywords 
+	= 'AS'
+	| 'SELECT'
+	| 'FROM'
+	| 'PARTITION'
+	| 'USE'
+	| 'IGNORE'
+	| 'FORCE'
+	| 'INDEX'
+	| 'KEY'
+	| 'FOR'
+	| 'JOIN'
+	;
+
 // todo: add datetime
 syntax Literal = string: String
 			   | number: Number
@@ -42,14 +56,16 @@ syntax Literal = string: String
 			   | null: Null
 			   | literalHole: QueryHole;
 
-syntax Identifier = identifier: Word
+syntax Identifier = identifier: Word \ RascalKeywords
 				  | identifier:  "`" Word "`"
 				  | identifier: "\"" Word "\""
 				  | identifier: "\'" Word "\'"
 				  | identifierHole : QueryHole;
 
-syntax SelectExpr = columnName: Identifier 
-				  | wildcard: "*";
+syntax SelectExpr = columnName: Identifier name 
+				  | wildcard: "*"
+				  | aliased: Identifier name 'AS' Identifier aliasName
+				  ;
 			  
 syntax Expr = orExpr: Expr 'OR' Expr
 			| orExpr: Expr "||" Expr
@@ -115,16 +131,37 @@ start syntax SQLQuery = selectQuery:SelectQuery
 				   	  | InsertQuery;
 				   //| UpdateQuery
 				   //| DeleteQuery;
-				   
-syntax SelectQuery = select: 'SELECT' ('ALL' | 'DISTINCT' | 'DISTINCTROW')?
-									'HIGH_PRIORITY'?
-									('MAX_STATEMENT_TIME =' Number)?
-									'STRAIGHT_JOIN'?
-									'SQL_SMALL_RESULT'? 'SQL_BIG_RESULT'? 'SQL_BUFFER_RESULT'?
-									('SQL_CACHE' | 'SQL_NO_CACHE')? 'SQL_CALC_FOUND_ROWS'?
-									{SelectExpr ","}*
-									('FROM' TableReferences ('PARTITION' {Identifier ","}+)?)?
-									('WHERE' Expr)?;
+
+lexical DMLModifier 
+	= 'ALL' 
+	| 'DISTINCT' 
+	| 'DISTINCTROW' 
+	| 'HIGH_PRIORITY' 
+	| 'STRAIGHT_JOIN' 
+	| 'SQL_SMALL_RESULT' 
+	| 'SQL_BIG_RESULT'
+	| 'SQL_BUFFER_RESULT'
+	| 'SQL_CACHE'
+	| 'SQL_NO_CACHE'
+	| 'SQL_CALC_FOUND_ROWS'
+	;
+	
+// TODO: Need support for MAX_STATEMENT_TIME
+
+syntax SelectExprs = selectExprs: {SelectExpr ","}* exprs;
+ 			   
+syntax FromClause 
+	= basicFromClause: 'FROM' TableReferences
+	| fromClauseWithPartition: 'FROM' TableReferences 'PARTITION' {Identifier ","}+ identifiers
+	| emptyFromClause:
+	;
+	
+syntax WhereClause
+	= whereClause: 'WHERE' Expr whereExpr
+	| emptyWhereClause:
+	;
+	
+syntax SelectQuery = select: 'SELECT' DMLModifier* modifiers SelectExprs FromClause WhereClause;									
 									//('GROUP BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+ 'WITH ROLLUP'?)?//HERE
 									//('HAVING' Expr)?
 									//('ORDER BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+)?
@@ -149,32 +186,53 @@ syntax InsertQuery = insertValues: "INSERT" ("LOW_PRIORITY" | "DELAYED" | "HIGH_
 syntax SubQuery = subQuery:"(" SelectQuery ")";
 
 	
-syntax TableReferences = tableReferences: EscapedTableReference {"," EscapedTableReference}*;
+syntax TableReferences 
+	= tableReferences: { EscapedTableReference ","}+ tableReferences;
 
-syntax EscapedTableReference = escaped: TableReference
-							 | escaped: "{" 'OJ' TableReference "}";
+syntax EscapedTableReference 
+	= normalReference: TableReference
+	| escapedReference: "{" 'OJ' TableReference "}"
+	;
 							 
-syntax TableReference = tableFactor: TableFactor
-					  | joinTable: JoinTable;
-				  
-syntax TableFactor = tableFactorPartition: Identifier ('PARTITION' {Identifier ","}+)?
-					 	('AS'? Identifier)? {IndexHint ","}*
-					| tableFactorSubQuery: SubQuery 'AS'? Identifier
+syntax TableReference 
+	= tableFactor: TableFactor
+	| joinTable: JoinTable
+	;
+
+syntax TableFactorPartition
+	= tableFactorPartion: 'PARTITION' {Identifier ","}+ partitionNames
+	| noPartition:
+	;
+	
+syntax TableFactorAlias
+	= tableFactorAlias: 'AS' Identifier identifier
+	| noAlias:
+	;
+	
+//syntax IndexHintList
+//	= indexHintList: { IndexHint "," }* hints
+//	| noIndexHints:
+//	;
+	
+syntax TableFactor = tableFactorPartition: Identifier tableName TableFactorPartition TableFactorAlias //IndexHintList
+					| tableFactorSubQuery: SubQuery 'AS' Identifier
 					| tableFactorReferences: "(" TableReferences ")";
 
 //TODO: meaningful names					
-syntax JoinTable = join1:TableReference ('INNER' | 'CROSS') 'JOIN' TableFactor JoinCondition?
-		         | join2:TableReference 'STRAIGHT_JOIN' TableFactor JoinCondition?
-		         | join3:TableReference ('LEFT' | 'RIGHT') 'OUTER'? 'JOIN' TableReferences JoinCondition
-		         | join4:TableReference 'NATURAL' (('LEFT' | 'RIGHT') 'OUTER'?)? 'JOIN' TableFactor;
+syntax JoinTable 
+	= innerJoin: TableReference ('INNER' | 'CROSS') 'JOIN' TableFactor JoinCondition?
+	| straightJoin: TableReference 'STRAIGHT_JOIN' TableFactor JoinCondition?
+	| outerJoin: TableReference ('LEFT' | 'RIGHT') 'OUTER'? 'JOIN' TableReferences JoinCondition
+	| outerJoinNoCondition: TableReference 'NATURAL' (('LEFT' | 'RIGHT') 'OUTER'?)? 'JOIN' TableFactor
+	;
 		         
 syntax JoinCondition = joinConditionOn:'ON' Expr
 					 | joinConditionUsing:'USING' "(" {Identifier ","}+ ")";
 					 
 
-syntax IndexHint = hint:'USE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("{Identifier ","}+")"
-				 | hint:'IGNORE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("{Identifier ","}+")"
-				 | hint:'FORCE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("{Identifier ","}+")";
+//syntax IndexHint = hint:'USE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("{Identifier ","}+")"
+//				 | hint:'IGNORE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("{Identifier ","}+")"
+//				 | hint:'FORCE' ('INDEX' | 'KEY') ('FOR' ('JOIN' | 'ORDER BY' | 'GROUP BY'))? "("{Identifier ","}+")";
 	
 	
 	
