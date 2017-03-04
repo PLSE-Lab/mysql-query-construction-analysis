@@ -4,7 +4,7 @@ extend lang::std::Layout;
 
 // putting the dot here should probably not happen...
 // right now it is just a quick fix to handle identifiers like row.column
-lexical Word = [a-zA-Z0-9_.$]*;
+lexical Word = [a-zA-Z0-9_$]*;
 
 lexical String = "\"" Word "\""
 			   | "\'" Word "\'";
@@ -56,14 +56,16 @@ syntax Literal = string: String
 			   | null: Null
 			   | literalHole: QueryHole;
 
-syntax Identifier = identifier: Word \ RascalKeywords
+syntax Identifier = identifier: Word \ MYSQLKeywords
 				  | identifier:  "`" Word "`"
 				  | identifier: "\"" Word "\""
 				  | identifier: "\'" Word "\'"
 				  | identifierHole : QueryHole;
 
 syntax SelectExpr = columnName: Identifier name 
+                  | columnWithTable: Identifier tableName "." Identifier name 
 				  | wildcard: "*"
+				  | wildcardWithTable: Identifier tableName "." "*"
 				  | aliased: Identifier name 'AS' Identifier aliasName
 				  ;
 			  
