@@ -6,8 +6,8 @@ extend lang::std::Layout;
 // right now it is just a quick fix to handle identifiers like row.column
 lexical Word = [a-zA-Z0-9_$]*;
 
-lexical String = "\"" Word "\""
-			   | "\'" Word "\'";
+lexical String = "\"" Word "\"";
+			   //| "\'" Word "\'";
 
 lexical Number = "-"?[0-9]+
 			   | Number"."Number
@@ -58,7 +58,7 @@ syntax Literal = string: String
 
 syntax Identifier = identifier: Word \ MYSQLKeywords
 				  | identifier:  "`" Word "`"
-				  | identifier: "\"" Word "\""
+				  //| identifier: "\"" Word "\""
 				  | identifier: "\'" Word "\'"
 				  | identifierHole : QueryHole;
 
@@ -74,8 +74,7 @@ syntax Expr = orExpr: Expr 'OR' Expr
 			| xorExpr: Expr 'XOR' Expr
 			| andExpr: Expr 'AND' Expr
 			| andExpr: Expr "&&" Expr
-			| notExpr: 'NOT' Expr
-			| notEpxr: "!" Expr
+			| notExpr: ('NOT' | "!") Expr
 			| booleanWithExpectedValue: BooleanPrimary 'IS' 'NOT'? ('TRUE' | 'FALSE' | 'UNKNOWN')
 			| boolean: BooleanPrimary;
 
@@ -108,10 +107,14 @@ syntax BitExpr = bitwiseOr: BitExpr "|" BitExpr
 			   //| BitExpr "+" IntervalExpr
 			   //| BitExpr "-" IntervalExpr
 			   | SimpleExpr;
-			   
+			  
+syntax FunctionCall
+	= basicCall: Identifier fname "(" ")"
+	;
+	 
 syntax SimpleExpr = lit: Literal
 				  | id: Identifier
-				  //| FunctionCall
+				  | fcall: FunctionCall
 				  | collation: SimpleExpr 'COLLATE' Word
 				  | paramMarker: ParamMarker
 				  | var: Variable
@@ -124,7 +127,8 @@ syntax SimpleExpr = lit: Literal
 				  | exprList: "(" {Expr ","}* ")"
 				  | rowExpr: 'ROW' "(" Expr "," {Expr ","}* ")"
 				  | subQuery: 'EXISTS'? SubQuery 
-				  | curlyBraces: "{" Identifier Expr "}";
+				  | curlyBraces: "{" Identifier Expr "}"
+				  ;
 				  //| MatchExpr
 				  //| CaseExpr
 				  //| IntervalExpr
@@ -163,7 +167,17 @@ syntax WhereClause
 	| emptyWhereClause:
 	;
 	
-syntax SelectQuery = select: 'SELECT' DMLModifier* modifiers SelectExprs FromClause WhereClause;									
+syntax OrderByClause
+	= orderByClause: 'ORDER' 'BY' { OrderByItem "," }+ orderByItems
+	| emptyOrderByClause:
+	;
+	
+syntax OrderByItem
+	= orderByExpr: Expr exp  ('ASC' | 'DESC')?
+	| orderByNumber: Number number  ('ASC' | 'DESC')?
+	;
+	
+syntax SelectQuery = select: 'SELECT' DMLModifier* modifiers SelectExprs FromClause WhereClause OrderByClause;									
 									//('GROUP BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+ 'WITH ROLLUP'?)?//HERE
 									//('HAVING' Expr)?
 									//('ORDER BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+)?
