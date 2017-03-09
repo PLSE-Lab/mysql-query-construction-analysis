@@ -2,9 +2,7 @@ module QCPAnalysis::MixedQuery::ConcreteSyntax
 
 extend lang::std::Layout;
 
-// putting the dot here should probably not happen...
-// right now it is just a quick fix to handle identifiers like row.column
-lexical Word = [a-zA-Z0-9_$]*;
+lexical Word = [a-zA-Z_$][a-zA-Z0-9_$]* | [0-9][a-zA-Z0-9_$]*[a-zA-Z_$][a-zA-Z0-9_$]*;
 
 lexical String = "\"" Word "\"";
 			   //| "\'" Word "\'";
@@ -56,17 +54,16 @@ syntax Literal = string: String
 			   | null: Null
 			   | literalHole: QueryHole;
 
-syntax Identifier = identifier: Word \ MYSQLKeywords
-				  | identifier:  "`" Word "`"
+syntax Identifier = regularIdentifier: Word \ MYSQLKeywords
+				  | wildcard: "*"
+				  | columnWithTable: Identifier tableName "." Identifier name
+				  | escapedIdentifierOne:  "`" Word "`"
 				  //| identifier: "\"" Word "\""
-				  | identifier: "\'" Word "\'"
+				  | escapedIdentifierTwo: "\'" Word "\'"
 				  | identifierHole : QueryHole;
 
-syntax SelectExpr = columnName: Identifier name 
-                  | columnWithTable: Identifier tableName "." Identifier name 
-				  | wildcard: "*"
-				  | wildcardWithTable: Identifier tableName "." "*"
-				  | aliased: Identifier name 'AS' Identifier aliasName
+syntax SelectExpr = selectExpr: Expr expr 
+				  | aliasedExpr: Expr expr 'AS' Identifier aliasName
 				  ;
 			  
 syntax Expr = orExpr: Expr 'OR' Expr
@@ -110,6 +107,7 @@ syntax BitExpr = bitwiseOr: BitExpr "|" BitExpr
 			  
 syntax FunctionCall
 	= basicCall: Identifier fname "(" ")"
+	| parameterizedCall: Identifier fname "(" { SimpleExpr "," }+ params ")"
 	;
 	 
 syntax SimpleExpr = lit: Literal
