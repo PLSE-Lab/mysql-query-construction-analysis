@@ -2,7 +2,9 @@ module QCPAnalysis::MixedQuery::ConcreteSyntax
 
 extend lang::std::Layout;
 
-lexical Word = [a-zA-Z_$][a-zA-Z0-9_$]* | [0-9][a-zA-Z0-9_$]*[a-zA-Z_$][a-zA-Z0-9_$]*;
+lexical Word 
+	= [a-zA-Z_$] !<< [a-zA-Z_$][a-zA-Z0-9_$]* !>> [a-zA-Z0-9_$]
+	| [0-9] !<< [0-9][a-zA-Z0-9_$]*[a-zA-Z_$][a-zA-Z0-9_$]* !>> [a-zA-Z0-9_$];
 
 lexical String = "\"" Word "\"";
 			   //| "\'" Word "\'";
@@ -219,7 +221,7 @@ syntax TableFactorPartition
 	;
 	
 syntax TableFactorAlias
-	= tableFactorAlias: 'AS' Identifier identifier
+	= tableFactorAlias: 'AS'? Identifier identifier
 	| noAlias:
 	;
 	
