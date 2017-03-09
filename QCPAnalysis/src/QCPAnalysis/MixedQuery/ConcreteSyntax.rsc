@@ -4,10 +4,18 @@ extend lang::std::Layout;
 
 lexical Word 
 	= [a-zA-Z_$] !<< [a-zA-Z_$][a-zA-Z0-9_$]* !>> [a-zA-Z0-9_$]
-	| [0-9] !<< [0-9][a-zA-Z0-9_$]*[a-zA-Z_$][a-zA-Z0-9_$]* !>> [a-zA-Z0-9_$];
+	| [0-9] !<< [0-9][a-zA-Z0-9_$]*[a-zA-Z_$][a-zA-Z0-9_$]* !>> [a-zA-Z0-9_$]
+	;
 
-lexical String = "\"" Word "\"";
-			   //| "\'" Word "\'";
+lexical StringCharacter
+	= "\\" [\" \' \\ b f n r t] 
+	| ![\" \' \\]
+	;
+
+lexical String
+	= "\"" StringCharacter* chars "\""
+	| "\'" StringCharacter* chars "\'"
+	;
 
 lexical Number = "-"?[0-9]+
 			   | Number"."Number
@@ -61,7 +69,7 @@ syntax Identifier = regularIdentifier: Word \ MYSQLKeywords
 				  | columnWithTable: Identifier tableName "." Identifier name
 				  | escapedIdentifierOne:  "`" Word "`"
 				  //| identifier: "\"" Word "\""
-				  | escapedIdentifierTwo: "\'" Word "\'"
+				  //| escapedIdentifierTwo: "\'" Word "\'"
 				  | identifierHole : QueryHole;
 
 syntax SelectExpr = selectExpr: Expr expr 
@@ -140,7 +148,7 @@ start syntax SQLQuery = selectQuery:SelectQuery
 
 lexical DMLModifier 
 	= 'ALL' 
-	| 'DISTINCT' 
+	| 'DISTINCT' !>> "("
 	| 'DISTINCTROW' 
 	| 'HIGH_PRIORITY' 
 	| 'STRAIGHT_JOIN' 
@@ -177,7 +185,14 @@ syntax OrderByItem
 	| orderByNumber: Number number  ('ASC' | 'DESC')?
 	;
 	
-syntax SelectQuery = select: 'SELECT' DMLModifier* modifiers SelectExprs FromClause WhereClause OrderByClause;									
+syntax LimitClause
+	= justRowCount: 'LIMIT' Number count
+	| offsetAndCount: 'LIMIT' Number offset "," Number count
+	| countAndOffset: 'LIMIT' Number count 'OFFSET' Number offset
+	| emptyLimitClause:
+	;
+	
+syntax SelectQuery = select: 'SELECT' DMLModifier* modifiers SelectExprs selectExprs FromClause fromClause WhereClause whereClause OrderByClause orderByClause LimitClause limitClause; 									
 									//('GROUP BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+ 'WITH ROLLUP'?)?//HERE
 									//('HAVING' Expr)?
 									//('ORDER BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+)?
