@@ -3,6 +3,9 @@ module QCPAnalysis::BuildQueries
 import QCPAnalysis::AbstractQuery;
 import QCPAnalysis::QCPCorpus;
 
+import QCPAnalysis::MixedQuery::AbstractSyntax;
+import QCPAnalysis::MixedQuery::LoadQuery;
+
 import lang::php::util::Corpus;
 import lang::php::util::Utils;
 import lang::php::ast::AbstractSyntax;
@@ -20,6 +23,8 @@ import Map;
 import IO;
 import ValueIO;
 import List;
+import Exception;
+import String;
 
 public map[str, list[Query]] buildQueriesCorpus(){
 	Corpus corpus = getCorpus();
@@ -48,10 +53,14 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, IncludesInfo 
 
 	for(c:call(name(name("mysql_query")), params) <- calls){
 	
-		// check if this call was already found by the QCP2a checker
+		// check if this call was already found by the QCP2 checker
 		if(c@at in [a.usedAt | a <- ca]){
 			queryParts = getOneFrom([a.queryParts | a <- ca, c@at == a.usedAt]);
-			res += QCP2a(c@at, buildMixedSnippets(queryParts));
+			mixed = buildMixedSnippets(queryParts);
+			SQLQuery parsed;
+			try parsed = load(mixed);
+			catch: parsed = error();
+			res += QCP2(c@at, mixed, parsed);
 			continue;
 		}
 		
@@ -98,12 +107,20 @@ public Query buildEasyCaseQuery(Expr c){
 		}
 		// check for QCP4a (encapsed string)
 		else if(actualParameter(scalar(encapsed(parts)), false) := head(params)){
-			return QCP4a(c@at, buildMixedSnippets(parts));
+			mixed = buildMixedSnippets(parts);
+			SQLQuery parsed;
+			try parsed = load(mixed);
+			catch: parsed = error();
+			return QCP4a(c@at, mixed, parsed);
 		}
 		
 		// check for QCP4b (concatenation)
 		else if(actualParameter(b:binaryOperation(left, right, concat()), false) := head(params)){
-			return QCP4b(c@at, buildMixedSnippets(b));
+			mixed = buildMixedSnippets(b);
+			SQLQuery parsed;
+			try parsed = load(mixed);
+			catch: parsed = error();
+			return QCP4b(c@at, mixed, parsed);
 		}
 		else{
 			return unclassified(c@at);
@@ -220,14 +237,22 @@ public Query buildMixedVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[
 		if(concatOrEncapsedGR.trueOnAllPaths){
 			// QCP4c check (QCP4a or QCP4b query assigned to a variable)
 			if(size(concatOrEncapsedGR.results) == 1){
-				return  QCP4c(c@at, buildMixedSnippets(toList(concatOrEncapsedGR.results)));
+				mixed = buildMixedSnippets(toList(concatOrEncapsedGR.results));
+				SQLQuery parsed;
+				try parsed = load(mixed);
+				catch: parsed = error();
+				return  QCP4c(c@at, mixed, parsed);
 			}
 			
 			// QCP3b check (QCP4 queries distributed over control flow)
 			if(size(concatOrEncapsedGR.results) > 1){
-				queries = [];
-				for(r <- concatOrEncapsedGR.results){
-					queries += [buildMixedSnippets(r)];
+				queries = {};
+					for(r <- concatOrEncapsedGR.results){
+					mixed = buildMixedSnippets(toList(concatOrEncapsedGR.results));
+					SQLQuery parsed;
+					try parsed = load(mixed);
+					catch: parsed = error();
+					queries += <mixed, parsed>;
 				}
 				return QCP3b(c@at, queries);
 			}
@@ -268,9 +293,13 @@ public Query buildQCP5Query(System pt, Expr c, IncludesInfo iinfo, map[loc, map[
 	return unclassified(c@at);
 }
 
-@doc{builds Query Snippets for QCP2a and QCP4 where there is a mixture of static and dynamic query parts}
+@doc{builds Query Snippets for QCP2 and QCP4 where there is a mixture of static and dynamic query parts}
 private str buildMixedSnippets(Expr e){
-	if(scalar(string(s)) := e) return s;
+	if(scalar(string(s)) := e){
+		res = replaceAll(s,"\n", "");
+		res = replaceAll(res, "\r", "");
+		return res;
+	}
 	else if(scalar(encapsed(parts)) := e) return buildMixedSnippets(parts);
 	else if(binaryOperation(left, right, concat()) := e) return buildMixedSnippets(left) + buildMixedSnippets(right);
 	else return "Ø";//symbol for dynamic query part
@@ -295,7 +324,7 @@ private Expr simplifyParams(Expr c:call(NameOrExpr funName, list[ActualParameter
 
 data ConcatBuilder = concatBuilder(str varName, list[Expr] queryParts, loc startsAt, Expr queryExpr, loc usedAt);
 
-@doc {checks for QCP2a occurrences (cascading .= assignments)}
+@doc {checks for QCP2 occurrences (cascading .= assignments)}
 public rel[str system, str version, ConcatBuilder occurrence] concatAssignments() {
 	rel[str system, str version, ConcatBuilder occurrence] res = { };
 	corpus = getCorpus();
