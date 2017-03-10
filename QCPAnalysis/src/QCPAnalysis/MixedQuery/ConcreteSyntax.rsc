@@ -141,11 +141,19 @@ syntax SimpleExpr = lit: Literal
 				  //| CaseExpr
 				  //| IntervalExpr
 	  
-start syntax SQLQuery = selectQuery:SelectQuery
-				   	  | InsertQuery;
+start syntax SQLQuery 
+	= selectQuery:SelectQuery
+	| InsertQuery
+	| SystemQuery
+	;
 				   //| UpdateQuery
 				   //| DeleteQuery;
 
+syntax SystemQuery
+	= showQuery: 'SHOW' ![\n]*
+	| setQuery: 'SET' ![\n]*
+	; 
+	
 lexical DMLModifier 
 	= 'ALL' 
 	| 'DISTINCT' !>> "("
@@ -195,8 +203,6 @@ syntax LimitClause
 syntax SelectQuery = select: 'SELECT' DMLModifier* modifiers SelectExprs selectExprs FromClause fromClause WhereClause whereClause OrderByClause orderByClause LimitClause limitClause; 									
 									//('GROUP BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+ 'WITH ROLLUP'?)?//HERE
 									//('HAVING' Expr)?
-									//('ORDER BY' {(Identifier | Expr | Number) ('ASC' | 'DESC')?}+)?
-									//('LIMIT' (Number | (Number 'OFFSET' Number)))?
 									//add rest of defininition from MySQL grammar (PROCEDURE, INTO, etc.)
 	
 syntax InsertQuery = insertValues: "INSERT" ("LOW_PRIORITY" | "DELAYED" | "HIGH_PRIORITY")? "IGNORE"?
