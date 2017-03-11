@@ -7,6 +7,8 @@ import lang::php::ast::System;
 import lang::php::analysis::cfg::CFG;
 import lang::php::analysis::cfg::BuildCFG;
 import lang::php::analysis::includes::IncludesInfo;
+import lang::php::analysis::signatures::Extract;
+import lang::php::analysis::signatures::Summaries;
 
 import Node;
 import ValueIO;
@@ -28,7 +30,7 @@ private Corpus newCorpus = (
 	"web2project"	: "3.3",
 	// 2017 additions below
 	"inoERP" 		: "0.5.1",
-	"PHPFusion"		: "7.02.07",
+	//"PHPFusion"		: "7.02.07", this system breaks the new QCP5 analysis....
 	"LinPHA"		: "1.3.4",
 	"Timeclock"		: "1.04",
 	"PHPAgenda" 	: "2.2.12",
@@ -70,6 +72,11 @@ public void buildCorpusInfo() {
 public void buildCorpusInfo(str p, str v) {
 	pt = loadBinary(p,v);
 	buildIncludesInfo(pt);
+}
+
+public void buildSummaries(){
+	map[PageType,loc] pagePaths = getAllLibraryPages();
+	extractSummaries(pagePaths);
 }
 
 public rel[str exprType, loc useLoc] exprTypesAndLocsInCorpus() {

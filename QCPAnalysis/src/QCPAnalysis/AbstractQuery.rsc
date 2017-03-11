@@ -27,6 +27,6 @@ public data Query = QCP1a(loc callloc, str sql)
 				  | QCP4a(loc callloc, str mixedQuery, SQLQuery parsed)
 				  | QCP4b(loc callloc, str mixedQuery, SQLQuery parsed)
 				  | QCP4c(loc callloc, str mixedQuery, SQLQuery parsed)
-				  | QCP5(loc callloc, loc paramTo)
+				  | QCP5(loc callloc, str functionOrMethodName, list[Query] paramQueries)
 				  | unclassified(loc callloc);
 

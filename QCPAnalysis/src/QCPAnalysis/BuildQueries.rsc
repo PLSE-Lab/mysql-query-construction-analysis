@@ -2,6 +2,7 @@ module QCPAnalysis::BuildQueries
 
 import QCPAnalysis::AbstractQuery;
 import QCPAnalysis::QCPCorpus;
+import QCPAnalysis::FunctionQueries;
 
 import QCPAnalysis::MixedQuery::AbstractSyntax;
 import QCPAnalysis::MixedQuery::LoadQuery;
@@ -26,32 +27,33 @@ import List;
 import Exception;
 import String;
 
-public map[str, list[Query]] buildQueriesCorpus(){
+public map[str, list[Query]] buildQueriesCorpus(str functionName = "mysql_query"){
 	Corpus corpus = getCorpus();
 	res = ();
-	ca = concatAssignments();
+	ca = concatAssignments(functionName);
 	for(p <- corpus, v := corpus[p]){
 		pt = loadBinary(p,v);
 		if (!pt has baseLoc) {
 			println("Skipping system <p>, version <v>, no base loc included");
 			continue;
 		}
-		sysCA = ca[p, v];
-		IncludesInfo iinfo = loadIncludesInfo(p, v);
-		calls = [ c | /c:call(name(name("mysql_query")),_) := pt ];
-		simplified = [s | c <- calls, s := simplifyParams(c, pt.baseLoc, iinfo)];
-		println("Calls in system <p>, version <v> (total = <size(calls)>):");
-		neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { c@at.top | c <- calls } );
-		queries = buildQueriesSystem(pt, simplified, iinfo, neededCFGs, sysCA);
+		calls = [ c | /c:call(name(name(functionName)),_) := pt ];
+		sysCA = ca[pt.name, pt.version];
+		queries = buildQueriesSystem(pt, calls, sysCA);
 		res += ("<p>_<v>" : queries);
 	}
 	return res;
 }
 
-public list[Query] buildQueriesSystem(System pt, list[Expr] calls, IncludesInfo iinfo, map[loc, map[NamePath,CFG]] cfgs, set[ConcatBuilder] ca){
+public list[Query] buildQueriesSystem(System pt, list[Expr] calls, set[ConcatBuilder] ca, str functionName = "mysql_query", int index = 0){
+	IncludesInfo iinfo = loadIncludesInfo(pt.name, pt.version);
+	simplified = [s | c <- calls, s := simplifyParams(c, pt.baseLoc, iinfo)];
+	println("Calls to <functionName> in system <pt.name>, version <pt.version> (total = <size(calls)>):");
+	println(pt.name);
+	neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { c@at.top | c <- simplified } );
+	
 	res = [];
-
-	for(c:call(name(name("mysql_query")), params) <- calls){
+	for(c:call(name(name(functionName)), params) <- calls){
 	
 		// check if this call was already found by the QCP2 checker
 		if(c@at in [a.usedAt | a <- ca]){
@@ -65,28 +67,28 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, IncludesInfo 
 		}
 		
 		//check for easy cases QCP1a, QCP4a, and QCP4b
-		query = buildEasyCaseQuery(c);
+		query = buildEasyCaseQuery(c, index);
 		if(unclassified(_) !:= query){
 			res += query;
 			continue;	
 		}
 		
 		// check for QCP1b and QCP3a
-		query = buildLiteralVariableQuery(pt, c, iinfo, cfgs);
+		query = buildLiteralVariableQuery(pt, c, iinfo, neededCFGs, index);
 		if(unclassified(_) !:= query){
 			res += query;
 			continue;	
 		}
 		
 		// check for QCP4a and QCP3b
-		query = buildMixedVariableQuery(pt, c, iinfo, cfgs);
+		query = buildMixedVariableQuery(pt, c, iinfo, neededCFGs, index);
 		if(unclassified(_) !:= query){
 			res += query;
 			continue;	
 		}
 		
 		// check for QCP5
-		query = buildQCP5Query(pt, c, iinfo, cfgs);
+		query = buildQCP5Query(pt, ca, neededCFGs, c, index);
 		if(unclassified(_) !:= query){
 			res += query;
 			continue;	
@@ -99,41 +101,35 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, IncludesInfo 
 }
 
 @doc{builds a Query structure for easy case (QCP1a,  QCP4a, or QCPb), if the query matches these cases. Otherwise, returns an unclassified query}
-public Query buildEasyCaseQuery(Expr c){
-
-	if(call(name(name("mysql_query")), params) := c){
-		if(actualParameter(scalar(string(s)),false) := head(params)){
-			return QCP1a(c@at, s);
-		}
-		// check for QCP4a (encapsed string)
-		else if(actualParameter(scalar(encapsed(parts)), false) := head(params)){
-			mixed = buildMixedSnippets(parts);
-			SQLQuery parsed;
-			try parsed = load(mixed);
-			catch: parsed = error();
-			return QCP4a(c@at, mixed, parsed);
-		}
+public Query buildEasyCaseQuery(Expr c, int index){
+	if(actualParameter(scalar(string(s)),false) := c.parameters[index]){
+		return QCP1a(c@at, s);
+	}
+	// check for QCP4a (encapsed string)
+	else if(actualParameter(scalar(encapsed(parts)), false) := c.parameters[index]){
+		mixed = buildMixedSnippets(parts);
+		SQLQuery parsed;
+		try parsed = load(mixed);
+		catch: parsed = error();
+		return QCP4a(c@at, mixed, parsed);
+	}
 		
-		// check for QCP4b (concatenation)
-		else if(actualParameter(b:binaryOperation(left, right, concat()), false) := head(params)){
-			mixed = buildMixedSnippets(b);
-			SQLQuery parsed;
-			try parsed = load(mixed);
-			catch: parsed = error();
-			return QCP4b(c@at, mixed, parsed);
-		}
-		else{
-			return unclassified(c@at);
-		}
+	// check for QCP4b (concatenation)
+	else if(actualParameter(b:binaryOperation(left, right, concat()), false) := c.parameters[index]){
+		mixed = buildMixedSnippets(b);
+		SQLQuery parsed;
+		try parsed = load(mixed);
+		catch: parsed = error();
+		return QCP4b(c@at, mixed, parsed);
 	}
 	else{
-		throw "error: buildEasyCase should only be called on calls to mysql_query";
+		return unclassified(c@at);
 	}
 }
 
 @doc{builds Query Structures for QCP1b or QCP3a if the query matches these cases. Otherwise, returns an unclassified query}
-public Query buildLiteralVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs){
-	if(call(_,[actualParameter(var(name(name(queryVar))),false),_*]) := c){
+public Query buildLiteralVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs, int index){
+	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){
 	
 		containingScript = pt.files[c@at.top];
 		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
@@ -190,9 +186,9 @@ public Query buildLiteralVariableQuery(System pt, Expr c, IncludesInfo iinfo, ma
 	return unclassified(c@at);
 }
 @doc{builds a Query Structue for QCP4c or QCP3b if the query matches these cases. Otherwise, returns an unclassified query}
-public Query buildMixedVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs){
+public Query buildMixedVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs, int index){
 
-	if(call(_,[actualParameter(var(name(name(queryVar))),false),_*]) := c){
+	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){
 		containingScript = pt.files[c@at.top];
 		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
 		callNode = findNodeForExpr(containingCFG, c);
@@ -261,38 +257,6 @@ public Query buildMixedVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[
 	return unclassified(c@at);
 }
 
-@doc{builds a query if it is classified as QCP5, otherwise returns an unclassified query}
-public Query buildQCP5Query(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs){
-
-	if(call(_,[actualParameter(var(name(name(queryVar))),false),_*]) := c){
-	
-		containingScript = pt.files[c@at.top];
-		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
-		callNode = findNodeForExpr(containingCFG, c);
-		entryNode = getEntryNode(containingCFG);
-		
-		if(functionEntry(functionName) := entryNode){
-			//find the function in the script matching the entryNode and see if queryVar is in its parameters
-			containingFunction = getOneFrom({s | s <- containingScript.body, function(functionName, _,_,_) := s});
-			paramNames = {p.paramName | p <- containingFunction.params};
-			if(queryVar in paramNames){
-				return QCP5(c@at, containingFunction@at);
-			}
-		}
-		
-		if(methodEntry(className, methodName) := entryNode){
-			// find the method in the script matching the entryNode and see if queryVar is in its parameters
-			containingClass = getOneFrom({cl | /Stmt cl <- containingScript.body, classDef(class(className,_,_,_,_)) := cl});
-			containingMethod = getOneFrom({m | m <- containingClass.classDef.members, method(methodName,_,_,_,_) := m});
-			paramNames = {p.paramName | p <- containingMethod.params};
-			if(queryVar in paramNames){				
-				return QCP5(c@at, containingMethod@at);
-			}
-		}
-	}
-	return unclassified(c@at);
-}
-
 @doc{builds Query Snippets for QCP2 and QCP4 where there is a mixture of static and dynamic query parts}
 private str buildMixedSnippets(Expr e){
 	if(scalar(string(s)) := e){
@@ -325,7 +289,7 @@ private Expr simplifyParams(Expr c:call(NameOrExpr funName, list[ActualParameter
 data ConcatBuilder = concatBuilder(str varName, list[Expr] queryParts, loc startsAt, Expr queryExpr, loc usedAt);
 
 @doc {checks for QCP2 occurrences (cascading .= assignments)}
-public rel[str system, str version, ConcatBuilder occurrence] concatAssignments() {
+public rel[str system, str version, ConcatBuilder occurrence] concatAssignments(str functionName) {
 	rel[str system, str version, ConcatBuilder occurrence] res = { };
 	corpus = getCorpus();
 
@@ -340,7 +304,7 @@ public rel[str system, str version, ConcatBuilder occurrence] concatAssignments(
 			// Find calls to mysql_query in this script that use a variable to store the query. We want to
 			// check to see which queries formed using concatenations reach this query.
 			queryCalls = { < queryCall, varName, queryCall@at > | 
-				/queryCall:call(name(name("mysql_query")), [actualParameter(var(name(name(varName))),_),*_]) := scr };
+				/queryCall:call(name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]) := scr };
 			
 			for ( varName <- queryCalls<1>) {
 				// Are there assignments with following appends into the query variable?
