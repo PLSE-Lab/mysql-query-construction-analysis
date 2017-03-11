@@ -43,7 +43,6 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 			}
 		}
 		
-		// TODO: handle methods in call graph analysis
 		if(methodEntry(className, methodName) := entryNode){
 			// find the method in the script matching the entryNode and see if queryVar is in its parameters
 			containingClass = getOneFrom({cl | /Stmt cl <- containingScript.body, classDef(class(className,_,_,_,_)) := cl});
@@ -52,8 +51,8 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 			if(queryVar in paramNames){
 				// record index in case method has multiple params (we are only interested in the query param for now)
 				int newIndex = indexOf(paramNames, queryVar);
-				list[Query] todo = [];		
-				return QCP5(c@at, methodName, todo);//placeholder
+				paramQueries = buildParamQueries(pt, ca, className, methodName, containingMethod@at, newIndex);
+				return QCP5(c@at, methodName, paramQueries);
 			}
 		}
 	}
@@ -63,10 +62,19 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 @doc{performs our query modeling function on calls to a particular function as if it were a call to mysql_query (as in cases of QCP5)}
 public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str functionName, loc functionLoc, int index){
 	cg = computeSystemCallGraph(pt);
-	
 	// get all calls to this function
-	calls = [c | /c:call(name(name(_)),_) := cg, functionCallee(functionName,functionLoc) in c@callees];
-
+	functionCalls = [c | /c:call(name(name(functionName)),_) := cg, functionCallee(functionName,functionLoc) in c@callees];
 	// run our query modeling function on the query parameters to the calls
-	return buildQueriesSystem(pt, calls, ca, functionName = functionName, index = index);
+	return buildQueriesSystem(pt, functionCalls, ca, functionName = functionName, index = index);
+}
+
+public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str className, str methodName, loc methodLoc, int index){
+	/*cg = computeSystemCallGraph(pt);
+	methodCalls = [mc | /mc:methodCall(_,name(name(methodName)),_) := cg,methodCallee(className,methodName,methodLoc) in mc@callees];
+	return buildQueriesSystem(pt, methodCalls, ca, functionName = methodName, index = index);
+	
+	
+	The above code has a bug where every method is processed rather than just relevant ones...
+	*/
+	return [];
 }

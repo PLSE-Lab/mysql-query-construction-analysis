@@ -2,10 +2,9 @@ module QCPAnalysis::BuildQueries
 
 import QCPAnalysis::AbstractQuery;
 import QCPAnalysis::QCPCorpus;
-import QCPAnalysis::FunctionQueries;
-
 import QCPAnalysis::MixedQuery::AbstractSyntax;
 import QCPAnalysis::MixedQuery::LoadQuery;
+import QCPAnalysis::FunctionQueries;
 
 import lang::php::util::Corpus;
 import lang::php::util::Utils;
@@ -49,11 +48,10 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, set[ConcatBui
 	IncludesInfo iinfo = loadIncludesInfo(pt.name, pt.version);
 	simplified = [s | c <- calls, s := simplifyParams(c, pt.baseLoc, iinfo)];
 	println("Calls to <functionName> in system <pt.name>, version <pt.version> (total = <size(calls)>):");
-	println(pt.name);
 	neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { c@at.top | c <- simplified } );
 	
 	res = [];
-	for(c:call(name(name(functionName)), params) <- calls){
+	for(c <- calls){
 	
 		// check if this call was already found by the QCP2 checker
 		if(c@at in [a.usedAt | a <- ca]){
@@ -278,6 +276,15 @@ private str buildMixedSnippets(list[Expr] parts){
 			
 @doc{Run the simplifier on the parameters being passed to this function}
 private Expr simplifyParams(Expr c:call(NameOrExpr funName, list[ActualParameter] parameters), loc baseLoc, IncludesInfo iinfo) {
+	list[ActualParameter] simplifiedParameters = [];
+	for (p:actualParameter(Expr expr, bool byRef) <- parameters) {
+		simplifiedParameters += p[expr=simplifyExpr(replaceConstants(expr,iinfo), baseLoc)];
+	}
+	return c[parameters=simplifiedParameters];
+}
+
+@doc{Run the simplifier on the parameters being passed to this method}
+private Expr simplifyParams(Expr c:methodCall(_,NameOrExpr methodName, list[ActualParameter] parameters), loc baseLoc, IncludesInfo iinfo) {
 	list[ActualParameter] simplifiedParameters = [];
 	for (p:actualParameter(Expr expr, bool byRef) <- parameters) {
 		simplifiedParameters += p[expr=simplifyExpr(replaceConstants(expr,iinfo), baseLoc)];
