@@ -71,10 +71,10 @@ public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str funct
 public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str className, str methodName, loc methodLoc, int index){
 	/*cg = computeSystemCallGraph(pt);
 	methodCalls = [mc | /mc:methodCall(_,name(name(methodName)),_) := cg,methodCallee(className,methodName,methodLoc) in mc@callees];
-	return buildQueriesSystem(pt, methodCalls, ca, functionName = methodName, index = index);
+	return buildQueriesSystem(pt, methodCalls, ca, functionName = methodName, index = index);The above code has a bug where every method is processed rather than just relevant ones...
 	
 	
-	The above code has a bug where every method is processed rather than just relevant ones...
+	IndexOutOfBounds caused by above code...due to default params as well?
 	*/
 	return [];
 }

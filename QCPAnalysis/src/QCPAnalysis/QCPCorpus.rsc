@@ -30,7 +30,7 @@ private Corpus newCorpus = (
 	"web2project"	: "3.3",
 	// 2017 additions below
 	"inoERP" 		: "0.5.1",
-	//"PHPFusion"		: "7.02.07",
+	"PHPFusion"		: "7.02.07",
 	"LinPHA"		: "1.3.4",
 	"Timeclock"		: "1.04",
 	"PHPAgenda" 	: "2.2.12",
