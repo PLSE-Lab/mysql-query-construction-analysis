@@ -25,9 +25,17 @@ public lrel[str, int] countCallsSystem(){
 	return res + <"total", total>;
 }
 
+alias QueryMap = map[str, list[Query]];
+
+public QueryMap loadQueryMap() {
+	return readBinaryValueFile(#QueryMap, |project://QCPAnalysis/results/lists/queryMap|);
+}
+
 @doc{gets all queries of a particular pattern. Note: run writeQueries() before this}
-public list[Query] getQCP(str pattern){
-	queryMap = readBinaryValueFile(#map[str, list[Query]], |project://QCPAnalysis/results/lists/queryMap|);
+public list[Query] getQCP(str pattern, QueryMap queryMap = ( )){
+	if (size(queryMap) == 0) {
+		queryMap = loadQueryMap();
+	}
 	queries = [q | sys <- queryMap, queries := queryMap[sys], q <- queries];
 	switch(pattern){
 		case "unclassified" : return [ q | q <- queries, q is unclassified ];
