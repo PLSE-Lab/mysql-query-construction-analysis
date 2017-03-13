@@ -6,6 +6,7 @@ import lang::php::analysis::cfg::CFG;
 import lang::php::analysis::cfg::BuildCFG;
 import lang::php::analysis::cfg::Util;
 import lang::php::analysis::cfg::FlowEdge;
+import lang::php::analysis::cfg::Label;
 
 import Set;
 import IO;
@@ -44,13 +45,23 @@ public CFG reduceCFG(CFG inputGraph, loc callLoc) {
 	
 	startNode = getOneFrom(possibleMatches);
 	
+	// Compute the nodes that are reachable from the call. The graph is then restricted
+	// to include only these nodes, since only they could influence the value of the
+	// query string.
 	cfgGraph = invert(cfgAsGraph(inputGraph));
 	reachableNodes = (cfgGraph*)[startNode];
 	cfgGraph = { < gn1, gn2 > | < gn1, gn2 > <- cfgGraph, gn1 in reachableNodes, gn2 in reachableNodes };
+
+	// Notes that are not marked can be discarded, we start by assuming all nodes
+	// are not needed and then mark them as we find they are
+	map[Lab,bool] markedNodes = ( n : false | n <- reachableNodes );
 	
 	// TODO: Now, starting at the call node, see what names are used; then we can
-	// reason backwards to see how those are made
-	queryVars = { vn | /var(name(name(vn))) := queryParameter(startNode) };
+	// reason backwards to see how those are made and mark the appropriate nodes
+	queryVars 
+		= { vn | /var(name(name(vn))) := queryParameter(startNode) }
+		+ { vn | /fetchArrayDim(var(name(name(vn)))) := queryParameter(startNode) }
+		;
 	
 	println("Starting with <size(queryVars)> variables");
 	set[CFGNode] assignments = { };
@@ -67,4 +78,10 @@ public CFG reduceCFG(CFG inputGraph, loc callLoc) {
 	inputGraph.edges = { e | e <- inputGraph.edges, e.from in reachableNodes || e.to in reachableNodes };
 	
 	return inputGraph;
+}
+
+public void testcode() {
+	pt = loadBinary("Schoolmate", "1.5.4");
+	qloc = |home:///PHPAnalysis/systems/Schoolmate/schoolmate_1.5.4/DeleteFunctions.php|(5364,87,<165,0>,<165,0>);
+	cfgs = cfgsWithCalls(pt,functionNames={"mysql_query"});
 }

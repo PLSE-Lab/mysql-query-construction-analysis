@@ -271,7 +271,7 @@ public Query buildQCP5Query(System pt, Expr c, IncludesInfo iinfo, map[loc, map[
 		callNode = findNodeForExpr(containingCFG, c);
 		entryNode = getEntryNode(containingCFG);
 		
-		if(functionEntry(functionName) := entryNode){
+		if(functionEntry(functionName,_) := entryNode){
 			//find the function in the script matching the entryNode and see if queryVar is in its parameters
 			containingFunction = getOneFrom({s | s <- containingScript.body, function(functionName, _,_,_) := s});
 			paramNames = {p.paramName | p <- containingFunction.params};
@@ -280,7 +280,7 @@ public Query buildQCP5Query(System pt, Expr c, IncludesInfo iinfo, map[loc, map[
 			}
 		}
 		
-		if(methodEntry(className, methodName) := entryNode){
+		if(methodEntry(className, methodName, _) := entryNode){
 			// find the method in the script matching the entryNode and see if queryVar is in its parameters
 			containingClass = getOneFrom({cl | /Stmt cl <- containingScript.body, classDef(class(className,_,_,_,_)) := cl});
 			containingMethod = getOneFrom({m | m <- containingClass.classDef.members, method(methodName,_,_,_,_) := m});
