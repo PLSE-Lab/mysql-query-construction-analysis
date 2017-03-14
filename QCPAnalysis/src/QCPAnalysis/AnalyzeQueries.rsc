@@ -8,6 +8,7 @@ import QCPAnalysis::AbstractQuery;
 import QCPAnalysis::QCPCorpus;
 
 import List;
+import Map;
 import ValueIO;
 
 @doc{counts the calls to mysql_query in each system}

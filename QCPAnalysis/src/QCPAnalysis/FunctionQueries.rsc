@@ -31,7 +31,7 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 		callNode = findNodeForExpr(containingCFG, c);
 		entryNode = getEntryNode(containingCFG);
 		
-		if(functionEntry(functionName) := entryNode){
+		if(functionEntry(functionName,_) := entryNode){
 			//find the function in the script matching the entryNode and see if queryVar is in its parameters
 			containingFunction = getOneFrom({s | s <- containingScript.body, function(functionName, _,_,_) := s});
 			paramNames = [p.paramName | p <- containingFunction.params];
@@ -43,7 +43,7 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 			}
 		}
 		
-		if(methodEntry(className, methodName) := entryNode){
+		if(methodEntry(className, methodName,_) := entryNode){
 			// find the method in the script matching the entryNode and see if queryVar is in its parameters
 			containingClass = getOneFrom({cl | /Stmt cl <- containingScript.body, classDef(class(className,_,_,_,_)) := cl});
 			containingMethod = getOneFrom({m | m <- containingClass.classDef.members, method(methodName,_,_,_,_) := m});
@@ -62,8 +62,10 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 @doc{performs our query modeling function on calls to a particular function as if it were a call to mysql_query (as in cases of QCP5)}
 public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str functionName, loc functionLoc, int index){
 	cg = computeSystemCallGraph(pt);
+	
 	// get all calls to this function
 	functionCalls = [c | /c:call(name(name(functionName)),_) := cg, functionCallee(functionName,functionLoc) in c@callees];
+	
 	// run our query modeling function on the query parameters to the calls
 	return buildQueriesSystem(pt, functionCalls, ca, functionName = functionName, index = index);
 }
@@ -72,7 +74,4 @@ public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str class
 	cg = computeSystemCallGraph(pt);
 	methodCalls = [mc | /mc:methodCall(_,name(name(methodName)),_) := cg,methodCallee(className,methodName,methodLoc) in mc@callees];
 	return buildQueriesSystem(pt, methodCalls, ca, functionName = methodName, index = index);
-	//The above code has a bug where every method is processed rather than just relevant ones...
-	//IndexOutOfBounds caused by above code...due to default params as well?
-	//return [];
 }
