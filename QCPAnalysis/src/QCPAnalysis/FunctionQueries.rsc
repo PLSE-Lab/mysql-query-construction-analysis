@@ -24,7 +24,7 @@ import IO;
 @doc{builds a query if it is classified as QCP5, otherwise returns an unclassified query}
 public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[NamePath, CFG]] cfgs, Expr c, int index){
 
-	if(actualParameter(var(name(name(queryVar))),false):= c.parameters[index]){
+	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){	
 	
 		containingScript = pt.files[c@at.top];
 		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
@@ -72,6 +72,10 @@ public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str funct
 
 public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str className, str methodName, loc methodLoc, int index){
 	cg = computeSystemCallGraph(pt);
+	
+	// get all calls to this method
 	methodCalls = [mc | /mc:methodCall(_,name(name(methodName)),_) := cg,methodCallee(className,methodName,methodLoc) in mc@callees];
+	
+	// run our query modeling function on the query parameters to the calls
 	return buildQueriesSystem(pt, methodCalls, ca, functionName = methodName, index = index);
 }

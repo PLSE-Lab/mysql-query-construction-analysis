@@ -11,6 +11,9 @@ import List;
 import Map;
 import ValueIO;
 
+set[str] qcp = {"unclassified", "QCP1", "QCP2", "QCP3", "QCP4", "QCP5"};
+set[str] qcpsubcases = {"unclassified", "QCP1a", "QCP1b", "QCP2", "QCP3a", "QCP3b", "QCP4a", "QCP4b", "QCP4c", "QCP5"};
+
 @doc{counts the calls to mysql_query in each system}
 public lrel[str, int] countCallsSystem(){
 	Corpus corpus = getCorpus();
@@ -78,27 +81,22 @@ public list[Query] getQCPSystem(str p, str v, str pattern){
 	}
 }
 
-@doc{function for getting QCP counts (true will return subcase counts, false, will return overall counts}
-public lrel[str, int] getQCPCounts(true) = [
-	<"QCP1a", size(getQCP("QCP1a"))>,
-	<"QCP1b", size(getQCP("QCP1b"))>,
-	<"QCP2", size(getQCP("QCP2"))>,
-	<"QCP3a", size(getQCP("QCP3a"))>,
-	<"QCP3b", size(getQCP("QCP3b"))>,
-	<"QCP4a", size(getQCP("QCP4a"))>,
-	<"QCP4b", size(getQCP("QCP4b"))>,
-	<"QCP4c", size(getQCP("QCP4c"))>,
-	<"QCP5", size(getQCP("QCP5"))>,
-	<"unclassified", size(getQCP("unclassified"))>
-];
-public lrel[str, int] getQCPCounts(false) = [
-	<"QCP1", size(getQCP("QCP1"))>,
-	<"QCP2", size(getQCP("QCP2"))>,
-	<"QCP3", size(getQCP("QCP3"))>,
-	<"QCP4", size(getQCP("QCP4"))>,
-	<"QCP5", size(getQCP("QCP5"))>,
-	<"unclassified", size(getQCP("unclassified"))>
-];
+
+@doc{function for getting QCP counts (true will return subcase counts, false, will return only overall counts}
+public lrel[str, int] getQCPCounts(bool subcases, QueryMap queryMap = ( )){
+	res = [];
+	if(subcases){
+		for(p <- qcpsubcases){
+			res += <p, size(getQCP(p, queryMap = queryMap))>;
+		}
+	}
+	else{
+		for(p <- qcp){
+			res += <p, size(getQCP(p, queryMap = queryMap))>;
+		}
+	}	
+	return res;
+}
 
 @doc{since buildQueriesCorpus takes a long time to run, this function writes the results of it to a file for quick reference}
 public void writeQueries(){
