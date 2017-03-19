@@ -51,8 +51,9 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 			if(queryVar in paramNames){
 				// record index in case method has multiple params (we are only interested in the query param for now)
 				int newIndex = indexOf(paramNames, queryVar);
-				paramQueries = buildParamQueries(pt, ca, className, methodName, containingMethod@at, newIndex);
-				return QCP5(c@at, methodName, paramQueries);
+				//paramQueries = buildParamQueries(pt, ca, className, methodName, containingMethod@at, newIndex);
+				//return QCP5(c@at, methodName, paramQueries);
+				return QCP5(c@at, methodName, []);
 			}
 		}
 	}

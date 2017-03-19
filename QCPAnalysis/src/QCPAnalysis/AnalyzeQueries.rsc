@@ -82,7 +82,7 @@ public list[Query] getQCPSystem(str p, str v, str pattern){
 }
 
 
-@doc{function for getting QCP counts (true will return subcase counts, false, will return only overall counts}
+@doc{function for getting QCP counts (true will return subcase counts, false will return only overall counts}
 public lrel[str, int] getQCPCounts(bool subcases, QueryMap queryMap = ( )){
 	res = [];
 	if(subcases){

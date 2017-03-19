@@ -86,9 +86,9 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, set[ConcatBui
 		}
 		
 		// restrict QCP5 analysis to only calls to mysql_query to prevent chaining of QCP5 classifications (for now)
-		if(functionName := "mysql_query"){
+		//if(functionName := "mysql_query"){
 			query = buildQCP5Query(pt, ca, neededCFGs, c, index);
-		}
+		//}
 		
 		if(unclassified(_) !:= query){
 			res += query;
