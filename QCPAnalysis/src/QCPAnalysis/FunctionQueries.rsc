@@ -22,26 +22,37 @@ import List;
 import IO;
 
 @doc{builds a query if it is classified as QCP5, otherwise returns an unclassified query}
-public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[NamePath, CFG]] cfgs, Expr c, int index){
+public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[NamePath, CFG]] cfgs, Expr c, int index, InvertedCallGraph invertedCallGraph, str functionName, set[str] seenBefore) {
+	if (! (index < size(c.parameters)) ) {
+		println("Index not available for call at location <c@at>");
+		return unclassified(c@at);
+	}
+	
+	if (functionName in seenBefore) {
+		return unclassified(c@at);
+	}
 
+	seenBefore = seenBefore + functionName;
+	
 	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){	
 	
 		containingScript = pt.files[c@at.top];
 		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
 		callNode = findNodeForExpr(containingCFG, c);
 		entryNode = getEntryNode(containingCFG);
-		
-		if(functionEntry(functionName,_) := entryNode){
-			//find the function in the script matching the entryNode and see if queryVar is in its parameters
-			containingFunction = getOneFrom({s | s <- containingScript.body, function(functionName, _,_,_) := s});
+
+		if (entryNode is functionEntry) {
+			// Find the function in the script that contains the call
+			containingFunction = getOneFrom({s | /s:function(fn,_,_,_) := pt, fn == entryNode.functionName, c@at < s@at});
 			paramNames = [p.paramName | p <- containingFunction.params];
 			if(queryVar in paramNames){
 				// record index in case function has multiple params (we are only interested in the query param for now)
 				int newIndex = indexOf(paramNames, queryVar);
-				paramQueries = buildParamQueries(pt, ca, functionName, containingFunction@at, newIndex);
-				return QCP5(c@at, functionName, paramQueries);
-			}
-		}
+				println("Call at <c@at>, in function at <containingFunction@at>, parameter <newIndex>, name <queryVar>");
+				paramQueries = buildParamQueries(pt, ca, entryNode.functionName, containingFunction@at, newIndex, invertedCallGraph, seenBefore);
+				return QCP5(c@at, entryNode.functionName, paramQueries);
+			}			
+		}		
 		
 		if(methodEntry(className, methodName,_) := entryNode){
 			// find the method in the script matching the entryNode and see if queryVar is in its parameters
@@ -51,9 +62,9 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 			if(queryVar in paramNames){
 				// record index in case method has multiple params (we are only interested in the query param for now)
 				int newIndex = indexOf(paramNames, queryVar);
-				//paramQueries = buildParamQueries(pt, ca, className, methodName, containingMethod@at, newIndex);
-				//return QCP5(c@at, methodName, paramQueries);
-				return QCP5(c@at, methodName, []);
+				paramQueries = buildParamQueries(pt, ca, className, methodName, containingMethod@at, newIndex, invertedCallGraph, seenBefore);
+				return QCP5(c@at, methodName, paramQueries);
+				//return QCP5(c@at, methodName, []);
 			}
 		}
 	}
@@ -61,22 +72,20 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 }
 
 @doc{performs our query modeling function on calls to a particular function as if it were a call to mysql_query (as in cases of QCP5)}
-public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str functionName, loc functionLoc, int index){
-	cg = computeSystemCallGraph(pt);
-	
+public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str functionName, loc functionLoc, int index, InvertedCallGraph invertedCallGraph, set[str] seenBefore) {
 	// get all calls to this function
-	functionCalls = [c | /c:call(name(name(functionName)),_) := cg, functionCallee(functionName,functionLoc) in c@callees];
+	callingLocs = invertedCallGraph[functionTarget(functionName,functionLoc)];
+	functionCalls = [c | /c:call(name(name(functionName)),_) := pt, c@at in callingLocs];
 	
 	// run our query modeling function on the query parameters to the calls
-	return buildQueriesSystem(pt, functionCalls, ca, functionName = functionName, index = index);
+	return buildQueriesSystem(pt, functionCalls, ca, invertedCallGraph, functionName = functionName, index = index, seenBefore = seenBefore);
 }
 
-public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str className, str methodName, loc methodLoc, int index){
-	cg = computeSystemCallGraph(pt);
-	
+public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str className, str methodName, loc methodLoc, int index, InvertedCallGraph invertedCallGraph, set[str] seenBefore) {
 	// get all calls to this method
-	methodCalls = [mc | /mc:methodCall(_,name(name(methodName)),_) := cg,methodCallee(className,methodName,methodLoc) in mc@callees];
+	callingLocs = invertedCallGraph[methodTarget(className,methodName,methodLoc)];
+	methodCalls = [mc | /mc:methodCall(_,name(name(methodName)),_) := pt, mc@at in callingLocs];
 	
 	// run our query modeling function on the query parameters to the calls
-	return buildQueriesSystem(pt, methodCalls, ca, functionName = methodName, index = index);
+	return buildQueriesSystem(pt, methodCalls, ca, invertedCallGraph, functionName = methodName, index = index, seenBefore = seenBefore);
 }
