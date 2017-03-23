@@ -48,6 +48,12 @@ public list[Query] getFunctionQueries(QueryMap queryMap = ()){
 	return res;
 }
 
+@doc{gets all unclassified queries with a particular errorcode}
+public list[Query] getUnclassifiedQueries(int errorCode, QueryMap queryMap = ()){
+	queries = [q | sys <- queryMap, queries := queryMap[sys], q <- queries] + getFunctionQueries(queryMap = queryMap);
+	return [q | q <- queries, unclassified(_,errorCode) := q];
+}
+
 @doc{gets all queries of a particular pattern. Note: run writeQueries() before this}
 public list[Query] getQCP(str pattern, QueryMap queryMap = ( ), bool withFunctionQueries = true){
 	if (size(queryMap) == 0) {
