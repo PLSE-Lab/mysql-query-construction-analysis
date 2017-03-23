@@ -35,64 +35,60 @@ public QueryMap loadQueryMap() {
 	return readBinaryValueFile(#QueryMap, |project://QCPAnalysis/results/lists/queryMap|);
 }
 
-@doc{gets all queries of a particular pattern. Note: run writeQueries() before this}
-public list[Query] getQCP(str pattern, QueryMap queryMap = ( )){
+@doc{gets all queries found by FunctionQueries.rsc (i.e., queries whose function is not mysql_query)}
+public list[Query] getFunctionQueries(QueryMap queryMap = ()){
 	if (size(queryMap) == 0) {
 		queryMap = loadQueryMap();
 	}
+	
+	qcp5 = [q | sys <- queryMap, queries := queryMap[sys], q <- queries, q is QCP5];
+	
+	functionQueries = [fq | q <- qcp5, fq <- q.paramQueries];
+	
+	return functionQueries;
+}
+
+@doc{gets all queries of a particular pattern. Note: run writeQueries() before this}
+public list[Query] getQCP(str pattern, QueryMap queryMap = ( ), bool withFunctionQueries = false){
+	if (size(queryMap) == 0) {
+		queryMap = loadQueryMap();
+	}
+	
+	list[Query] functionQueries = [];
+	if(withFunctionQueries){
+		functionQueries = getFunctionQueries(queryMap = queryMap);
+	}	
+	
 	queries = [q | sys <- queryMap, queries := queryMap[sys], q <- queries];
 	switch(pattern){
-		case "unclassified" : return [ q | q <- queries, q is unclassified ];
-		case "QCP1" : return [q | q <- queries, q is QCP1a || q is QCP1b ];
-		case "QCP1a" : return [q | q <- queries, q is QCP1a ];
-		case "QCP1b" : return [q | q <- queries, q is QCP1b ];
-		case "QCP2" : return [q | q <- queries, q is QCP2];
-		case "QCP3" : return [q | q <- queries, q is QCP3a || q is QCP3b ];
-		case "QCP3a" : return [q | q <- queries, q is QCP3a ];
-		case "QCP3b" : return [q | q <- queries, q is QCP3b ];
-		case "QCP4" : return [q | q <- queries, q is QCP4a || q is QCP4b || q is QCP4c ];
-		case "QCP4a" : return [q | q <- queries, q is QCP4a ];
-		case "QCP4b" : return [q | q <- queries, q is QCP4b ];
-		case "QCP4c" : return [q | q <- queries, q is QCP4c ];
-		case "QCP5" : return [q | q <- queries, q is QCP5 ];
+		case "unclassified" : return [ q | q <- queries + functionQueries, q is unclassified ];
+		case "QCP1" : return [q | q <- queries + functionQueries, q is QCP1a || q is QCP1b ];
+		case "QCP1a" : return [q | q <- queries + functionQueries, q is QCP1a ];
+		case "QCP1b" : return [q | q <- queries + functionQueries, q is QCP1b ];
+		case "QCP2" : return [q | q <- queries + functionQueries, q is QCP2];
+		case "QCP3" : return [q | q <- queries + functionQueries, q is QCP3a || q is QCP3b ];
+		case "QCP3a" : return [q | q <- queries + functionQueries, q is QCP3a ];
+		case "QCP3b" : return [q | q <- queries + functionQueries, q is QCP3b ];
+		case "QCP4" : return [q | q <- queries + functionQueries, q is QCP4a || q is QCP4b || q is QCP4c ];
+		case "QCP4a" : return [q | q <- queries + functionQueries, q is QCP4a ];
+		case "QCP4b" : return [q | q <- queries + functionQueries, q is QCP4b ];
+		case "QCP4c" : return [q | q <- queries + functionQueries, q is QCP4c ];
+		case "QCP5" : return [q | q <- queries + functionQueries, q is QCP5 ];
 		default : throw "unexpected pattern name <pattern> entered";
 	}
 }
 
-@doc{gets Queries in a particular system of a particular pattern}
-public list[Query] getQCPSystem(str p, str v, str pattern){
-	queryMap = readBinaryValueFile(#map[str, list[Query]], |project://QCPAnalysis/results/lists/queryMap|);
-	queries = queryMap["<p>_<v>"];
-	switch(pattern){
-		case "unclassified" : return [ q | q <- queries, q is unclassified ];
-		case "QCP1" : return [q | q <- queries, q is QCP1a || q is QCP1b ];
-		case "QCP1a" : return [q | q <- queries, q is QCP1a ];
-		case "QCP1b" : return [q | q <- queries, q is QCP1b ];
-		case "QCP2" : return [q | q <- queries, q is QCP2];
-		case "QCP3" : return [q | q <- queries, q is QCP3a || q is QCP3b ];
-		case "QCP3a" : return [q | q <- queries, q is QCP3a ];
-		case "QCP3b" : return [q | q <- queries, q is QCP3b ];
-		case "QCP4" : return [q | q <- queries, q is QCP4a || q is QCP4b || q is QCP4c ];
-		case "QCP4a" : return [q | q <- queries, q is QCP4a ];
-		case "QCP4b" : return [q | q <- queries, q is QCP4b ];
-		case "QCP4c" : return [q | q <- queries, q is QCP4c ];
-		case "QCP5" : return [q | q <- queries, q is QCP5 ];
-		default : throw "unexpected pattern name <pattern> entered";
-	}
-}
-
-
-@doc{function for getting QCP counts (true will return subcase counts, false will return only overall counts}
-public lrel[str, int] getQCPCounts(bool subcases, QueryMap queryMap = ( )){
+@doc{gets counts for each QCP (subcases = true will return subcase counts, false will return only overall counts}
+public lrel[str, int] getQCPCounts(bool subcases, QueryMap queryMap = ( ), bool withFunctionQueries = false){
 	res = [];
 	if(subcases){
 		for(p <- qcpsubcases){
-			res += <p, size(getQCP(p, queryMap = queryMap))>;
+			res += <p, size(getQCP(p, queryMap = queryMap, withFunctionQueries = withFunctionQueries))>;
 		}
 	}
 	else{
 		for(p <- qcp){
-			res += <p, size(getQCP(p, queryMap = queryMap))>;
+			res += <p, size(getQCP(p, queryMap = queryMap, withFunctionQueries = withFunctionQueries))>;
 		}
 	}	
 	return res;
