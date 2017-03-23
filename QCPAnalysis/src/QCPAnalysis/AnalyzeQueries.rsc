@@ -41,15 +41,15 @@ public list[Query] getFunctionQueries(QueryMap queryMap = ()){
 		queryMap = loadQueryMap();
 	}
 	
-	qcp5 = [q | sys <- queryMap, queries := queryMap[sys], q <- queries, q is QCP5];
-	
-	functionQueries = [fq | q <- qcp5, fq <- q.paramQueries];
-	
-	return functionQueries;
+	res = [];
+	visit(queryMap){
+		case QCP5(_,_,paramQueries): res = res + paramQueries;
+	}
+	return res;
 }
 
 @doc{gets all queries of a particular pattern. Note: run writeQueries() before this}
-public list[Query] getQCP(str pattern, QueryMap queryMap = ( ), bool withFunctionQueries = false){
+public list[Query] getQCP(str pattern, QueryMap queryMap = ( ), bool withFunctionQueries = true){
 	if (size(queryMap) == 0) {
 		queryMap = loadQueryMap();
 	}
@@ -79,7 +79,7 @@ public list[Query] getQCP(str pattern, QueryMap queryMap = ( ), bool withFunctio
 }
 
 @doc{gets counts for each QCP (subcases = true will return subcase counts, false will return only overall counts}
-public lrel[str, int] getQCPCounts(bool subcases, QueryMap queryMap = ( ), bool withFunctionQueries = false){
+public lrel[str, int] getQCPCounts(bool subcases, QueryMap queryMap = ( ), bool withFunctionQueries = true){
 	res = [];
 	if(subcases){
 		for(p <- qcpsubcases){
