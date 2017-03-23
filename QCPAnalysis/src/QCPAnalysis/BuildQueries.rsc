@@ -75,21 +75,21 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, set[ConcatBui
 		
 		//check for easy cases QCP1a, QCP4a, and QCP4b
 		query = buildEasyCaseQuery(c, index);
-		if(unclassified(_) !:= query){
+		if(!(query is unclassified)){
 			res += query;
 			continue;	
 		}
 		
 		// check for QCP1b and QCP3a
 		query = buildLiteralVariableQuery(pt, c, iinfo, neededCFGs, index);
-		if(unclassified(_) !:= query){
+		if(!(query is unclassified)){
 			res += query;
 			continue;	
 		}
 		
 		// check for QCP4a and QCP3b
 		query = buildMixedVariableQuery(pt, c, iinfo, neededCFGs, index);
-		if(unclassified(_) !:= query){
+		if(!(query is unclassified)){
 			res += query;
 			continue;	
 		}
@@ -99,13 +99,13 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, set[ConcatBui
 			query = buildQCP5Query(pt, ca, neededCFGs, c, index, invertedCallGraph, functionName, seenBefore);
 		//}
 		
-		if(unclassified(_) !:= query){
+		if(!(query is unclassified)){
 			res += query;
 			continue;	
 		}
 		
-		// nothing classified this query, add it as an unclassified query
-		res += unclassified(c@at);
+		// query remained unclassified after all classifications, add it as unclassified
+		res += query;
 	}
 	return res;
 }
@@ -114,7 +114,7 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, set[ConcatBui
 public Query buildEasyCaseQuery(Expr c, int index){
 	if (! (index < size(c.parameters)) ) {
 		println("Index not available for call at location <c@at>");
-		return unclassified(c@at);
+		return unclassified(c@at, 1);
 	}
 	if(actualParameter(scalar(string(s)),false) := c.parameters[index]){
 		return QCP1a(c@at, s);
@@ -137,7 +137,7 @@ public Query buildEasyCaseQuery(Expr c, int index){
 		return QCP4b(c@at, mixed, parsed);
 	}
 	else{
-		return unclassified(c@at);
+		return unclassified(c@at,0);
 	}
 }
 
@@ -145,7 +145,7 @@ public Query buildEasyCaseQuery(Expr c, int index){
 public Query buildLiteralVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs, int index){
 	if (! (index < size(c.parameters)) ) {
 		println("Index not available for call at location <c@at>");
-		return unclassified(c@at);
+		return unclassified(c@at,1);
 	}
 
 	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){
@@ -202,13 +202,13 @@ public Query buildLiteralVariableQuery(System pt, Expr c, IncludesInfo iinfo, ma
 			}
 		}
 	}
-	return unclassified(c@at);
+	return unclassified(c@at,0);
 }
 @doc{builds a Query Structue for QCP4c or QCP3b if the query matches these cases. Otherwise, returns an unclassified query}
 public Query buildMixedVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs, int index){
 	if (! (index < size(c.parameters)) ) {
 		println("Index not available for call at location <c@at>");
-		return unclassified(c@at);
+		return unclassified(c@at,1);
 	}
 
 	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){
@@ -277,7 +277,7 @@ public Query buildMixedVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[
 			}
 		}
 	}
-	return unclassified(c@at);
+	return unclassified(c@at,0);
 }
 
 @doc{builds Query Snippets for QCP2 and QCP4 where there is a mixture of static and dynamic query parts}
@@ -391,7 +391,7 @@ public set[ConcatBuilder] concatAssignments(System theSystem, str functionName) 
 						}
 					}
 					allUsingQueries = findAllReachedUntil(neededCFGAsGraph, startNode, foundQueryCall, foundAnotherAssignment, collectQueryCall);
-					res = res + { < systemName, systemVersion, concatBuilder(varName, queryParts, firstPart@at, queryCallExpr, queryCallLoc) > | < queryCallExpr, queryCallLoc > <- allUsingQueries };
+					res = res + { concatBuilder(varName, queryParts, firstPart@at, queryCallExpr, queryCallLoc) | < queryCallExpr, queryCallLoc > <- allUsingQueries };
 				}
 			}
 		}

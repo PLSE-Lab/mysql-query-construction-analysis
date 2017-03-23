@@ -28,5 +28,8 @@ public data Query = QCP1a(loc callloc, str sql)
 				  | QCP4b(loc callloc, str mixedQuery, SQLQuery parsed)
 				  | QCP4c(loc callloc, str mixedQuery, SQLQuery parsed)
 				  | QCP5(loc callloc, str functionOrMethodName, list[Query] paramQueries)
-				  | unclassified(loc callloc);
-
+				  | unclassified(loc callloc, int errorCode);
+				  // ERROR CODES:
+				  // 0: no patterns matched the query (normal case for unclassified query)
+				  // 1: classification failed due to there not being enough actual parameters
+				  // 2: classification failed due to infinite recursion in QCP5 classification

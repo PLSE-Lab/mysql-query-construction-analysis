@@ -25,11 +25,11 @@ import IO;
 public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[NamePath, CFG]] cfgs, Expr c, int index, InvertedCallGraph invertedCallGraph, str functionName, set[str] seenBefore) {
 	if (! (index < size(c.parameters)) ) {
 		println("Index not available for call at location <c@at>");
-		return unclassified(c@at);
+		return unclassified(c@at,1);
 	}
 	
 	if (functionName in seenBefore) {
-		return unclassified(c@at);
+		return unclassified(c@at,2);
 	}
 
 	seenBefore = seenBefore + functionName;
@@ -68,7 +68,7 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 			}
 		}
 	}
-	return unclassified(c@at);
+	return unclassified(c@at,0);
 }
 
 @doc{performs our query modeling function on calls to a particular function as if it were a call to mysql_query (as in cases of QCP5)}
