@@ -2,7 +2,7 @@ module QCPAnalysis::AbstractQuery
 
 import lang::php::ast::AbstractSyntax;
 
-import QCPAnalysis::MixedQuery::AbstractSyntax;
+import QCPAnalysis::ParseSQL::AbstractSyntax;
 
 /*
  * QCP1: a) param to mysql_query is a literal string
@@ -19,8 +19,8 @@ import QCPAnalysis::MixedQuery::AbstractSyntax;
  */
  
 
-public data Query = QCP1a(loc callloc, str sql)
-				  | QCP1b(loc callloc, str sql)
+public data Query = QCP1a(loc callloc, str sql, SQLQuery parsed)
+				  | QCP1b(loc callloc, str sql, SQLQuery parsed)
 				  | QCP2(loc callloc, str mixedQuery, SQLQuery parsed)
 				  | QCP3a(loc callloc, list[str] staticqueries)
 				  | QCP3b(loc callloc, rel[str, SQLQuery] mixedAndParsed)

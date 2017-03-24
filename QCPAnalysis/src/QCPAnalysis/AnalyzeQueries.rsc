@@ -10,6 +10,8 @@ import QCPAnalysis::QCPCorpus;
 import List;
 import Map;
 import ValueIO;
+import IO;
+import String;
 
 set[str] qcp = {"unclassified", "QCP1", "QCP2", "QCP3", "QCP4", "QCP5"};
 set[str] qcpsubcases = {"unclassified", "QCP1a", "QCP1b", "QCP2", "QCP3a", "QCP3b", "QCP4a", "QCP4b", "QCP4c", "QCP5"};
@@ -104,4 +106,13 @@ public lrel[str, int] getQCPCounts(bool subcases, QueryMap queryMap = ( ), bool 
 public void writeQueries(){
 	queries = buildQueriesCorpus();
 	writeBinaryValueFile(|project://QCPAnalysis/results/lists/queryMap|, queries);
+}
+
+@doc{function to write QCP1 for parser testing}
+public void writeQCP1(QueryMap queryMap = ()){
+	writeFile(|project://QCPAnalysis/results/lists/qcp1|, "");
+	qcp1 = getQCP("QCP1", queryMap = loadQueryMap(), withFunctionQueries = true);
+	for(q <- qcp1){
+		appendToFile(|project://QCPAnalysis/results/lists/qcp1|, replaceAll(q.sql, "\n", "") + "\n");
+	}
 }

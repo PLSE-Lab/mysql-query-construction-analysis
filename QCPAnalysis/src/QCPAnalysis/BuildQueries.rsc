@@ -2,8 +2,9 @@ module QCPAnalysis::BuildQueries
 
 import QCPAnalysis::AbstractQuery;
 import QCPAnalysis::QCPCorpus;
-import QCPAnalysis::MixedQuery::AbstractSyntax;
-import QCPAnalysis::MixedQuery::LoadQuery;
+import QCPAnalysis::ParseSQL::AbstractSyntax;
+import QCPAnalysis::ParseSQL::RunSQLParser;
+import QCPAnalysis::ParseSQL::LoadQuery;
 import QCPAnalysis::FunctionQueries;
 
 import lang::php::util::Corpus;
@@ -66,10 +67,7 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, set[ConcatBui
 		if(c@at in [a.usedAt | a <- ca]){
 			queryParts = getOneFrom([a.queryParts | a <- ca, c@at == a.usedAt]);
 			mixed = buildMixedSnippets(queryParts);
-			SQLQuery parsed;
-			try parsed = load(mixed);
-			catch: parsed = error();
-			res += QCP2(c@at, mixed, parsed);
+			res += QCP2(c@at, mixed, unknownQuery());
 			continue;
 		}
 		
@@ -117,24 +115,21 @@ public Query buildEasyCaseQuery(Expr c, int index){
 		return unclassified(c@at, 1);
 	}
 	if(actualParameter(scalar(string(s)),false) := c.parameters[index]){
-		return QCP1a(c@at, s);
+		SQLQuery parsed;
+		try parsed = runParser(s);
+		catch: parsed = parseError();
+		return QCP1a(c@at, s, parsed);
 	}
 	// check for QCP4a (encapsed string)
 	else if(actualParameter(scalar(encapsed(parts)), false) := c.parameters[index]){
 		mixed = buildMixedSnippets(parts);
-		SQLQuery parsed;
-		try parsed = load(mixed);
-		catch: parsed = error();
-		return QCP4a(c@at, mixed, parsed);
+		return QCP4a(c@at, mixed, unknownQuery());
 	}
 		
 	// check for QCP4b (concatenation)
 	else if(actualParameter(b:binaryOperation(left, right, concat()), false) := c.parameters[index]){
 		mixed = buildMixedSnippets(b);
-		SQLQuery parsed;
-		try parsed = load(mixed);
-		catch: parsed = error();
-		return QCP4b(c@at, mixed, parsed);
+		return QCP4b(c@at, mixed, unknownQuery());
 	}
 	else{
 		return unclassified(c@at,0);
@@ -193,7 +188,11 @@ public Query buildLiteralVariableQuery(System pt, Expr c, IncludesInfo iinfo, ma
 		if(literalGR.trueOnAllPaths){
 			// QCP1b (single literal assignment into the query variable)
 			if(size(literalGR.results) == 1){
-				return QCP1b(c@at, getOneFrom(literalGR.results).scalarVal.strVal);
+				s = getOneFrom(literalGR.results).scalarVal.strVal;
+				SQLQuery parsed;
+				try parsed = runParser(s);
+				catch: parsed = parseError();
+				return QCP1b(c@at, s, parsed);
 			}
 				
 			// QCP3a (literal assignments distributed over control flow)
@@ -257,21 +256,15 @@ public Query buildMixedVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[
 			// QCP4c check (QCP4a or QCP4b query assigned to a variable)
 			if(size(concatOrEncapsedGR.results) == 1){
 				mixed = buildMixedSnippets(toList(concatOrEncapsedGR.results));
-				SQLQuery parsed;
-				try parsed = load(mixed);
-				catch: parsed = error();
-				return  QCP4c(c@at, mixed, parsed);
+				return  QCP4c(c@at, mixed, unknownQuery());
 			}
 			
 			// QCP3b check (QCP4 queries distributed over control flow)
 			if(size(concatOrEncapsedGR.results) > 1){
 				queries = {};
-					for(r <- concatOrEncapsedGR.results){
+				for(r <- concatOrEncapsedGR.results){
 					mixed = buildMixedSnippets(toList(concatOrEncapsedGR.results));
-					SQLQuery parsed;
-					try parsed = load(mixed);
-					catch: parsed = error();
-					queries += <mixed, parsed>;
+					queries += <mixed, unknownQuery()>;
 				}
 				return QCP3b(c@at, queries);
 			}
