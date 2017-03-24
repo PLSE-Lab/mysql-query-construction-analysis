@@ -5,6 +5,7 @@ import QCPAnalysis::QCPCorpus;
 import QCPAnalysis::MixedQuery::AbstractSyntax;
 import QCPAnalysis::MixedQuery::LoadQuery;
 import QCPAnalysis::FunctionQueries;
+import QCPAnalysis::QCPSystemInfo;
 
 import lang::php::util::Corpus;
 import lang::php::util::Utils;
@@ -30,38 +31,34 @@ import Relation;
 
 data ConcatBuilder = concatBuilder(str varName, list[Expr] queryParts, loc startsAt, Expr queryExpr, loc usedAt);
 
-public map[str, list[Query]] buildQueriesCorpus(str functionName = "mysql_query", set[str] seenBefore = { }){
+public map[str, list[Query]] buildQueriesCorpus(str functionName = "mysql_query"){
 	Corpus corpus = getCorpus();
 	res = ();
 	for(p <- corpus, v := corpus[p]){
-		res["<p>_<v>"] = buildQueriesSystem(p, v, functionName = functionName, seenBefore = seenBefore);
+		res["<p>_<v>"] = buildQueriesSystem(p, v, functionName = functionName, seenBefore = { });
 	}
 	return res;
 }
 
 public list[Query] buildQueriesSystem(str p, str v, str functionName = "mysql_query", set[str] seenBefore = { }) {
-	pt = loadBinary(p,v);
-	if (!pt has baseLoc) {
+	qcpi = readQCPSystemInfo(p,v);
+	if (!qcpi.sys has baseLoc) {
 		println("Skipping system <p>, version <v>, no base loc included");
 		return [ ];
 	}
 
-	calls = [ c | /c:call(name(name(functionName)),_) := pt ];
-	ca = concatAssignments(pt, functionName);
-	invertedCallGraph = invert(computeSystemCallGraph(pt));
+	calls = qcpi.functionCalls[_,functionName];
+	ca = concatAssignments(qcpi, functionName);
 
-	return buildQueriesSystem(pt, calls, ca, invertedCallGraph, functionName = functionName, seenBefore = seenBefore); 
+	return buildQueriesSystem(qcpi, calls, ca, functionName = functionName, seenBefore = seenBefore); 
 }
 
-public list[Query] buildQueriesSystem(System pt, list[Expr] calls, set[ConcatBuilder] ca, InvertedCallGraph invertedCallGraph, str functionName = "mysql_query", set[str] seenBefore = { }, int index = 0) {
-	IncludesInfo iinfo = loadIncludesInfo(pt.name, pt.version);
-	simplified = [s | c <- calls, s := simplifyParams(c, pt.baseLoc, iinfo)];
-	println("Calls to <functionName> in system <pt.name>, version <pt.version> (total = <size(calls)>):");
-	neededCFGs = ( l : buildCFGs(pt.files[l], buildBasicBlocks=false) | l <- { c@at.top | c <- simplified } );
+public list[Query] buildQueriesSystem(QCPSystemInfo qcpi, set[Expr] calls, set[ConcatBuilder] ca, str functionName = "mysql_query", set[str] seenBefore = { }, int index = 0) {
+	simplified = [s | c <- calls, s := simplifyParams(c, qcpi.sys.baseLoc, qcpi.iinfo)];
+	println("Calls to <functionName> in system <qcpi.sys.name>, version <qcpi.sys.version> (total = <size(calls)>):");
 	
 	res = [];
 	for(c <- calls){
-	
 		// check if this call was already found by the QCP2 checker
 		if(c@at in [a.usedAt | a <- ca]){
 			queryParts = getOneFrom([a.queryParts | a <- ca, c@at == a.usedAt]);
@@ -81,14 +78,14 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, set[ConcatBui
 		}
 		
 		// check for QCP1b and QCP3a
-		query = buildLiteralVariableQuery(pt, c, iinfo, neededCFGs, index);
+		query = buildLiteralVariableQuery(qcpi, c, index);
 		if(unclassified(_) !:= query){
 			res += query;
 			continue;	
 		}
 		
 		// check for QCP4a and QCP3b
-		query = buildMixedVariableQuery(pt, c, iinfo, neededCFGs, index);
+		query = buildMixedVariableQuery(qcpi, c, index);
 		if(unclassified(_) !:= query){
 			res += query;
 			continue;	
@@ -96,7 +93,7 @@ public list[Query] buildQueriesSystem(System pt, list[Expr] calls, set[ConcatBui
 		
 		// restrict QCP5 analysis to only calls to mysql_query to prevent chaining of QCP5 classifications (for now)
 		//if(functionName := "mysql_query"){
-			query = buildQCP5Query(pt, ca, neededCFGs, c, index, invertedCallGraph, functionName, seenBefore);
+			query = buildQCP5Query(qcpi, ca, c, index, functionName, seenBefore);
 		//}
 		
 		if(unclassified(_) !:= query){
@@ -142,7 +139,7 @@ public Query buildEasyCaseQuery(Expr c, int index){
 }
 
 @doc{builds Query Structures for QCP1b or QCP3a if the query matches these cases. Otherwise, returns an unclassified query}
-public Query buildLiteralVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs, int index){
+public Query buildLiteralVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 	if (! (index < size(c.parameters)) ) {
 		println("Index not available for call at location <c@at>");
 		return unclassified(c@at);
@@ -150,14 +147,14 @@ public Query buildLiteralVariableQuery(System pt, Expr c, IncludesInfo iinfo, ma
 
 	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){
 	
-		containingScript = pt.files[c@at.top];
-		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
+		containingScript = qcpi.sys.files[c@at.top];
+		containingCFG = findContainingCFG(containingScript, qcpi.systemCFGs[c@at.top], c@at);
 		callNode = findNodeForExpr(containingCFG, c);
 			
 		// If we have a standard literal assignment to the query var, then we can use the assigned value
 		bool assignsScalarToQueryVar(CFGNode cn) {
 			if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
-				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,qcpi.iinfo), qcpi.sys.baseLoc);
 				if (scalar(string(_)) := simplifiedQueryExpr) {
 					return true;
 				}
@@ -169,7 +166,7 @@ public Query buildLiteralVariableQuery(System pt, Expr c, IncludesInfo iinfo, ma
 		// literal assignment we could find above, e.g., $x = goodValue, $x .= badValue. 
 		bool assignsNonScalarToQueryVar(CFGNode cn) {
 			if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
-				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,qcpi.iinfo), qcpi.sys.baseLoc);
 				if (scalar(string(_)) !:= simplifiedQueryExpr) {
 					return true;
 				}
@@ -181,7 +178,7 @@ public Query buildLiteralVariableQuery(System pt, Expr c, IncludesInfo iinfo, ma
 				
 		Expr getAssignedScalar(CFGNode cn) {
 			if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
-				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,qcpi.iinfo), qcpi.sys.baseLoc);
 				if (ss:scalar(string(_)) := simplifiedQueryExpr) {
 					return ss;
 				}
@@ -204,20 +201,21 @@ public Query buildLiteralVariableQuery(System pt, Expr c, IncludesInfo iinfo, ma
 	}
 	return unclassified(c@at);
 }
+
 @doc{builds a Query Structue for QCP4c or QCP3b if the query matches these cases. Otherwise, returns an unclassified query}
-public Query buildMixedVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[loc, map[NamePath, CFG]] cfgs, int index){
+public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 	if (! (index < size(c.parameters)) ) {
 		println("Index not available for call at location <c@at>");
 		return unclassified(c@at);
 	}
 
 	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){
-		containingScript = pt.files[c@at.top];
-		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
+		containingScript = qcpi.sys.files[c@at.top];
+		containingCFG = findContainingCFG(containingScript, qcpi.systemCFGs[c@at.top], c@at);
 		callNode = findNodeForExpr(containingCFG, c);
 		bool assignsConcatOrEncapsedToQueryVar(CFGNode cn){
 			if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
-				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,qcpi.iinfo), qcpi.sys.baseLoc);
 				if (scalar(encapsed(_)) := simplifiedQueryExpr || binaryOperation(left,right,concat()) := simplifiedQueryExpr) {
 					return true;
 				}
@@ -227,7 +225,7 @@ public Query buildMixedVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[
 				
 		bool notAssignsConcatOrEncapsedToQueryVar(CFGNode cn) {
 			if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
-				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,qcpi.iinfo), qcpi.sys.baseLoc);
 				if (scalar(encapsed(_)) := simplifiedQueryExpr || binaryOperation(left,right,concat()) := simplifiedQueryExpr) {
 					return false;
 				} else {
@@ -239,7 +237,7 @@ public Query buildMixedVariableQuery(System pt, Expr c, IncludesInfo iinfo, map[
 		
 		Expr getAssignedConcatOrEncapsed(CFGNode cn){
 			if (exprNode(assign(var(name(name(queryVar))),queryExpr),_) := cn) {
-				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,iinfo), pt.baseLoc);
+				simplifiedQueryExpr = simplifyExpr(replaceConstants(queryExpr,qcpi.iinfo), qcpi.sys.baseLoc);
 				if (e:scalar(encapsed(_)) := simplifiedQueryExpr) {
 					return e;
 				}
@@ -330,16 +328,16 @@ public rel[str system, str version, ConcatBuilder occurrence] concatAssignments(
 
 @doc {checks for QCP2 occurrences (cascading .= assignments) for functionName across the given system based on the provided name and version}
 public rel[str system, str version, ConcatBuilder occurrence] concatAssignments(str systemName, str systemVersion, str functionName) {
-	return { < systemName, systemVersion > } join concatAssignments(loadBinary(systemName, systemVersion), functionName);
+	qcpi = readQCPSystemInfo(p,v);
+	return { < systemName, systemVersion > } join concatAssignments(qcpi, functionName);
 }
 
 @doc {checks for QCP2 occurrences (cascading .= assignments) for functionName across the entire system}
-public set[ConcatBuilder] concatAssignments(System theSystem, str functionName) {
+public set[ConcatBuilder] concatAssignments(QCPSystemInfo qcpi, str functionName) {
 	set[ConcatBuilder] res = { };
-	cfgsForScripts = ( );
 	
-	for (scriptLoc <- theSystem.files) {
-		Script scr = theSystem.files[scriptLoc];
+	for (scriptLoc <- qcpi.sys.files) {
+		Script scr = qcpi.sys.files[scriptLoc];
 		
 		// Find calls to mysql_query in this script that use a variable to store the query. We want to
 		// check to see which queries formed using concatenations reach this query.
@@ -358,11 +356,7 @@ public set[ConcatBuilder] concatAssignments(System theSystem, str functionName) 
 					}
 				}
 				if (size(queryParts) > 1) {
-					//println("Found a concat query starting at <firstPart@at> with <size(queryParts)> parts, for variable <varName>");
-					if (scriptLoc notin cfgsForScripts) {
-						cfgsForScripts[scriptLoc] = buildCFGs(scr, buildBasicBlocks=false);
-					}
-					scriptCFGs = cfgsForScripts[scriptLoc];
+					scriptCFGs = qcpi.systemCFGs[scriptLoc];
 					neededCFG = findContainingCFG(scr, scriptCFGs, queryParts[-1]@at);
 					neededCFGAsGraph = cfgAsGraph(neededCFG);
 					startNode = findNodeForExpr(neededCFG, queryParts[-1]@at);
@@ -391,7 +385,7 @@ public set[ConcatBuilder] concatAssignments(System theSystem, str functionName) 
 						}
 					}
 					allUsingQueries = findAllReachedUntil(neededCFGAsGraph, startNode, foundQueryCall, foundAnotherAssignment, collectQueryCall);
-					res = res + { < systemName, systemVersion, concatBuilder(varName, queryParts, firstPart@at, queryCallExpr, queryCallLoc) > | < queryCallExpr, queryCallLoc > <- allUsingQueries };
+					res = res + { concatBuilder(varName, queryParts, firstPart@at, queryCallExpr, queryCallLoc) | < queryCallExpr, queryCallLoc > <- allUsingQueries };
 				}
 			}
 		}

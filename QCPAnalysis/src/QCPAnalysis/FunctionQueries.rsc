@@ -3,6 +3,7 @@ module QCPAnalysis::FunctionQueries
 import QCPAnalysis::AbstractQuery;
 import QCPAnalysis::QCPCorpus;
 import QCPAnalysis::BuildQueries;
+import QCPAnalysis::QCPSystemInfo;
 
 import lang::php::util::Corpus;
 import lang::php::util::Utils;
@@ -22,7 +23,7 @@ import List;
 import IO;
 
 @doc{builds a query if it is classified as QCP5, otherwise returns an unclassified query}
-public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[NamePath, CFG]] cfgs, Expr c, int index, InvertedCallGraph invertedCallGraph, str functionName, set[str] seenBefore) {
+public Query buildQCP5Query(QCPSystemInfo qcpi, set[ConcatBuilder] ca, Expr c, int index, str functionName, set[str] seenBefore) {
 	if (! (index < size(c.parameters)) ) {
 		println("Index not available for call at location <c@at>");
 		return unclassified(c@at);
@@ -36,20 +37,21 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 	
 	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){	
 	
-		containingScript = pt.files[c@at.top];
-		containingCFG = findContainingCFG(containingScript, cfgs[c@at.top], c@at);
+		containingScript = qcpi.sys.files[c@at.top];
+		containingCFG = findContainingCFG(containingScript, qcpi.systemCFGs[c@at.top], c@at);
 		callNode = findNodeForExpr(containingCFG, c);
 		entryNode = getEntryNode(containingCFG);
 
 		if (entryNode is functionEntry) {
 			// Find the function in the script that contains the call
-			containingFunction = getOneFrom({s | /s:function(fn,_,_,_) := pt, fn == entryNode.functionName, c@at < s@at});
+			// TODO: Should we extract defs into info as well?
+			containingFunction = getOneFrom({s | /s:function(fn,_,_,_) := qcpi.sys, fn == entryNode.functionName, c@at < s@at});
 			paramNames = [p.paramName | p <- containingFunction.params];
 			if(queryVar in paramNames){
 				// record index in case function has multiple params (we are only interested in the query param for now)
 				int newIndex = indexOf(paramNames, queryVar);
 				println("Call at <c@at>, in function at <containingFunction@at>, parameter <newIndex>, name <queryVar>");
-				paramQueries = buildParamQueries(pt, ca, entryNode.functionName, containingFunction@at, newIndex, invertedCallGraph, seenBefore);
+				paramQueries = buildParamQueries(qcpi, ca, entryNode.functionName, containingFunction@at, newIndex, seenBefore);
 				return QCP5(c@at, entryNode.functionName, paramQueries);
 			}			
 		}		
@@ -62,7 +64,7 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 			if(queryVar in paramNames){
 				// record index in case method has multiple params (we are only interested in the query param for now)
 				int newIndex = indexOf(paramNames, queryVar);
-				paramQueries = buildParamQueries(pt, ca, className, methodName, containingMethod@at, newIndex, invertedCallGraph, seenBefore);
+				paramQueries = buildParamQueries(qcpi, ca, className, methodName, containingMethod@at, newIndex, seenBefore);
 				return QCP5(c@at, methodName, paramQueries);
 				//return QCP5(c@at, methodName, []);
 			}
@@ -72,20 +74,20 @@ public Query buildQCP5Query(System pt, set[ConcatBuilder] ca,  map[loc, map[Name
 }
 
 @doc{performs our query modeling function on calls to a particular function as if it were a call to mysql_query (as in cases of QCP5)}
-public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str functionName, loc functionLoc, int index, InvertedCallGraph invertedCallGraph, set[str] seenBefore) {
+public list[Query] buildParamQueries(QCPSystemInfo qcpi, set[ConcatBuilder] ca, str functionName, loc functionLoc, int index, set[str] seenBefore) {
 	// get all calls to this function
-	callingLocs = invertedCallGraph[functionTarget(functionName,functionLoc)];
-	functionCalls = [c | /c:call(name(name(functionName)),_) := pt, c@at in callingLocs];
+	callingLocs = qcpi.cg[functionTarget(functionName,functionLoc)];
+	functionCalls = qcpi.functionCalls[callingLocs, functionName];
 	
 	// run our query modeling function on the query parameters to the calls
-	return buildQueriesSystem(pt, functionCalls, ca, invertedCallGraph, functionName = functionName, index = index, seenBefore = seenBefore);
+	return buildQueriesSystem(qcpi, functionCalls, ca, functionName = functionName, index = index, seenBefore = seenBefore);
 }
 
-public list[Query] buildParamQueries(System pt, set[ConcatBuilder] ca, str className, str methodName, loc methodLoc, int index, InvertedCallGraph invertedCallGraph, set[str] seenBefore) {
+public list[Query] buildParamQueries(QCPSystemInfo qcpi, set[ConcatBuilder] ca, str className, str methodName, loc methodLoc, int index, set[str] seenBefore) {
 	// get all calls to this method
-	callingLocs = invertedCallGraph[methodTarget(className,methodName,methodLoc)];
-	methodCalls = [mc | /mc:methodCall(_,name(name(methodName)),_) := pt, mc@at in callingLocs];
+	callingLocs = qcpi.cg[methodTarget(className,methodName,methodLoc)];
+	methodCalls = qcpi.methodCalls[callingLocs, methodName];
 	
 	// run our query modeling function on the query parameters to the calls
-	return buildQueriesSystem(pt, methodCalls, ca, invertedCallGraph, functionName = methodName, index = index, seenBefore = seenBefore);
+	return buildQueriesSystem(qcpi, methodCalls, ca, functionName = methodName, index = index, seenBefore = seenBefore);
 }
