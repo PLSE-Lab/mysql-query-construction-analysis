@@ -2,8 +2,9 @@ module QCPAnalysis::BuildQueries
 
 import QCPAnalysis::AbstractQuery;
 import QCPAnalysis::QCPCorpus;
-import QCPAnalysis::MixedQuery::AbstractSyntax;
-import QCPAnalysis::MixedQuery::LoadQuery;
+import QCPAnalysis::ParseSQL::AbstractSyntax;
+import QCPAnalysis::ParseSQL::RunSQLParser;
+import QCPAnalysis::ParseSQL::LoadQuery;
 import QCPAnalysis::FunctionQueries;
 import QCPAnalysis::QCPSystemInfo;
 
@@ -63,30 +64,27 @@ public list[Query] buildQueriesSystem(QCPSystemInfo qcpi, set[Expr] calls, set[C
 		if(c@at in [a.usedAt | a <- ca]){
 			queryParts = getOneFrom([a.queryParts | a <- ca, c@at == a.usedAt]);
 			mixed = buildMixedSnippets(queryParts);
-			SQLQuery parsed;
-			try parsed = load(mixed);
-			catch: parsed = error();
-			res += QCP2(c@at, mixed, parsed);
+			res += QCP2(c@at, mixed, unknownQuery());
 			continue;
 		}
 		
 		//check for easy cases QCP1a, QCP4a, and QCP4b
 		query = buildEasyCaseQuery(c, index);
-		if(unclassified(_) !:= query){
+		if(!(query is unclassified)){
 			res += query;
 			continue;	
 		}
 		
 		// check for QCP1b and QCP3a
 		query = buildLiteralVariableQuery(qcpi, c, index);
-		if(unclassified(_) !:= query){
+		if(!(query is unclassified)){
 			res += query;
 			continue;	
 		}
 		
 		// check for QCP4a and QCP3b
 		query = buildMixedVariableQuery(qcpi, c, index);
-		if(unclassified(_) !:= query){
+		if(!(query is unclassified)){
 			res += query;
 			continue;	
 		}
@@ -96,13 +94,13 @@ public list[Query] buildQueriesSystem(QCPSystemInfo qcpi, set[Expr] calls, set[C
 			query = buildQCP5Query(qcpi, ca, c, index, functionName, seenBefore);
 		//}
 		
-		if(unclassified(_) !:= query){
+		if(!(query is unclassified)){
 			res += query;
 			continue;	
 		}
 		
-		// nothing classified this query, add it as an unclassified query
-		res += unclassified(c@at);
+		// query remained unclassified after all classifications, add it as unclassified
+		res += query;
 	}
 	return res;
 }
@@ -111,30 +109,27 @@ public list[Query] buildQueriesSystem(QCPSystemInfo qcpi, set[Expr] calls, set[C
 public Query buildEasyCaseQuery(Expr c, int index){
 	if (! (index < size(c.parameters)) ) {
 		println("Index not available for call at location <c@at>");
-		return unclassified(c@at);
+		return unclassified(c@at, 1);
 	}
 	if(actualParameter(scalar(string(s)),false) := c.parameters[index]){
-		return QCP1a(c@at, s);
+		SQLQuery parsed;
+		try parsed = runParser(s);
+		catch: parsed = parseError();
+		return QCP1a(c@at, s, parsed);
 	}
 	// check for QCP4a (encapsed string)
 	else if(actualParameter(scalar(encapsed(parts)), false) := c.parameters[index]){
 		mixed = buildMixedSnippets(parts);
-		SQLQuery parsed;
-		try parsed = load(mixed);
-		catch: parsed = error();
-		return QCP4a(c@at, mixed, parsed);
+		return QCP4a(c@at, mixed, unknownQuery());
 	}
 		
 	// check for QCP4b (concatenation)
 	else if(actualParameter(b:binaryOperation(left, right, concat()), false) := c.parameters[index]){
 		mixed = buildMixedSnippets(b);
-		SQLQuery parsed;
-		try parsed = load(mixed);
-		catch: parsed = error();
-		return QCP4b(c@at, mixed, parsed);
+		return QCP4b(c@at, mixed, unknownQuery());
 	}
 	else{
-		return unclassified(c@at);
+		return unclassified(c@at,0);
 	}
 }
 
@@ -142,7 +137,7 @@ public Query buildEasyCaseQuery(Expr c, int index){
 public Query buildLiteralVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 	if (! (index < size(c.parameters)) ) {
 		println("Index not available for call at location <c@at>");
-		return unclassified(c@at);
+		return unclassified(c@at,1);
 	}
 
 	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){
@@ -190,7 +185,11 @@ public Query buildLiteralVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 		if(literalGR.trueOnAllPaths){
 			// QCP1b (single literal assignment into the query variable)
 			if(size(literalGR.results) == 1){
-				return QCP1b(c@at, getOneFrom(literalGR.results).scalarVal.strVal);
+				s = getOneFrom(literalGR.results).scalarVal.strVal;
+				SQLQuery parsed;
+				try parsed = runParser(s);
+				catch: parsed = parseError();
+				return QCP1b(c@at, s, parsed);
 			}
 				
 			// QCP3a (literal assignments distributed over control flow)
@@ -199,14 +198,14 @@ public Query buildLiteralVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 			}
 		}
 	}
-	return unclassified(c@at);
+	return unclassified(c@at,0);
 }
 
 @doc{builds a Query Structue for QCP4c or QCP3b if the query matches these cases. Otherwise, returns an unclassified query}
 public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 	if (! (index < size(c.parameters)) ) {
 		println("Index not available for call at location <c@at>");
-		return unclassified(c@at);
+		return unclassified(c@at,1);
 	}
 
 	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){
@@ -255,27 +254,21 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 			// QCP4c check (QCP4a or QCP4b query assigned to a variable)
 			if(size(concatOrEncapsedGR.results) == 1){
 				mixed = buildMixedSnippets(toList(concatOrEncapsedGR.results));
-				SQLQuery parsed;
-				try parsed = load(mixed);
-				catch: parsed = error();
-				return  QCP4c(c@at, mixed, parsed);
+				return  QCP4c(c@at, mixed, unknownQuery());
 			}
 			
 			// QCP3b check (QCP4 queries distributed over control flow)
 			if(size(concatOrEncapsedGR.results) > 1){
 				queries = {};
-					for(r <- concatOrEncapsedGR.results){
+				for(r <- concatOrEncapsedGR.results){
 					mixed = buildMixedSnippets(toList(concatOrEncapsedGR.results));
-					SQLQuery parsed;
-					try parsed = load(mixed);
-					catch: parsed = error();
-					queries += <mixed, parsed>;
+					queries += <mixed, unknownQuery()>;
 				}
 				return QCP3b(c@at, queries);
 			}
 		}
 	}
-	return unclassified(c@at);
+	return unclassified(c@at,0);
 }
 
 @doc{builds Query Snippets for QCP2 and QCP4 where there is a mixture of static and dynamic query parts}

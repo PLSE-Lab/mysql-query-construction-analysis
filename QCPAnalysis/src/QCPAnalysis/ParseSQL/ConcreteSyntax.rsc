@@ -1,4 +1,4 @@
-module QCPAnalysis::MixedQuery::ConcreteSyntax
+module QCPAnalysis::ParseSQL::ConcreteSyntax
 
 extend lang::std::Layout;
 

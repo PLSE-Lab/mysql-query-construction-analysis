@@ -1,9 +1,9 @@
-module QCPAnalysis::MixedQuery::TestParser
+module QCPAnalysis::ParseSQL::TestParser
 
 import lang::php::ast::AbstractSyntax;
 import lang::php::ast::System;
 import QCPAnalysis::AbstractQuery;
-import QCPAnalysis::MixedQuery::ConcreteSyntax;
+import QCPAnalysis::ParseSQL::ConcreteSyntax;
 
 import ParseTree;
 import IO;
