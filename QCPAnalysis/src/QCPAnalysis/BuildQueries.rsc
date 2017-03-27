@@ -113,20 +113,27 @@ public Query buildEasyCaseQuery(Expr c, int index){
 	}
 	if(actualParameter(scalar(string(s)),false) := c.parameters[index]){
 		SQLQuery parsed;
-		try parsed = runParser(s);
+		sql = replaceAll(replaceAll(s, "\n", " "), "\t", " ");
+		try parsed = runParser(sql);
 		catch: parsed = parseError();
-		return QCP1a(c@at, s, parsed);
+		return QCP1a(c@at, sql, parsed);
 	}
 	// check for QCP4a (encapsed string)
 	else if(actualParameter(scalar(encapsed(parts)), false) := c.parameters[index]){
-		mixed = buildMixedSnippets(parts);
-		return QCP4a(c@at, mixed, unknownQuery());
+		mixed = replaceAll(replaceAll(buildMixedSnippets(parts), "\n", " "), "\t", " ");
+		SQLQuery parsed;
+		try parsed = runParser(mixed);
+		catch: parsed = parseError();
+		return QCP4a(c@at, mixed, parsed);
 	}
 		
 	// check for QCP4b (concatenation)
 	else if(actualParameter(b:binaryOperation(left, right, concat()), false) := c.parameters[index]){
-		mixed = buildMixedSnippets(b);
-		return QCP4b(c@at, mixed, unknownQuery());
+		mixed = replaceAll(replaceAll(buildMixedSnippets(b), "\n", " "), "\t", " ");
+		SQLQuery parsed;
+		try parsed = runParser(mixed);
+		catch: parsed = parseError();
+		return QCP4b(c@at, mixed, parsed);
 	}
 	else{
 		return unclassified(c@at,0);
@@ -187,9 +194,10 @@ public Query buildLiteralVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 			if(size(literalGR.results) == 1){
 				s = getOneFrom(literalGR.results).scalarVal.strVal;
 				SQLQuery parsed;
-				try parsed = runParser(s);
+				sql = replaceAll(replaceAll(s, "\n", " "), "\t", " ");
+				try parsed = runParser(sql);
 				catch: parsed = parseError();
-				return QCP1b(c@at, s, parsed);
+				return QCP1b(c@at, sql, parsed);
 			}
 				
 			// QCP3a (literal assignments distributed over control flow)
@@ -253,8 +261,11 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 		if(concatOrEncapsedGR.trueOnAllPaths){
 			// QCP4c check (QCP4a or QCP4b query assigned to a variable)
 			if(size(concatOrEncapsedGR.results) == 1){
-				mixed = buildMixedSnippets(toList(concatOrEncapsedGR.results));
-				return  QCP4c(c@at, mixed, unknownQuery());
+				mixed = replaceAll(replaceAll(buildMixedSnippets(toList(concatOrEncapsedGR.results)), "\n", " "), "\t", " ");
+				SQLQuery parsed;
+				try parsed = runParser(mixed);
+				catch: parsed = parseError();
+				return QCP4c(c@at, mixed, parsed);
 			}
 			
 			// QCP3b check (QCP4 queries distributed over control flow)

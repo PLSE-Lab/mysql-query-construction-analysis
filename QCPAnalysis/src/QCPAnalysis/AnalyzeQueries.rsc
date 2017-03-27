@@ -108,11 +108,31 @@ public void writeQueries(){
 	writeBinaryValueFile(|project://QCPAnalysis/results/lists/queryMap|, queries);
 }
 
-@doc{function to write QCP1 for parser testing}
-public void writeQCP1(QueryMap queryMap = ()){
+@doc{function to write abstract sql queries file for manual inspection}
+public void writeParsed(QueryMap queryMap = ()){
 	writeFile(|project://QCPAnalysis/results/lists/qcp1|, "");
 	qcp1 = getQCP("QCP1", queryMap = loadQueryMap(), withFunctionQueries = false);
+	qcp4 = getQCP("QCP4", queryMap = loadQueryMap(), withFunctionQueries = false);
+	
+	int parseErrorsQCP1 = 0;
+	int unknownQueriesQCP1 = 0;
+	
+	int parseErrorsQCP4 = 0;
+	int unknownQueriesQCP4 = 0;
+	
+	
+	
 	for(q <- qcp1){
 		appendToFile(|project://QCPAnalysis/results/lists/qcp1|,"<q.sql>\n<q.parsed>\n\n");
+		if(q.parsed is parseError) parseErrorsQCP1 = parseErrorsQCP1 + 1;
+		if(q.parsed is unknownQuery) unknownQueriesQCP1 = unknownQueriesQCP1 + 1; 
 	}
+	for(q <- qcp4){
+		appendToFile(|project://QCPAnalysis/results/lists/qcp1|,"<q.mixedQuery>\n<q.parsed>\n\n");
+		if(q.parsed is parseError) parseErrorsQCP4 = parseErrorsQCP4 + 1;
+		if(q.parsed is unknownQuery) unknownQueriesQCP4 = unknownQueriesQCP4 + 1; 
+	}
+	
+	println("Out of <size(qcp1)> QCP1 query parse attempts, <unknownQueriesQCP1> were an unknown query type and <parseErrorsQCP1> did not parse.");
+	println("Out of <size(qcp4)> QCP4 query parse attempts, <unknownQueriesQCP4> were an unknown query type and <parseErrorsQCP4> did not parse.");
 }
