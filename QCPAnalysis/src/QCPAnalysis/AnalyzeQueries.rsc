@@ -111,8 +111,8 @@ public void writeQueries(){
 @doc{function to write QCP1 for parser testing}
 public void writeQCP1(QueryMap queryMap = ()){
 	writeFile(|project://QCPAnalysis/results/lists/qcp1|, "");
-	qcp1 = getQCP("QCP1", queryMap = loadQueryMap(), withFunctionQueries = true);
+	qcp1 = getQCP("QCP1", queryMap = loadQueryMap(), withFunctionQueries = false);
 	for(q <- qcp1){
-		appendToFile(|project://QCPAnalysis/results/lists/qcp1|, replaceAll(q.sql, "\n", "") + "\n");
+		appendToFile(|project://QCPAnalysis/results/lists/qcp1|,"<q.sql>\n<q.parsed>\n\n");
 	}
 }
