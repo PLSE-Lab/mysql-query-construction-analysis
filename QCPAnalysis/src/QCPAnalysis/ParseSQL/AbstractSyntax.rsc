@@ -1,11 +1,13 @@
 module QCPAnalysis::ParseSQL::AbstractSyntax
 
-public data SQLQuery = selectQuery(Tables tables)
-					 | updateQuery(Tables tables)
-					 | insertQuery(Tables tables)
-					 | deleteQuery(Tables tables)
+public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from)
+					 | updateQuery(list[Exp] tables)
+					 | insertQuery(Exp into)
+					 | deleteQuery(list[Exp] from)
 					 | unknownQuery()// logic to translate this query into rascal is not yet implemented 
 					 | parseError();// query did not parse
 
-public data Tables = table(str tablename)
-				   | tables(set[str] tablenames);
+public data Exp = column(str columnName)
+				| table(str tableName)
+				| database(str dbName)
+				| unknownExpression();
