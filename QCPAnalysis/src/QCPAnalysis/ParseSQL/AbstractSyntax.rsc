@@ -8,6 +8,7 @@ public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from)
 					 | parseError();// query did not parse
 
 public data Exp = name(SQLName name)
+				| star()
 				| unknownExpression();
 				
 public data SQLName = column(str column)
@@ -16,3 +17,4 @@ public data SQLName = column(str column)
 					| tableColumn(str table, str column)
 					| databaseTable(str database, str column)
 					| databaseTableColumn(str database, str table, str column);
+					
