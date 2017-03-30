@@ -123,12 +123,12 @@ public void writeParsed(QueryMap queryMap = ()){
 	
 	
 	for(q <- qcp1){
-		appendToFile(|project://QCPAnalysis/results/lists/qcp1|,"<q.sql>\n<q.parsed>\n\n");
+		appendToFile(|project://QCPAnalysis/results/lists/qcp1|,"<q.sql>\n<q.parsed>\n<q.callloc>\n\n");
 		if(q.parsed is parseError) parseErrorsQCP1 = parseErrorsQCP1 + 1;
 		if(q.parsed is unknownQuery) unknownQueriesQCP1 = unknownQueriesQCP1 + 1; 
 	}
 	for(q <- qcp4){
-		appendToFile(|project://QCPAnalysis/results/lists/qcp1|,"<q.mixedQuery>\n<q.parsed>\n\n");
+		appendToFile(|project://QCPAnalysis/results/lists/qcp1|,"<q.mixedQuery>\n<q.parsed>\n<q.callloc>\n\n");
 		if(q.parsed is parseError) parseErrorsQCP4 = parseErrorsQCP4 + 1;
 		if(q.parsed is unknownQuery) unknownQueriesQCP4 = unknownQueriesQCP4 + 1; 
 	}

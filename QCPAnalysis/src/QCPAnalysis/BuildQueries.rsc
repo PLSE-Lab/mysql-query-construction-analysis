@@ -129,7 +129,7 @@ public Query buildEasyCaseQuery(Expr c, int index){
 		
 	// check for QCP4b (concatenation)
 	else if(actualParameter(b:binaryOperation(left, right, concat()), false) := c.parameters[index]){
-		mixed = replaceAll(replaceAll(buildMixedSnippets(b), "\n", " "), "\t", " ");
+		mixed = replaceAll(replaceAll(buildMixedSnippets([b]), "\n", " "), "\t", " ");
 		SQLQuery parsed;
 		try parsed = runParser(mixed);
 		catch: parsed = parseError();
@@ -283,21 +283,24 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 }
 
 @doc{builds Query Snippets for QCP2 and QCP4 where there is a mixture of static and dynamic query parts}
-private str buildMixedSnippets(Expr e){
-	if(scalar(string(s)) := e){
-		res = replaceAll(s,"\n", "");
-		res = replaceAll(res, "\r", "");
-		return res;
-	}
-	else if(scalar(encapsed(parts)) := e) return buildMixedSnippets(parts);
-	else if(binaryOperation(left, right, concat()) := e) return buildMixedSnippets(left) + buildMixedSnippets(right);
-	else return "Ø";//symbol for dynamic query part
-}
 private str buildMixedSnippets(list[Expr] parts){
 	res = "";
+	int holeIndex = 0;
 	for(p <- parts){
-		res += buildMixedSnippets(p);
+		if(scalar(string(s)) := p){
+			res = res + s;
+		}	
+		else if(binaryOperation(left, right, concat()) := p){
+			res = res + buildMixedSnippets([left]) + buildMixedSnippets([right]);
+		}
+		else{
+			res = res + "?<holeIndex>";//symbol for dynamic query part
+			holeIndex = holeIndex + 1;
+		}
 	}
+	
+	res = replaceAll(res,"\n", "");
+	res = replaceAll(res, "\r", "");
 	return res;
 }
 			
