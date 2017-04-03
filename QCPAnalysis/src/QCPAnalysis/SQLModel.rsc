@@ -7,6 +7,9 @@ import lang::php::analysis::cfg::BuildCFG;
 import lang::php::analysis::cfg::Util;
 import lang::php::analysis::cfg::FlowEdge;
 import lang::php::analysis::cfg::Label;
+import lang::php::util::Utils;
+import lang::php::analysis::usedef::UseDef;
+import lang::php::analysis::slicing::BasicSlicer;
 
 import Set;
 import IO;
@@ -15,6 +18,8 @@ import Relation;
 // TODO: Currently, this focuses just on function calls. We need to also add
 // support for method calls to pick up calls to new APIs, such as the PDO
 // libraries.
+
+data SQLModel = sqlModel();
 
 public rel[loc callLoc, CFG graph] cfgsWithCalls(System s, set[str] functionNames = {}, set[str] methodNames = {}) {
 	rel[loc callLoc, CFG graph] res = { };
@@ -27,61 +32,25 @@ public rel[loc callLoc, CFG graph] cfgsWithCalls(System s, set[str] functionName
 	return res;
 }
 
+//public Expr queryParameter(call(name(name("mysql_query")),[actualParameter(Expr e,_),_*])) = e;
 public Expr queryParameter(exprNode(call(name(name("mysql_query")),[actualParameter(Expr e,_),_*]),_)) = e;
 public default Expr queryParameter(CFGNode n) { throw "Unexpected parameter <n>"; }
 
-public CFG reduceCFG(CFG inputGraph, loc callLoc) {
-	// First, find the node representing the call
-	possibleMatches = { n | n:exprNode(cn:call(_,_),_) <- inputGraph.nodes, cn@at == callLoc };
-	
-	// If we have more than one, this is a problem -- we should only have one,
-	// so this would be a bug
-	if (size(possibleMatches) > 1) {
-		throw "Error, should have at most one match for node at <callLoc>, instead have <size(possibleMatches)>";
-	} else if (size(possibleMatches) == 0) {
-		println("WARNING: No matches found in CFG for call at location <callLoc>");
-		return inputGraph;
-	}
-	
-	startNode = getOneFrom(possibleMatches);
-	
-	// Compute the nodes that are reachable from the call. The graph is then restricted
-	// to include only these nodes, since only they could influence the value of the
-	// query string.
-	cfgGraph = invert(cfgAsGraph(inputGraph));
-	reachableNodes = (cfgGraph*)[startNode];
-	cfgGraph = { < gn1, gn2 > | < gn1, gn2 > <- cfgGraph, gn1 in reachableNodes, gn2 in reachableNodes };
 
-	// Notes that are not marked can be discarded, we start by assuming all nodes
-	// are not needed and then mark them as we find they are
-	map[Lab,bool] markedNodes = ( n : false | n <- reachableNodes );
+public SQLModel buildModel(CFG inputCFG, loc callLoc) {
+	inputNode = getNodeForExpr(inputCFG, callLoc);
+	d = definitions(inputCFG);
+	u = uses(inputCFG, d);
 	
-	// TODO: Now, starting at the call node, see what names are used; then we can
-	// reason backwards to see how those are made and mark the appropriate nodes
-	queryVars 
-		= { vn | /var(name(name(vn))) := queryParameter(startNode) }
-		+ { vn | /fetchArrayDim(var(name(name(vn)))) := queryParameter(startNode) }
-		;
+	slicedCFG = basicSlice(inputCFG, inputNode, u[inputNode.l]<0>);
 	
-	println("Starting with <size(queryVars)> variables");
-	set[CFGNode] assignments = { };
-	
-	solve(queryVars, assignments) {
-		directAssignments = { an | an:exprNode(assign(var(name(name(vn))),_),_) <- reachableNodes, vn in queryVars };
-		println("Found <size(directAssignments)> assignments");
-		assignments = assignments + directAssignments;
-		queryVars = queryVars + { vn | /var(name(name(vn))) := assignments };
-		println("Expanded to <size(queryVars)> variables");
-	}
-	
-	inputGraph.nodes = reachableNodes;
-	inputGraph.edges = { e | e <- inputGraph.edges, e.from in reachableNodes || e.to in reachableNodes };
-	
-	return inputGraph;
+	return sqlModel();
 }
 
 public void testcode() {
 	pt = loadBinary("Schoolmate", "1.5.4");
 	qloc = |home:///PHPAnalysis/systems/Schoolmate/schoolmate_1.5.4/DeleteFunctions.php|(5364,87,<165,0>,<165,0>);
+	locInWhile = |home:///PHPAnalysis/systems/Schoolmate/schoolmate_1.5.4/ManageGrades.php|(7737,98,<213,0>,<213,0>);
+	locInIf = |home:///PHPAnalysis/systems/Schoolmate/schoolmate_1.5.4/Registration.php|(860,115,<22,0>,<22,0>);
 	cfgs = cfgsWithCalls(pt,functionNames={"mysql_query"});
 }
