@@ -8,7 +8,7 @@ import lang::php::util::Config;
 import ValueIO;
 
 public SQLQuery runParser(str query){
-	sqlParserLoc = lang::php::util::Config::baseLoc + "sql-parser/src/";
+	sqlParserLoc = lang::php::util::Config::baseLoc + "sql-parser/src/Rascal";
 	
 	args = ["SQL2Rascal.php", query];
 	phpOut = executePHP(args, sqlParserLoc);
