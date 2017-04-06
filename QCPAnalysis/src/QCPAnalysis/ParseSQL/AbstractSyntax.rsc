@@ -9,6 +9,7 @@ public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, 
 
 public data Exp = name(SQLName name)
 			    | literal(str literalVal)
+			    | call(str functionName)//TODO: function params
 				| star()
 				| unknownExpression();
 				
