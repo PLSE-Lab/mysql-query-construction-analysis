@@ -37,3 +37,7 @@ public data Condition = condition(str exp)// TODO: hold more information about c
 					  | or(Condition left, Condition right)
 					  | xor(Condition left, Condition right)
 					  | not(Condition condition);
+
+public data Limit = limit(int numRows)
+				  | limitWithOffset(int numRows, int offset)
+				  | noLimit();
