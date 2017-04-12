@@ -30,6 +30,8 @@ import Exception;
 import String;
 import Relation;
 
+private int holeID = 0;
+
 data ConcatBuilder = concatBuilder(str varName, list[Expr] queryParts, loc startsAt, Expr queryExpr, loc usedAt);
 
 public map[str, list[Query]] buildQueriesCorpus(str functionName = "mysql_query"){
@@ -67,6 +69,7 @@ public list[Query] buildQueriesSystem(QCPSystemInfo qcpi, set[Expr] calls, set[C
 			for(qp <- queryParts){
 				mixed += buildMixedSnippets(qp);
 			}
+			holeID = 0;
 			res += QCP2(c@at, mixed, unknownQuery());
 			continue;
 		}
@@ -124,6 +127,7 @@ public Query buildEasyCaseQuery(Expr c, int index){
 	// check for QCP4a (encapsed string)
 	else if(actualParameter(s:scalar(encapsed(parts)), false) := c.parameters[index]){
 		mixed = replaceAll(replaceAll(buildMixedSnippets(s), "\n", " "), "\t", " ");
+		holeID = 0;
 		SQLQuery parsed;
 		try parsed = runParser(mixed);
 		catch: parsed = parseError();
@@ -133,6 +137,7 @@ public Query buildEasyCaseQuery(Expr c, int index){
 	// check for QCP4b (concatenation)
 	else if(actualParameter(b:binaryOperation(left, right, concat()), false) := c.parameters[index]){
 		mixed = replaceAll(replaceAll(buildMixedSnippets(b), "\n", " "), "\t", " ");
+		holeID = 0;
 		SQLQuery parsed;
 		try parsed = runParser(mixed);
 		catch: parsed = parseError();
@@ -265,6 +270,7 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 			// QCP4c check (QCP4a or QCP4b query assigned to a variable)
 			if(size(concatOrEncapsedGR.results) == 1){
 				mixed = replaceAll(replaceAll(buildMixedSnippets(getOneFrom(concatOrEncapsedGR.results)), "\n", " "), "\t", " ");
+				holeID = 0;
 				SQLQuery parsed;
 				try parsed = runParser(mixed);
 				catch: parsed = parseError();
@@ -278,6 +284,7 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 					mixed = buildMixedSnippets(r);
 					queries += <mixed, unknownQuery()>;
 				}
+				holeID = 0;
 				return QCP3b(c@at, queries);
 			}
 		}
@@ -288,7 +295,6 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 @doc{builds Query Snippets for QCP2 and QCP4 where there is a mixture of static and dynamic query parts}
 private str buildMixedSnippets(Expr e){
 	res = "";
-	int holeIndex = 0;
 	if(scalar(string(s)) := e){
 		res = res + s;
 	}
@@ -301,8 +307,8 @@ private str buildMixedSnippets(Expr e){
 		res = res + buildMixedSnippets(left) + buildMixedSnippets(right);
 	}
 	else{
-		res = res + "?<holeIndex>";//symbol for dynamic query part
-		holeIndex = holeIndex + 1;
+		res = res + "?<holeID>";//symbol for dynamic query part
+		holeID = holeID + 1;
 	}
 	
 	res = replaceAll(res,"\n", "");
