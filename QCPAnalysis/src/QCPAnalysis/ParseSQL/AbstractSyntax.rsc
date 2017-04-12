@@ -1,5 +1,7 @@
 module QCPAnalysis::ParseSQL::AbstractSyntax
 
+import lang::php::ast::AbstractSyntax;
+
 public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, Where where, GroupBy group, Having having, OrderBy order, Limit limit)
 					 | updateQuery(list[Exp] tables, Where where, OrderBy order, Limit limit)
 					 | insertQuery(list[Exp] into)
@@ -11,6 +13,7 @@ public data Exp = name(SQLName name)
 			    | literal(str literalVal)
 			    | call(str functionName)//TODO: function params
 				| star()
+				| hole(int holeID)
 				| unknownExpression()
 				| aliased(Exp exp, str theAlias);
 				
@@ -42,3 +45,4 @@ public data Condition = condition(str exp)// TODO: hold more information about c
 public data Limit = limit(int numRows)
 				  | limitWithOffset(int numRows, int offset)
 				  | noLimit();
+				  
