@@ -25,10 +25,11 @@ import List;
 
 data SQLModel
 	= literalNode(str literalFragment)
-	| concatNode(SQLModel left, SQLModel right)
-	| dynamicNode(Expr expr)
+	| nameNode(str name)
+	| dynamicNode(list[SQLModel] fragments)
 	| conditionNode(Expr cond, SQLModel trueBranch, SQLModel falseBranch)
 	| emptyNode()
+	| computedNode(Expr e)
 	;
 
 public rel[loc callLoc, CFG graph] cfgsWithCalls(System s, set[str] functionNames = {}, set[str] methodNames = {}) {
@@ -47,28 +48,38 @@ public Expr queryParameter(exprNode(call(name(name("mysql_query")),[actualParame
 public default Expr queryParameter(CFGNode n) { throw "Unexpected parameter <n>"; }
 
 
+public Expr getQueryExpr(call(name(name("mysql_query")),[actualParameter(Expr e,_),*_])) = e;
+public default Expr getQueryExpr(Expr e) { throw "Unhandled query expression <e>"; }
+ 
+public list[SQLModel] buildQueryFragments(scalar(string(str s))) = [ literalNode(s) ];
+public list[SQLModel] buildQueryFragments(var(name(name(str s)))) = [ nameNode(s) ];
+public list[SQLModel] buildQueryFragments(fetchArrayDim(var(name(name(str s))),_)) = [ nameNode(s) ];
+public list[SQLModel] buildQueryFragments(binaryOperation(Expr l, Expr r, concat())) = buildQueryFragments(l) + buildQueryFragments(r);
+public list[SQLModel] buildQueryFragments(scalar(encapsed(list[Expr] pieces))) = [ *buildQueryFragments(p) | p <- pieces ];
+public list[SQLModel] buildQueryFragments(Expr e) = [ computedNode(e) ];
+
 public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions = { "mysql_query" }) {
 	inputSystem = qcpi.sys;
 	baseLoc = inputSystem.baseLoc;
 	inputCFG = findContainingCFG(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
 	iinfo = qcpi.iinfo;
-
 	inputNode = findNodeForExpr(inputCFG, callLoc);
 
-	if (exprNode(expr,_) := inputNode, expr is call || expr is methodCall) {
-		expr = simplifyParams(expr, baseLoc, iinfo);
-		if (call(name(name(fn)),params) := expr, fn in functions, size(params) == 1, actualParameter(scalar(string(queryString)),_) := params[0]) {
-			return literalNode(queryString);
-		}
-	}
-	
 	d = definitions(inputCFG);
 	u = uses(inputCFG, d);
-	
 	slicedCFG = basicSlice(inputCFG, inputNode, u[inputNode.l]<0>);
+
+	nodesForLabels = ( n.l : n | n <- inputCFG.nodes );
+	queryExpr = getQueryExpr(simplifyParams(inputNode.expr, baseLoc, iinfo));	
+	if (scalar(string(queryString)) := queryExpr) {
+		return literalNode(queryString);
+	} else {
+		fragments = buildQueryFragments(queryExpr);
+		println("Query has <size(fragments)> fragments");
+		for (f <- fragments) println(f);
+	}		
 	
-	// Now, build the model to represent the actual query
-	return emptyNode();
+	return literalNode("Not done yet!");
 }
 
 data SQLPiece = staticPiece(str literal) | dynamicPiece();
