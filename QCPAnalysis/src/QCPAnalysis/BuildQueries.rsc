@@ -7,6 +7,7 @@ import QCPAnalysis::ParseSQL::RunSQLParser;
 import QCPAnalysis::ParseSQL::LoadQuery;
 import QCPAnalysis::FunctionQueries;
 import QCPAnalysis::QCPSystemInfo;
+import QCPAnalysis::Utils;
 
 import lang::php::util::Corpus;
 import lang::php::util::Utils;
@@ -303,25 +304,6 @@ private str buildMixedSnippets(list[Expr] parts){
 	res = replaceAll(res, "\r", "");
 	return res;
 }
-			
-@doc{Run the simplifier on the parameters being passed to this function}
-private Expr simplifyParams(Expr c:call(NameOrExpr funName, list[ActualParameter] parameters), loc baseLoc, IncludesInfo iinfo) {
-	list[ActualParameter] simplifiedParameters = [];
-	for (p:actualParameter(Expr expr, bool byRef) <- parameters) {
-		simplifiedParameters += p[expr=simplifyExpr(replaceConstants(expr,iinfo), baseLoc)];
-	}
-	return c[parameters=simplifiedParameters];
-}
-
-@doc{Run the simplifier on the parameters being passed to this method}
-private Expr simplifyParams(Expr c:methodCall(_,NameOrExpr methodName, list[ActualParameter] parameters), loc baseLoc, IncludesInfo iinfo) {
-	list[ActualParameter] simplifiedParameters = [];
-	for (p:actualParameter(Expr expr, bool byRef) <- parameters) {
-		simplifiedParameters += p[expr=simplifyExpr(replaceConstants(expr,iinfo), baseLoc)];
-	}
-	return c[parameters=simplifiedParameters];
-}
-
 
 @doc {checks for QCP2 occurrences (cascading .= assignments) for functionName across the entire corpus}
 public rel[str system, str version, ConcatBuilder occurrence] concatAssignments(str functionName) {

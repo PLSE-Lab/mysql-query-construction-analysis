@@ -71,7 +71,7 @@ public void buildCorpusInfo() {
 
 public void buildCorpusInfo(str p, str v) {
 	pt = loadBinary(p,v);
-	buildIncludesInfo(pt);
+	buildIncludesInfo(pt, forceBuild=true);
 }
 
 public void buildSummaries(){
