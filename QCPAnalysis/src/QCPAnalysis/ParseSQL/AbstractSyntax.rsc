@@ -1,9 +1,11 @@
 module QCPAnalysis::ParseSQL::AbstractSyntax
 
-public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, Where where, GroupBy group, Having having, OrderBy order)
-					 | updateQuery(list[Exp] tables, Where where, OrderBy order)
+import lang::php::ast::AbstractSyntax;
+
+public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, Where where, GroupBy group, Having having, OrderBy order, Limit limit)
+					 | updateQuery(list[Exp] tables, Where where, OrderBy order, Limit limit)
 					 | insertQuery(list[Exp] into)
-					 | deleteQuery(list[Exp] from, Where where, OrderBy order)
+					 | deleteQuery(list[Exp] from, Where where, OrderBy order, Limit limit)
 					 | unknownQuery()// logic to translate this query into rascal is not yet implemented 
 					 | parseError();// query did not parse
 
@@ -11,7 +13,9 @@ public data Exp = name(SQLName name)
 			    | literal(str literalVal)
 			    | call(str functionName)//TODO: function params
 				| star()
-				| unknownExpression();
+				| hole(int holeID)
+				| unknownExpression()
+				| aliased(Exp exp, str theAlias);
 				
 public data SQLName = column(str column)
 					| table(str table)
@@ -37,3 +41,8 @@ public data Condition = condition(str exp)// TODO: hold more information about c
 					  | or(Condition left, Condition right)
 					  | xor(Condition left, Condition right)
 					  | not(Condition condition);
+
+public data Limit = limit(int numRows)
+				  | limitWithOffset(int numRows, int offset)
+				  | noLimit();
+				  

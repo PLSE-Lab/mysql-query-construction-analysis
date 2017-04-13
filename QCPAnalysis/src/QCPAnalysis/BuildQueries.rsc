@@ -31,6 +31,8 @@ import Exception;
 import String;
 import Relation;
 
+private int holeID = 0;
+
 data ConcatBuilder = concatBuilder(str varName, list[Expr] queryParts, loc startsAt, Expr queryExpr, loc usedAt);
 
 public map[str, list[Query]] buildQueriesCorpus(str functionName = "mysql_query"){
@@ -64,7 +66,11 @@ public list[Query] buildQueriesSystem(QCPSystemInfo qcpi, set[Expr] calls, set[C
 		// check if this call was already found by the QCP2 checker
 		if(c@at in [a.usedAt | a <- ca]){
 			queryParts = getOneFrom([a.queryParts | a <- ca, c@at == a.usedAt]);
-			mixed = buildMixedSnippets(queryParts);
+			mixed = "";
+			for(qp <- queryParts){
+				mixed += buildMixedSnippets(qp);
+			}
+			holeID = 0;
 			res += QCP2(c@at, mixed, unknownQuery());
 			continue;
 		}
@@ -120,8 +126,9 @@ public Query buildEasyCaseQuery(Expr c, int index){
 		return QCP1a(c@at, sql, parsed);
 	}
 	// check for QCP4a (encapsed string)
-	else if(actualParameter(scalar(encapsed(parts)), false) := c.parameters[index]){
-		mixed = replaceAll(replaceAll(buildMixedSnippets(parts), "\n", " "), "\t", " ");
+	else if(actualParameter(s:scalar(encapsed(parts)), false) := c.parameters[index]){
+		mixed = replaceAll(replaceAll(buildMixedSnippets(s), "\n", " "), "\t", " ");
+		holeID = 0;
 		SQLQuery parsed;
 		try parsed = runParser(mixed);
 		catch: parsed = parseError();
@@ -130,7 +137,8 @@ public Query buildEasyCaseQuery(Expr c, int index){
 		
 	// check for QCP4b (concatenation)
 	else if(actualParameter(b:binaryOperation(left, right, concat()), false) := c.parameters[index]){
-		mixed = replaceAll(replaceAll(buildMixedSnippets([b]), "\n", " "), "\t", " ");
+		mixed = replaceAll(replaceAll(buildMixedSnippets(b), "\n", " "), "\t", " ");
+		holeID = 0;
 		SQLQuery parsed;
 		try parsed = runParser(mixed);
 		catch: parsed = parseError();
@@ -262,7 +270,8 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 		if(concatOrEncapsedGR.trueOnAllPaths){
 			// QCP4c check (QCP4a or QCP4b query assigned to a variable)
 			if(size(concatOrEncapsedGR.results) == 1){
-				mixed = replaceAll(replaceAll(buildMixedSnippets(toList(concatOrEncapsedGR.results)), "\n", " "), "\t", " ");
+				mixed = replaceAll(replaceAll(buildMixedSnippets(getOneFrom(concatOrEncapsedGR.results)), "\n", " "), "\t", " ");
+				holeID = 0;
 				SQLQuery parsed;
 				try parsed = runParser(mixed);
 				catch: parsed = parseError();
@@ -273,9 +282,10 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 			if(size(concatOrEncapsedGR.results) > 1){
 				queries = {};
 				for(r <- concatOrEncapsedGR.results){
-					mixed = buildMixedSnippets(toList(concatOrEncapsedGR.results));
+					mixed = buildMixedSnippets(r);
 					queries += <mixed, unknownQuery()>;
 				}
+				holeID = 0;
 				return QCP3b(c@at, queries);
 			}
 		}
@@ -284,20 +294,22 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 }
 
 @doc{builds Query Snippets for QCP2 and QCP4 where there is a mixture of static and dynamic query parts}
-private str buildMixedSnippets(list[Expr] parts){
+private str buildMixedSnippets(Expr e){
 	res = "";
-	int holeIndex = 0;
-	for(p <- parts){
-		if(scalar(string(s)) := p){
-			res = res + s;
-		}	
-		else if(binaryOperation(left, right, concat()) := p){
-			res = res + buildMixedSnippets([left]) + buildMixedSnippets([right]);
+	if(scalar(string(s)) := e){
+		res = res + s;
+	}
+	else if(scalar(encapsed(parts)) := e){
+		for(p <- parts){
+			res += buildMixedSnippets(p);
 		}
-		else{
-			res = res + "?<holeIndex>";//symbol for dynamic query part
-			holeIndex = holeIndex + 1;
-		}
+	}
+	else if(binaryOperation(left, right, concat()) := e){
+		res = res + buildMixedSnippets(left) + buildMixedSnippets(right);
+	}
+	else{
+		res = res + "?<holeID>";//symbol for dynamic query part
+		holeID = holeID + 1;
 	}
 	
 	res = replaceAll(res,"\n", "");
