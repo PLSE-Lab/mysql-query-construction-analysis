@@ -19,7 +19,7 @@ import Relation;
 
 data QCPSystemInfo = qcpSystemInfo(
 	System sys, 
-	map[loc,map[NamePath,CFG]] systemCFGs, 
+	map[loc,map[loc,CFG]] systemCFGs, 
 	rel[loc callLoc, str methodName, Expr methodCall] methodCalls,
 	rel[loc callLoc, str functionName, Expr functionCall] functionCalls,
 	InvertedCallGraph cg,
@@ -27,7 +27,7 @@ data QCPSystemInfo = qcpSystemInfo(
 	);
 
 public QCPSystemInfo extractQCPSystemInfo(System s) {
-	map[loc,map[NamePath,CFG]] systemCFGs = ( );
+	map[loc,map[loc,CFG]] systemCFGs = ( );
 	for (l <- s.files) {
 		systemCFGs[l] = buildCFGs(s.files[l], buildBasicBlocks=false);
 	}
