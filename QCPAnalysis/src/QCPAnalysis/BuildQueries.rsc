@@ -273,7 +273,7 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 				holeID = 0;
 				SQLQuery parsed;
 				try parsed = runParser(mixed);
-				catch: parsed = parseError();
+				catch: parsed = parseError();;
 				return QCP4c(c@at, mixed, parsed);
 			}
 			
@@ -307,7 +307,7 @@ private str buildMixedSnippets(Expr e){
 		res = res + buildMixedSnippets(left) + buildMixedSnippets(right);
 	}
 	else{
-		res = res + "?<holeID>";//symbol for dynamic query part
+		res = res + " ?<holeID> ";//symbol for dynamic query part
 		holeID = holeID + 1;
 	}
 	
