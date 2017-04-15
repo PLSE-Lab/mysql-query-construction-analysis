@@ -4,8 +4,8 @@ import lang::php::ast::AbstractSyntax;
 
 public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, Where where, GroupBy group, Having having, OrderBy order, Limit limit, list[Join] joins)
 					 | updateQuery(list[Exp] tables, Where where, OrderBy order, Limit limit)
-					 | insertQuery(list[Exp] into)
-					 | deleteQuery(list[Exp] from, Where where, OrderBy order, Limit limit)
+					 | insertQuery(Into into, list[list[str]] valueLists)
+					 | deleteQuery(list[Exp] from, list[str] using, Where where, OrderBy order, Limit limit)
 					 | unknownQuery()// logic to translate this query into rascal is not yet implemented 
 					 | parseError();// query did not parse
 
@@ -14,7 +14,7 @@ public data Exp = name(SQLName name)
 			    | call(str functionName)//TODO: function params
 				| star()
 				| hole(int holeID)
-				| unknownExpression()
+				| unknownExp(str expression)
 				| aliased(Exp exp, str theAlias);
 				
 public data SQLName = column(str column)
@@ -49,4 +49,7 @@ public data Limit = limit(int numRows)
 public data Join = simpleJoin(str joinType, Exp joinExp)
 				 | joinOn(str joinType, Exp joinExp, Condition on)
 				 | joinUsing(str joinType, Exp joinExp, list[str] using);
+				 
+public data Into = into(Exp dest, list[str] columns)
+			     | noInto();
 				  
