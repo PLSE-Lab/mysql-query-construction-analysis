@@ -6,6 +6,7 @@ import lang::php::util::Utils;
 import QCPAnalysis::BuildQueries;
 import QCPAnalysis::AbstractQuery;
 import QCPAnalysis::QCPCorpus;
+import QCPAnalysis::ParseSQL::AbstractSyntax;
 
 import List;
 import Map;
@@ -86,7 +87,7 @@ public list[Query] getQCP(str pattern, QueryMap queryMap = ( ), bool withFunctio
 }
 
 @doc{gets counts for each QCP (subcases = true will return subcase counts, false will return only overall counts}
-public lrel[str, int] getQCPCounts(bool subcases, QueryMap queryMap = ( ), bool withFunctionQueries = true){
+public lrel[str, int] getQCPCounts(bool subcases, QueryMap queryMap = ( ), bool withFunctionQueries = false){
 	res = [];
 	if(subcases){
 		for(p <- qcpsubcases){
@@ -107,7 +108,7 @@ public void writeQueries(){
 	writeBinaryValueFile(|project://QCPAnalysis/results/lists/queryMap|, queries);
 }
 
-@doc{function to write abstract sql queries file for manual inspection}
+@doc{function to write abstract sql queries to a file for manual inspection}
 public void writeParsed(QueryMap queryMap = ()){
 	writeFile(|project://QCPAnalysis/results/lists/qcp1|, "");
 	qcp1 = getQCP("QCP1", queryMap = loadQueryMap(), withFunctionQueries = false);
@@ -135,4 +136,44 @@ public void writeParsed(QueryMap queryMap = ()){
 	
 	println("Out of <size(qcp1)> QCP1 query parse attempts, <unknownQueriesQCP1> were an unknown query type and <parseErrorsQCP1> did not parse.");
 	println("Out of <size(qcp4)> QCP4 query parse attempts, <unknownQueriesQCP4> were an unknown query type and <parseErrorsQCP4> did not parse.");
+}
+
+@doc{returns true if this string represents a query hole}
+public bool isQueryHole(str queryPart) = /^\?\d+$/ := trim(queryPart);
+
+@doc{traverses the queryMap and classifies the query holes contained in each SQLQuery type}
+public rel[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
+	if (size(queryMap) == 0) {
+		queryMap = loadQueryMap();
+	}
+	
+	queries = [q | sys <- queryMap, queries := queryMap[sys], q <- queries];
+	println(size(queries));
+	queriesWithHoles = [q.parsed | q <- queries, q is QCP2 || q is QCP4a || q is QCP4b || q is QCP4c];
+	int name = 0;
+	int valuesClause = 0;
+	int setOpNewValue = 0;
+	
+	top-down visit(queriesWithHoles){
+		case i:insertQuery(into, valueLists, setOps, onDuplicateSetOps) : {
+			println("Examining query holes in <i>");
+			if(hole(_) := into.dest)  name = name + 1;
+			for(c <- into.columns){
+				if(isQueryHole(c)) name = name + 1;
+			}
+			for(l <- valueLists, v <- l){
+				if(isQueryHole(v)) valuesClause = valuesClause + 1;
+			}
+			for(s <- setOps + onDuplicateSetOps){
+				if(isQueryHole(s.column)) nameHoles = nameHoles + 1;
+				if(isQueryHole(s.newValue)) setOpNewValue = setOpNewValue + 1;
+			}
+		}
+	}
+	
+	return {
+		<"Query Hole in SQL name", name>,
+		<"Query Holes on RHS of SET operation", setOpNewValue>,
+		<"Query Hole in VALUES clause", valuesClause>
+	};
 }
