@@ -3,8 +3,8 @@ module QCPAnalysis::ParseSQL::AbstractSyntax
 import lang::php::ast::AbstractSyntax;
 
 public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, Where where, GroupBy group, Having having, OrderBy order, Limit limit, list[Join] joins)
-					 | updateQuery(list[Exp] tables, Where where, OrderBy order, Limit limit)
-					 | insertQuery(Into into, list[list[str]] valueLists)
+					 | updateQuery(list[Exp] tables, list[SetOp] setOps, Where where, OrderBy order, Limit limit)
+					 | insertQuery(Into into, list[list[str]] valueLists, list[SetOp] setOps, list[SetOp] onDuplicateSetOps)
 					 | deleteQuery(list[Exp] from, list[str] using, Where where, OrderBy order, Limit limit)
 					 | unknownQuery()// logic to translate this query into rascal is not yet implemented 
 					 | parseError();// query did not parse
@@ -52,4 +52,6 @@ public data Join = simpleJoin(str joinType, Exp joinExp)
 				 
 public data Into = into(Exp dest, list[str] columns)
 			     | noInto();
+			     
+public data SetOp = setOp(str column, str newValue);
 				  
