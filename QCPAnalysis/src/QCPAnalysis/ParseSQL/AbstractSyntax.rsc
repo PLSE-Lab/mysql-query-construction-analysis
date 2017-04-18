@@ -6,6 +6,7 @@ public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, 
 					 | updateQuery(list[Exp] tables, list[SetOp] setOps, Where where, OrderBy order, Limit limit)
 					 | insertQuery(Into into, list[list[str]] valueLists, list[SetOp] setOps, list[SetOp] onDuplicateSetOps)
 					 | deleteQuery(list[Exp] from, list[str] using, Where where, OrderBy order, Limit limit)
+					 | setQuery(list[setOp] setOps)
 					 | unknownQuery()// logic to translate this query into rascal is not yet implemented 
 					 | parseError();// query did not parse
 
