@@ -283,9 +283,11 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 				queries = {};
 				for(r <- concatOrEncapsedGR.results){
 					mixed = buildMixedSnippets(r);
-					queries += <mixed, unknownQuery()>;
+					try parsed = runParser(mixed);
+					catch: parsed = parseError();;
+					queries += <mixed, parsed>;
+					holeID = 0;
 				}
-				holeID = 0;
 				return QCP3b(c@at, queries);
 			}
 		}

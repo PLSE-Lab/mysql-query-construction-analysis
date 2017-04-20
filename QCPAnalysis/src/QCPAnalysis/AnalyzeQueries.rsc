@@ -148,8 +148,7 @@ public rel[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 	}
 	
 	queries = [q | sys <- queryMap, queries := queryMap[sys], q <- queries];
-	println(size(queries));
-	queriesWithHoles = [q.parsed | q <- queries, q is QCP2 || q is QCP4a || q is QCP4b || q is QCP4c];
+	queriesWithHoles = [q | q <- queries, q is QCP2 || q is QCP3b || q is QCP4a || q is QCP4b || q is QCP4c];
 	int name = 0;
 	int valuesClause = 0;
 	int setOpNewValue = 0;
