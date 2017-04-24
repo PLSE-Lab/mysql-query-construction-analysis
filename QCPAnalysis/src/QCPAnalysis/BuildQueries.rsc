@@ -31,7 +31,11 @@ import Exception;
 import String;
 import Relation;
 
+/*used for printing holes in dynamic query strings (i.e. ?0, ?1, ?2, etc)*/
 private int holeID = 0;
+
+/*keeps track of the total number of query holes found in the corpus*/
+private int totalHoles = 0;
 
 data ConcatBuilder = concatBuilder(str varName, list[Expr] queryParts, loc startsAt, Expr queryExpr, loc usedAt);
 
@@ -109,6 +113,7 @@ public list[Query] buildQueriesSystem(QCPSystemInfo qcpi, set[Expr] calls, set[C
 		// query remained unclassified after all classifications, add it as unclassified
 		res += query;
 	}
+	println("<totalHoles> query holes were found in the corpus");
 	return res;
 }
 
@@ -312,6 +317,7 @@ private str buildMixedSnippets(Expr e){
 	else{
 		res = res + "?<holeID>";//symbol for dynamic query part
 		holeID = holeID + 1;
+		totalHoles = totalHoles + 1;
 	}
 	
 	res = replaceAll(res,"\n", "");
