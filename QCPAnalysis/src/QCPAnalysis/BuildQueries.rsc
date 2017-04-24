@@ -96,7 +96,7 @@ public list[Query] buildQueriesSystem(QCPSystemInfo qcpi, set[Expr] calls, set[C
 			continue;	
 		}
 		
-		// restrict QCP5 analysis to only calls to mysql_query to prevent chaining of QCP5 classifications (for now)
+		/*// restrict QCP5 analysis to only calls to mysql_query to prevent chaining of QCP5 classifications (for now)
 		//if(functionName := "mysql_query"){
 			query = buildQCP5Query(qcpi, ca, c, index, functionName, seenBefore);
 		//}
@@ -104,7 +104,7 @@ public list[Query] buildQueriesSystem(QCPSystemInfo qcpi, set[Expr] calls, set[C
 		if(!(query is unclassified)){
 			res += query;
 			continue;	
-		}
+		}*/
 		
 		// query remained unclassified after all classifications, add it as unclassified
 		res += query;
