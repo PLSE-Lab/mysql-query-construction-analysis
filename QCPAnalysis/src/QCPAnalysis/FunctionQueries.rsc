@@ -51,7 +51,8 @@ public Query buildQCP5Query(QCPSystemInfo qcpi, set[ConcatBuilder] ca, Expr c, i
 				// record index in case function has multiple params (we are only interested in the query param for now)
 				int newIndex = indexOf(paramNames, queryVar);
 				println("Call at <c@at>, in function at <containingFunction@at>, parameter <newIndex>, name <queryVar>");
-				paramQueries = buildParamQueries(qcpi, ca, entryNode.functionName, containingFunction@at, newIndex, seenBefore);
+				set[ConcatBuilder] newCa = concatAssignments(qcpi, entryNode.functionName);
+				paramQueries = buildParamQueries(qcpi, newCa, entryNode.functionName, containingFunction@at, newIndex, seenBefore);
 				return QCP5(c@at, entryNode.functionName, paramQueries);
 			}			
 		}		
@@ -64,7 +65,8 @@ public Query buildQCP5Query(QCPSystemInfo qcpi, set[ConcatBuilder] ca, Expr c, i
 			if(queryVar in paramNames){
 				// record index in case method has multiple params (we are only interested in the query param for now)
 				int newIndex = indexOf(paramNames, queryVar);
-				paramQueries = buildParamQueries(qcpi, ca, className, methodName, containingMethod@at, newIndex, seenBefore);
+				set[ConcatBuilder] newCa = concatAssignments(qcpi, methodName);
+				paramQueries = buildParamQueries(qcpi, newCa, className, methodName, containingMethod@at, newIndex, seenBefore);
 				return QCP5(c@at, methodName, paramQueries);
 				//return QCP5(c@at, methodName, []);
 			}

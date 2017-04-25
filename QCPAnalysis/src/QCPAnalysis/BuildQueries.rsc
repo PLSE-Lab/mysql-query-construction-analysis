@@ -96,7 +96,7 @@ public list[Query] buildQueriesSystem(QCPSystemInfo qcpi, set[Expr] calls, set[C
 			continue;	
 		}
 		
-		// restrict QCP5 analysis to only calls to mysql_query to prevent chaining of QCP5 classifications (for now)
+		/*// restrict QCP5 analysis to only calls to mysql_query to prevent chaining of QCP5 classifications (for now)
 		//if(functionName := "mysql_query"){
 			query = buildQCP5Query(qcpi, ca, c, index, functionName, seenBefore);
 		//}
@@ -104,7 +104,7 @@ public list[Query] buildQueriesSystem(QCPSystemInfo qcpi, set[Expr] calls, set[C
 		if(!(query is unclassified)){
 			res += query;
 			continue;	
-		}
+		}*/
 		
 		// query remained unclassified after all classifications, add it as unclassified
 		res += query;
@@ -274,7 +274,7 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 				holeID = 0;
 				SQLQuery parsed;
 				try parsed = runParser(mixed);
-				catch: parsed = parseError();
+				catch: parsed = parseError();;
 				return QCP4c(c@at, mixed, parsed);
 			}
 			
@@ -283,9 +283,11 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 				queries = {};
 				for(r <- concatOrEncapsedGR.results){
 					mixed = buildMixedSnippets(r);
-					queries += <mixed, unknownQuery()>;
+					try parsed = runParser(mixed);
+					catch: parsed = parseError();;
+					queries += <mixed, parsed>;
+					holeID = 0;
 				}
-				holeID = 0;
 				return QCP3b(c@at, queries);
 			}
 		}
@@ -335,15 +337,18 @@ public rel[str system, str version, ConcatBuilder occurrence] concatAssignments(
 
 @doc {checks for QCP2 occurrences (cascading .= assignments) for functionName across the entire system}
 public set[ConcatBuilder] concatAssignments(QCPSystemInfo qcpi, str functionName) {
+	println("Checking for QCP2 occurences in <qcpi.sys.name>-<qcpi.sys.version> function/method <functionName>");
 	set[ConcatBuilder] res = { };
 	
 	for (scriptLoc <- qcpi.sys.files) {
 		Script scr = qcpi.sys.files[scriptLoc];
 		
-		// Find calls to mysql_query in this script that use a variable to store the query. We want to
+		// Find calls to functionName in this script that use a variable to store the query. We want to
 		// check to see which queries formed using concatenations reach this query.
 		queryCalls = { < queryCall, varName, queryCall@at > | 
-			/queryCall:call(name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]) := scr };
+			/queryCall:call(name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]) := scr 
+			|| /queryCall:methodCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]) := scr 
+			|| /queryCall:staticCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]) := scr};
 		
 		for ( varName <- queryCalls<1>) {
 			// Are there assignments with following appends into the query variable?
@@ -365,16 +370,25 @@ public set[ConcatBuilder] concatAssignments(QCPSystemInfo qcpi, str functionName
 					// Now, make sure the query is actually reachable
 					// bool(CFGNode cn) pred, bool(CFGNode cn) stop, &T (CFGNode cn) gather
 					bool foundQueryCall(CFGNode cn) {
-						if (exprNode(call(name(name("mysql_query")), [actualParameter(var(name(name(varName))),_),*_]),_) := cn) {
+						if (exprNode(call(name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]),_) := cn
+							|| exprNode(methodCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]),_) := cn
+							|| exprNode(staticCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]),_) := cn) {
 							return true;
 						} else {
 							return false;
 						}
 					}
 					tuple[Expr,loc] collectQueryCall(CFGNode cn) {
-						if (exprNode(exprToCollect:call(name(name("mysql_query")), [actualParameter(var(name(name(varName))),_),*_]),_) := cn) {
+						if (exprNode(exprToCollect:call(name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]),_) := cn) {
 							return < exprToCollect, exprToCollect@at >;
-						} else {
+						} 
+						else if(exprNode(exprToCollect:methodCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]),_) := cn){
+							return < exprToCollect, exprToCollect@at >;
+						}
+						else if(exprNode(exprToCollect:staticCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]),_) := cn){
+							return < exprToCollect, exprToCollect@at >;
+						}
+						else {
 							throw "Given unexpected node: <cn>";
 						}
 					}
