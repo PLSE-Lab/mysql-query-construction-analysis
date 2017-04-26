@@ -4,10 +4,12 @@ import lang::php::ast::AbstractSyntax;
 
 public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, Where where, GroupBy group, Having having, OrderBy order, Limit limit, list[Join] joins)
 					 | updateQuery(list[Exp] tables, list[SetOp] setOps, Where where, OrderBy order, Limit limit)
-					 | insertQuery(Into into, list[list[str]] valueLists, list[SetOp] setOps, Select select, list[SetOp] onDuplicateSetOps)
+					 | insertQuery(Into into, list[list[str]] values, list[SetOp] setOps, Select select, list[SetOp] onDuplicateSetOps)
 					 | deleteQuery(list[Exp] from, list[str] using, Where where, OrderBy order, Limit limit)
 					 | setQuery(list[SetOp] setOps)
 					 | dropQuery(list[Expr] fields, Expr table)
+					 | alterQuery(Expr table) //TODO: altered fields and options
+					 | replaceQuery(Into into, list[list[str]] values, list[SetOp] setOps, Select select)
 					 | unknownQuery()// logic to translate this query into rascal is not yet implemented 
 					 | parseError();// query did not parse
 
