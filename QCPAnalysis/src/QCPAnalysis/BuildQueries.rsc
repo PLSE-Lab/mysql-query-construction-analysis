@@ -45,6 +45,7 @@ public map[str, list[Query]] buildQueriesCorpus(str functionName = "mysql_query"
 	for(p <- corpus, v := corpus[p]){
 		res["<p>_<v>"] = buildQueriesSystem(p, v, functionName = functionName, seenBefore = { });
 	}
+	println("<totalHoles> query holes were found in the corpus");
 	return res;
 }
 
@@ -113,7 +114,6 @@ public list[Query] buildQueriesSystem(QCPSystemInfo qcpi, set[Expr] calls, set[C
 		// query remained unclassified after all classifications, add it as unclassified
 		res += query;
 	}
-	println("<totalHoles> query holes were found in the corpus");
 	return res;
 }
 
