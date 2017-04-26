@@ -18,18 +18,22 @@ import Set;
 import IO;
 import Relation;
 import List;
+import Map;
 
 // TODO: Currently, this focuses just on function calls. We need to also add
 // support for method calls to pick up calls to new APIs, such as the PDO
 // libraries.
 
-data SQLModel
-	= literalNode(str literalFragment)
-	| nameNode(str name)
-	| dynamicNode(list[SQLModel] fragments)
-	| conditionNode(Expr cond, SQLModel trueBranch, SQLModel falseBranch)
-	| emptyNode()
-	| computedNode(Expr e)
+data SQLModel = sqlModel(rel[SQLModelNode, SQLModelNode] modelGraph, SQLModelNode topNode);
+
+data SQLModelNode
+	= literalNode(str literalFragment, Lab l)
+	| nameUseNode(Name name, Lab l)
+	| nameDefNode(Name name, DefExpr definingExpr, Lab l)
+	| dynamicNode(list[SQLModel] fragments, Lab l)
+	| conditionNode(Expr cond, SQLModel trueBranch, SQLModel falseBranch, Lab l)
+	| emptyNode(Lab l)
+	| computedNode(Expr e, Lab l)
 	;
 
 public rel[loc callLoc, CFG graph] cfgsWithCalls(System s, set[str] functionNames = {}, set[str] methodNames = {}) {
@@ -43,20 +47,43 @@ public rel[loc callLoc, CFG graph] cfgsWithCalls(System s, set[str] functionName
 	return res;
 }
 
+//public rel[Name, SQLModelNode] cfgNode2ModelNode(exprNode(Expr e, Lab l)) = expr2ModelNode(e,l);
+//public rel[Name, SQLModelNode] cfgNode2ModelNode(stmtNode(Stmt s, Lab l)) = stmt2ModelNode(s,l);
+//
+//public rel[Name, SQLModelNode] cfgNode2ModelNode(functionEntry(_,_)) = { };
+//public rel[Name, SQLModelNode] cfgNode2ModelNode(functionExit(_,_)) = { };
+//public rel[Name, SQLModelNode] cfgNode2ModelNode(methodEntry(_,_,_)) = { };
+//public rel[Name, SQLModelNode] cfgNode2ModelNode(methodExit(_,_,_)) = { };
+//public rel[Name, SQLModelNode] cfgNode2ModelNode(scriptEntry(_)) = { };
+//public rel[Name, SQLModelNode] cfgNode2ModelNode(scriptExit(_)) = { };
+//
+//public default rel[Name, SQLModelNode] cfgNode2ModelNode(CFGNode n) {
+//	throw "Unhandled CFG node in cfgNode2ModelNode: <n>";
+//}
+
+//public rel[Name, SQLModelNode] expr2ModelNode(var(name(name(str s))), Lab l) = { < varName(s), nameUseNode(varName(s), l) > };
+//public rel[Name, SQLModelNode] expr2ModelNode(assign(var(name(name(str s))), Expr e), Lab l) = { < varName(s), nameDefNode(varName(s), e, l) > };
+//public default rel[Name, SQLModelNode] expr2ModelNode(Expr e, Lab l) = { < computedName(e), computedNode(e,l) > };
+//
+//public default rel[Name, SQLModelNode] expr2StmtNode(Stmt s, Lab l) = { };
+
 //public Expr queryParameter(call(name(name("mysql_query")),[actualParameter(Expr e,_),_*])) = e;
 public Expr queryParameter(exprNode(call(name(name("mysql_query")),[actualParameter(Expr e,_),_*]),_)) = e;
 public default Expr queryParameter(CFGNode n) { throw "Unexpected parameter <n>"; }
 
-
 public Expr getQueryExpr(call(name(name("mysql_query")),[actualParameter(Expr e,_),*_])) = e;
 public default Expr getQueryExpr(Expr e) { throw "Unhandled query expression <e>"; }
  
-public list[SQLModel] buildQueryFragments(scalar(string(str s))) = [ literalNode(s) ];
-public list[SQLModel] buildQueryFragments(var(name(name(str s)))) = [ nameNode(s) ];
-public list[SQLModel] buildQueryFragments(fetchArrayDim(var(name(name(str s))),_)) = [ nameNode(s) ];
-public list[SQLModel] buildQueryFragments(binaryOperation(Expr l, Expr r, concat())) = buildQueryFragments(l) + buildQueryFragments(r);
-public list[SQLModel] buildQueryFragments(scalar(encapsed(list[Expr] pieces))) = [ *buildQueryFragments(p) | p <- pieces ];
-public list[SQLModel] buildQueryFragments(Expr e) = [ computedNode(e) ];
+//public list[SQLModelNode] buildQueryFragments(Lab l, scalar(string(str s))) = [ literalNode(s, l) ];
+//public list[SQLModelNode] buildQueryFragments(Lab l, var(name(name(str s)))) = [ nameNode(s, l) ];
+//public list[SQLModelNode] buildQueryFragments(Lab l, fetchArrayDim(var(name(name(str s))),_)) = [ nameNode(s, l) ];
+//public list[SQLModelNode] buildQueryFragments(Lab l, binaryOperation(Expr lft, Expr rt, concat())) = buildQueryFragments(lft, l) + buildQueryFragments(rt, l);
+//public list[SQLModelNode] buildQueryFragments(Lab l, scalar(encapsed(list[Expr] pieces))) = [ *buildQueryFragments(p, l) | p <- pieces ];
+//public list[SQLModelNode] buildQueryFragments(Lab l, Expr e) = [ computedNode(e, l) ];
+
+public SQLModelNode getNodeRep(exprNode(call(name(name(fn)),[actualParameter(scalar(string(str s)),_),_*]), Lab l)) = literalNode(s,l);
+public SQLModelNode getNodeRep(exprNode(call(name(name(fn)),[actualParameter(Expr e,_),_*]), Lab l)) = computedNode(e,l) when scalar(string(_)) !:= e;
+public default SQLModelNode getNodeRep(CFGNode n) { throw "Unexpected node: <n>"; }
 
 public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions = { "mysql_query" }) {
 	inputSystem = qcpi.sys;
@@ -68,18 +95,19 @@ public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions =
 	d = definitions(inputCFG);
 	u = uses(inputCFG, d);
 	slicedCFG = basicSlice(inputCFG, inputNode, u[inputNode.l]<0>);
-
 	nodesForLabels = ( n.l : n | n <- inputCFG.nodes );
-	queryExpr = getQueryExpr(simplifyParams(inputNode.expr, baseLoc, iinfo));	
-	if (scalar(string(queryString)) := queryExpr) {
-		return literalNode(queryString);
-	} else {
-		fragments = buildQueryFragments(queryExpr);
-		println("Query has <size(fragments)> fragments");
-		for (f <- fragments) println(f);
-	}		
 	
-	return literalNode("Not done yet!");
+	firstNode = getNodeRep(inputNode);
+	rel[SQLModelNode, SQLModelNode] modelGraph = { < firstNode, nameUseNode(usedName, definedAt) > | < usedName, definedAt > <- u[inputNode.l] };
+	solve(modelGraph) {
+		modelGraph = modelGraph +
+			{ < nameUseNode(usedName, definedAt1), nameDefNode(definedName, definingExpr, definedAt2) > | nameUseNode(usedName, definedAt1) <- modelGraph<1>, < definedName, definingExpr, definedAt2 > <- d[definedAt1] } +
+			{ < nameDefNode(definedName, definingExpr, definedAt1), nameUseNode(usedName, definedAt2) > | nameDefNode(definedName, definingExpr, definedAt1) <- modelGraph<0>, < usedName, definedAt2 > <- u[definedAt1] }; 
+	}
+
+	println("Computed model graph is size <size(modelGraph)>");
+	
+	return sqlModel(modelGraph, firstNode);
 }
 
 data SQLPiece = staticPiece(str literal) | dynamicPiece();
