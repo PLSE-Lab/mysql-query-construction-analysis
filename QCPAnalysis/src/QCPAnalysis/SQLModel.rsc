@@ -10,6 +10,8 @@ import lang::php::analysis::cfg::Label;
 import lang::php::util::Utils;
 import lang::php::analysis::usedef::UseDef;
 import lang::php::analysis::slicing::BasicSlicer;
+import lang::php::analysis::evaluators::Simplify;
+import lang::php::analysis::includes::QuickResolve;
 
 import QCPAnalysis::Utils;
 import QCPAnalysis::QCPSystemInfo;
@@ -19,23 +21,106 @@ import IO;
 import Relation;
 import List;
 import Map;
+import analysis::graphs::Graph;
 
 // TODO: Currently, this focuses just on function calls. We need to also add
 // support for method calls to pick up calls to new APIs, such as the PDO
 // libraries.
 
-data SQLModel = sqlModel(rel[SQLModelNode, SQLModelNode] modelGraph, SQLModelNode topNode);
-
-data SQLModelNode
-	= literalNode(str literalFragment, Lab l)
-	| nameUseNode(Name name, Lab l)
-	| nameDefNode(Name name, DefExpr definingExpr, Lab l)
-	| dynamicNode(list[SQLModel] fragments, Lab l)
-	| conditionNode(Expr cond, SQLModel trueBranch, SQLModel falseBranch, Lab l)
-	| emptyNode(Lab l)
-	| computedNode(Expr e, Lab l)
+// Fragment can be
+// 1) literal
+// 2) name
+// 3) dynamic
+// 4) list of fragments
+// 5) concat
+data QueryFragment
+	= literalFragment(str literalFragment)
+	| nameFragment(Name name)
+	| dynamicFragment(Expr fragmentExpr)
+	| compositeFragment(list[QueryFragment] fragments)
+	| concatFragment(QueryFragment left, QueryFragment right)
+	| unknownFragment()
 	;
 
+data SQLModel = sqlModel(rel[Lab, QueryFragment, Lab, QueryFragment] fragmentRel, QueryFragment startFragment);
+
+@doc{Turn a specific expression into a possibly-nested query fragment.}
+public QueryFragment expr2qf(Expr ex, QCPSystemInfo qcpi, bool simplify=true) {
+	QueryFragment expr2qfAux(Expr e) {
+		if (simplify) {
+			e = simplifyExpr(replaceConstants(e,qcpi.iinfo), qcpi.sys.baseLoc);
+		}
+		
+		switch(e) {
+			case scalar(string(s)) :
+				return literalFragment(s);
+				
+			case scalar(encapsed(parts)) : {
+				return compositeFragment([expr2qfAux(part) | part <- parts ]);
+			}
+			
+			case binaryOperation(left, right, concat()) :
+				return concatFragment(expr2qfAux(left), expr2qfAux(right));
+				
+			case assignWOp(left, right, concat()) :
+				return concatFragment(expr2qfAux(left), expr2qfAux(right));
+			
+			case var(name(name(vn))) :
+				return nameFragment(varName(vn));
+			
+			case fetchArrayDim(var(name(name(vn))),_) :
+				return nameFragment(varName(vn));
+				
+			case var(expr(Expr e)) :
+				return nameFragment(computedName(e));
+			
+			case fetchArrayDim(var(expr(Expr e)),_) :
+				return nameFragment(computedName(e));
+			
+			case propertyFetch(target, name(name(vn))) :
+				return nameFragment(propertyName(target, vn));
+				
+			case propertyFetch(target, Expr e) :
+				return nameFragment(computedPropertyName(target, e));
+			
+			case staticPropertyFetch(name(name(target)), name(name(vn))) :
+				return nameFragment(staticPopertyName(target, vn));
+				
+			case staticPropertyFetch(name(name(target)), Expr e) :
+				return nameFragment(computedStaticPopertyName(target, e));
+			
+			case staticPropertyFetch(expr(Expr target), name(name(vn))) :
+				return nameFragment(computedStaticPopertyName(target, vn));
+				
+			case staticPropertyFetch(expr(Expr target), Expr e) :
+				return nameFragment(computedStaticPopertyName(target, e));
+		
+			default:
+				return dynamicFragment(e);
+		}
+	}
+	
+	return expr2qfAux(ex);
+}
+
+public rel[Lab, QueryFragment, Lab, QueryFragment] expandFragment(Lab l, QueryFragment qf, Uses u, Defs d, QCPSystemInfo qcpi) {
+	rel[Lab, QueryFragment, Lab, QueryFragment] res = { };
+	
+	// TODO: Do we want all names in the fragment, or just leaf node names?
+	set[Name] usedNames = { n | /nameFragment(Name n) := qf };
+	println("Found <size(usedNames)> names in fragment");
+	
+	for (n <- usedNames, ul <- u[l, n], < de, dl > <- d[ul, n]) {
+		if (de is defExpr) {
+			newFragment = expr2qf(de.e, qcpi);
+			res = res + < l, qf, dl, newFragment >;
+		} else {
+			res = res + < l, qf, dl, unknownFragment() >;
+		}
+	}
+	
+	return res;
+} 
 public rel[loc callLoc, CFG graph] cfgsWithCalls(System s, set[str] functionNames = {}, set[str] methodNames = {}) {
 	rel[loc callLoc, CFG graph] res = { };
 	for (l <- s.files) {
@@ -47,44 +132,12 @@ public rel[loc callLoc, CFG graph] cfgsWithCalls(System s, set[str] functionName
 	return res;
 }
 
-//public rel[Name, SQLModelNode] cfgNode2ModelNode(exprNode(Expr e, Lab l)) = expr2ModelNode(e,l);
-//public rel[Name, SQLModelNode] cfgNode2ModelNode(stmtNode(Stmt s, Lab l)) = stmt2ModelNode(s,l);
-//
-//public rel[Name, SQLModelNode] cfgNode2ModelNode(functionEntry(_,_)) = { };
-//public rel[Name, SQLModelNode] cfgNode2ModelNode(functionExit(_,_)) = { };
-//public rel[Name, SQLModelNode] cfgNode2ModelNode(methodEntry(_,_,_)) = { };
-//public rel[Name, SQLModelNode] cfgNode2ModelNode(methodExit(_,_,_)) = { };
-//public rel[Name, SQLModelNode] cfgNode2ModelNode(scriptEntry(_)) = { };
-//public rel[Name, SQLModelNode] cfgNode2ModelNode(scriptExit(_)) = { };
-//
-//public default rel[Name, SQLModelNode] cfgNode2ModelNode(CFGNode n) {
-//	throw "Unhandled CFG node in cfgNode2ModelNode: <n>";
-//}
-
-//public rel[Name, SQLModelNode] expr2ModelNode(var(name(name(str s))), Lab l) = { < varName(s), nameUseNode(varName(s), l) > };
-//public rel[Name, SQLModelNode] expr2ModelNode(assign(var(name(name(str s))), Expr e), Lab l) = { < varName(s), nameDefNode(varName(s), e, l) > };
-//public default rel[Name, SQLModelNode] expr2ModelNode(Expr e, Lab l) = { < computedName(e), computedNode(e,l) > };
-//
-//public default rel[Name, SQLModelNode] expr2StmtNode(Stmt s, Lab l) = { };
-
-//public Expr queryParameter(call(name(name("mysql_query")),[actualParameter(Expr e,_),_*])) = e;
-public Expr queryParameter(exprNode(call(name(name("mysql_query")),[actualParameter(Expr e,_),_*]),_)) = e;
-public default Expr queryParameter(CFGNode n) { throw "Unexpected parameter <n>"; }
-
 public Expr getQueryExpr(call(name(name("mysql_query")),[actualParameter(Expr e,_),*_])) = e;
 public default Expr getQueryExpr(Expr e) { throw "Unhandled query expression <e>"; }
  
-//public list[SQLModelNode] buildQueryFragments(Lab l, scalar(string(str s))) = [ literalNode(s, l) ];
-//public list[SQLModelNode] buildQueryFragments(Lab l, var(name(name(str s)))) = [ nameNode(s, l) ];
-//public list[SQLModelNode] buildQueryFragments(Lab l, fetchArrayDim(var(name(name(str s))),_)) = [ nameNode(s, l) ];
-//public list[SQLModelNode] buildQueryFragments(Lab l, binaryOperation(Expr lft, Expr rt, concat())) = buildQueryFragments(lft, l) + buildQueryFragments(rt, l);
-//public list[SQLModelNode] buildQueryFragments(Lab l, scalar(encapsed(list[Expr] pieces))) = [ *buildQueryFragments(p, l) | p <- pieces ];
-//public list[SQLModelNode] buildQueryFragments(Lab l, Expr e) = [ computedNode(e, l) ];
-
-public SQLModelNode getNodeRep(exprNode(call(name(name(fn)),[actualParameter(scalar(string(str s)),_),_*]), Lab l)) = literalNode(s,l);
-public SQLModelNode getNodeRep(exprNode(call(name(name(fn)),[actualParameter(Expr e,_),_*]), Lab l)) = computedNode(e,l) when scalar(string(_)) !:= e;
-public default SQLModelNode getNodeRep(CFGNode n) { throw "Unexpected node: <n>"; }
-
+public Expr queryParameter(exprNode(Expr e,_)) = getQueryExpr(e);
+public default Expr queryParameter(CFGNode n) { throw "Unexpected parameter <n>"; }
+ 
 public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions = { "mysql_query" }) {
 	inputSystem = qcpi.sys;
 	baseLoc = inputSystem.baseLoc;
@@ -97,27 +150,32 @@ public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions =
 	slicedCFG = basicSlice(inputCFG, inputNode, u[inputNode.l]<0>);
 	nodesForLabels = ( n.l : n | n <- inputCFG.nodes );
 	
-	firstNode = getNodeRep(inputNode);
-	rel[SQLModelNode, SQLModelNode] modelGraph = { < firstNode, nameUseNode(usedName, definedAt) > | < usedName, definedAt > <- u[inputNode.l] };
-	solve(modelGraph) {
-		modelGraph = modelGraph +
-			{ < nameUseNode(usedName, definedAt1), nameDefNode(definedName, definingExpr, definedAt2) > | nameUseNode(usedName, definedAt1) <- modelGraph<1>, < definedName, definingExpr, definedAt2 > <- d[definedAt1] } +
-			{ < nameDefNode(definedName, definingExpr, definedAt1), nameUseNode(usedName, definedAt2) > | nameDefNode(definedName, definingExpr, definedAt1) <- modelGraph<0>, < usedName, definedAt2 > <- u[definedAt1] }; 
+	queryExp = queryParameter(inputNode);
+	startingFragment = expr2qf(queryExp, qcpi);
+	rel[Lab, QueryFragment, Lab, QueryFragment] res = { };
+	solve(res) {
+		for ( < l, f > <- (res<2,3> + < inputNode.l, startingFragment>) ) {
+			res = res + expandFragment(l, f, u, d, qcpi);
+		} 
 	}
-
-	println("Computed model graph is size <size(modelGraph)>");
 	
-	return sqlModel(modelGraph, firstNode);
+	return sqlModel(res, startingFragment);
 }
 
-data SQLPiece = staticPiece(str literal) | dynamicPiece();
-alias SQLYield = list[SQLPiece];
-
-public set[SQLYield] yields(SQLModel m) {
-	if (literalNode(fragment) := m) {
-		return { [ staticPiece(fragment) ] };
-	}
+public QueryFragment testFragments(str exprText) {
+	QCPSystemInfo qcpi = readQCPSystemInfo("Schoolmate","1.5.4");
+	inputExpr = parsePHPExpression(exprText);
+	return expr2qf(inputExpr, qcpi);
 }
+
+//data SQLPiece = staticPiece(str literal) | dynamicPiece();
+//alias SQLYield = list[SQLPiece];
+//
+//public set[SQLYield] yields(SQLModel m) {
+//	if (literalNode(fragment) := m) {
+//		return { [ staticPiece(fragment) ] };
+//	}
+//}
 
 public void testcode() {
 	pt = loadBinary("Schoolmate", "1.5.4");
