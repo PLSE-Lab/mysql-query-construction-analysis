@@ -177,6 +177,24 @@ public QueryFragment testFragments(str exprText) {
 //	}
 //}
 
+@doc{converts a yield to a string parsable by the sql parser}
+/*public str buildSQLString(SQLYield yield){
+	str res = "";
+	int holeID = 0;
+	for(SQLPiece piece <- yield){
+		if(piece is dynamicPiece){
+			res = res +  "?<holeID>";
+			holeID = holeID + 1;
+			continue;
+		}
+		if(staticPiece(lit) := piece){
+			res = res + lit;
+			continue;
+		}
+	}
+	return res;
+}*/
+
 public void testcode() {
 	pt = loadBinary("Schoolmate", "1.5.4");
 	literalQueryLoc = |home:///PHPAnalysis/systems/Schoolmate/schoolmate_1.5.4/EditClass.php|(956,57,<29,0>,<29,0>);
