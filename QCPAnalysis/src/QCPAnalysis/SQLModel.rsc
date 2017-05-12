@@ -42,7 +42,7 @@ data QueryFragment
 	| unknownFragment()
 	;
 
-data SQLModel = sqlModel(rel[Lab, QueryFragment, Lab, QueryFragment] fragmentRel, QueryFragment startFragment);
+data SQLModel = sqlModel(rel[Lab, QueryFragment, Lab, QueryFragment] fragmentRel, QueryFragment startFragment, Lab startLabel);
 
 @doc{Turn a specific expression into a possibly-nested query fragment.}
 public QueryFragment expr2qf(Expr ex, QCPSystemInfo qcpi, bool simplify=true) {
@@ -159,7 +159,7 @@ public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions =
 		} 
 	}
 	
-	return sqlModel(res, startingFragment);
+	return sqlModel(res, startingFragment, inputNode.l);
 }
 
 public QueryFragment testFragments(str exprText) {
@@ -168,14 +168,69 @@ public QueryFragment testFragments(str exprText) {
 	return expr2qf(inputExpr, qcpi);
 }
 
-//data SQLPiece = staticPiece(str literal) | dynamicPiece();
-//alias SQLYield = list[SQLPiece];
-//
-//public set[SQLYield] yields(SQLModel m) {
-//	if (literalNode(fragment) := m) {
-//		return { [ staticPiece(fragment) ] };
-//	}
-//}
+data SQLPiece = staticPiece(str literal) | namePiece(str name) | dynamicPiece();
+alias SQLYield = list[SQLPiece];
+
+public set[SQLYield] yields(SQLModel m) {
+	SQLYield yieldForFragment(literalFragment(str s)) = [ staticPiece(s) ];
+	SQLYield yieldForFragment(nameFragment(Name n)) = [ yieldForName(n) ];
+	SQLYield yieldForFragment(dynamicFragment(Expr e)) = [ dynamicPiece() ];
+	SQLYield yieldForFragment(compositeFragment(list[QueryFragment] fragments)) = [ *yieldForFragment(f) | f <- fragments ];
+	SQLYield yieldForFragment(concatFragment(QueryFragment left, QueryFragment right)) = yieldForFragment(left) + yieldForFragment(right);
+	SQLYield yieldForFragment(unknownFragment()) = [ dynamicPiece() ];
+	
+	SQLPiece yieldForName(varName(str varName)) = namePiece(varName);
+	SQLPiece yieldForName(computedName(Expr computedName)) = namePiece("UNKNOWN_NAME");
+	SQLPiece yieldForName(propertyName(Expr targetObject, str propertyName)) = namePiece("UNKNOWN_TARGET.<propertyName>");
+	SQLPiece yieldForName(computedPropertyName(Expr targetObject, Expr computedPropertyName)) = namePiece("UNKNOWN_TARGET.UNKNOWN_PROPERTY");
+	SQLPiece yieldForName(staticPropertyName(str className, str propertyName)) = namePiece("<className>::<propertyName>");
+	SQLPiece yieldForName(computedStaticPropertyName(Expr computedClassName, str propertyName)) = namePiece("UNKNOWN_TARGET::<propertyName>");
+	SQLPiece yieldForName(computedStaticPropertyName(str className, Expr computedPropertyName)) = namePiece("<className>::UNKNOWN_PROPERTY");
+	SQLPiece yieldForName(computedStaticPropertyName(Expr computedClassName, Expr computedPropertyName)) = namePiece("UNKNOWN_TARGET::UNKNOWN_PROPERTY");
+
+	set[SQLYield] buildPieces(QueryFragment fragment, Lab l) {
+		if (fragment is nameFragment) {
+			// Get the labels of the defining nodes (nl) for names (fragment) used in this node (l)
+			nameLabels = { nl | < l, _, nl, fragment > <- m.fragmentRel };
+			
+			// These are the labels and expressions that define the names used in this node
+			possibleExpansions = m.fragmentRel[nameLabels,fragment];
+			
+			// If we have expansions, try to further expand those
+			if (size(possibleExpansions) > 0) {
+				expansions = { *buildPieces(f,lf) | < lf, f > <- possibleExpansions };
+				finalExpansions = { };
+				for (e <- expansions) {
+					// If a name just expanded into a dynamic piece, it's more informative to just keep the name
+					if ([dynamicPiece()] := e) {
+						finalExpansions = finalExpansions + [ yieldForName(fragment.name) ];
+					} else {
+						finalExpansions = finalExpansions + e;
+					}
+				}
+				return finalExpansions;
+			} else {
+				// If we have no expansions, return the name instead
+				return { [ yieldForName(fragment.name) ] };
+			}
+		} else if (fragment is compositeFragment) {
+			compositeYield = buildPieces(fragment.fragments[0], l);
+			for (f <- fragment.fragments[1..]) {
+				nextYield = buildPieces(f, l);
+				compositeYield = { cyi + nyi | cyi <- compositeYield, nyi <- nextYield };
+			}
+			return compositeYield;
+		} else if (fragment is concatFragment) {
+			leftYield = buildPieces(fragment.left, l);
+			rightYield = buildPieces(fragment.right, l);
+			concatYield = { lyi + ryi | lyi <- leftYield, ryi <- rightYield };
+		} else {
+			return { yieldForFragment(fragment) };
+		}
+	}
+		
+	return buildPieces(m.startFragment, m.startLabel);
+}
 
 public void testcode() {
 	pt = loadBinary("Schoolmate", "1.5.4");
