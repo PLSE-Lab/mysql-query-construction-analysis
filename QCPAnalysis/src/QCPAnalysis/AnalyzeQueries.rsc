@@ -139,8 +139,61 @@ public void writeParsed(QueryMap queryMap = ()){
 	println("Out of <size(mixed)> Dynamic(QCP2 and QCP4) query parse attempts, <unknownQueriesQCP4> were an unknown query type and <parseErrorsQCP4> did not parse.");
 }
 
+@doc{counts the number of each query type in the corpus}
+public rel[str, int] countQueryTypes(QueryMap queryMap = ( )){
+	if (size(queryMap) == 0) {
+		queryMap = loadQueryMap();
+	}
+	
+	queries = [q | sys <- queryMap, queries := queryMap[sys], q <- queries];
+	parsed = [q.parsed | q <- queries, q is QCP1a || q is QCP1b || q is QCP2 || q is QCP4a || q is QCP4b || q is QCP4c];
+	
+	return {
+		<"SELECT querys", size([p | p <- parsed, p is selectQuery])>,
+		<"UPDATE querys", size([p | p <- parsed, p is updateQuery])>,
+		<"INSERT querys", size([p | p <- parsed, p is insertQuery])>,
+		<"DELETE querys", size([p | p <- parsed, p is deleteQuery])>,
+		<"SET querys", size([p | p <- parsed, p is setQuery])>,
+		<"DROP querys", size([p | p <- parsed, p is dropQuery])>,
+		<"ALTER querys", size([p | p <- parsed, p is alterQuery])>,
+		<"REPLACE querys", size([p | p <- parsed, p is replaceQuery])>,
+		<"TRUNCATE querys", size([p | p <- parsed, p is truncateQuery])>,
+		<"Queries with unknown type", size([p | p <- parsed, p is unknownQuery])>,
+		<"Parse Errors", size([p | p <- parsed, p is parseError])>
+	};
+}
+
 @doc{returns true if this string represents a query hole}
 public bool isQueryHole(str queryPart) = /^\?\d+$/ := trim(queryPart);
+
+@doc{returns the number of query holes found in the subject string}
+public int holesInString(str subject){
+	res = 0;
+	
+	possibleMatches = findAll(subject, "?");
+
+	// for each possible match (? character), check if the next character or the next two characters make up a number
+	// (making the reasonable assumption that all queries have <=99 holes)
+	for(p <- possibleMatches){
+		try{
+			int d = toInt(substring(subject, p + 1, p + 3));
+			res = res + 1;
+			continue;
+		}
+		catch: {
+			try{
+				int d = toInt(substring(subject, p + 1, p + 2));
+				res = res + 1;
+				continue;
+			}
+			catch: {
+				continue;
+			}
+		}	
+	}
+	
+	return res;
+}
 
 @doc{traverses the queryMap and classifies the query holes contained in each SQLQuery type}
 public rel[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
@@ -149,15 +202,80 @@ public rel[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 	}
 	
 	queries = [q | sys <- queryMap, queries := queryMap[sys], q <- queries];
-	queriesWithHoles = [q | q <- queries, q is QCP2 || q is QCP3b || q is QCP4a || q is QCP4b || q is QCP4c];
+	queriesWithHoles = [q | q <- queries, q is QCP2 || q is QCP4a || q is QCP4b || q is QCP4c];
+	//TODO: add yields of QCP3 (will be handled once model is finished)
+	
 	int name = 0;
 	int valuesClause = 0;
 	int setOpNewValue = 0;
+	int whereClause = 0;
+	int havingClause = 0;
+	int limitClause = 0;
+	int onClause = 0;
 	
-	top-down visit(queriesWithHoles){
-		case i:insertQuery(into, valueLists, setOps, onDuplicateSetOps) : {
-			println("Examining query holes in <i>");
-			if(hole(_) := into.dest)  name = name + 1;
+	for(q <- queriesWithHoles){
+		if(selectQuery(selectExp, from, where, group, having, order, limit, joins) := q.parsed){
+			for(se <- selectExp){
+				if(se is hole) name = name + 1;
+			}
+			
+			for(f <- from){
+				if(f is hole) name = name + 1;
+			}
+			
+			if(where is where){
+				visit(where.condition){
+					case condition(s) : {
+						// TODO: condition expressions will have a more detailed representation than strings
+						whereClause = whereClause + holesInString(s);
+					}
+				}
+			}
+			if(group is groupBy){
+				for(<g, m> <- group){
+					if(g is hole) name = name + 1;
+				}
+			}
+			if(having is having){
+				visit(having.condition){
+					case condition(s) : {
+						// TODO: condition expressions will have a more detailed representation than strings
+						havingClause = havingClause + holesInString(s);
+					}
+				}
+			}
+			if(order is orderBy){
+				for(<od, m> <- order){
+					if(od is hole) name = name + 1;
+				}
+			}
+			if(!(limit is noLimit)){
+				if(isQueryHole(limit.numRows)) limitClause = limitClause + 1;
+				if(limit is limitWithOffset){
+					if(isQueryHole(limit.offset)) limitClause = limitClause + 1;
+				}
+			}
+			for(j <- joins){
+				if(j.joinExp is hole) name = name + 1;
+				if(j is joinOn){
+					visit(j.on){
+						case condition(s) : {
+							// TODO: condition expressions will have a more detailed representation than strings
+							onClause = onClause + holesInString(s);
+						}
+					}
+					continue;
+				}
+				if(j is joinUsing){
+					for(u <- using){
+						if(isQueryHole(u)) name = name + 1;
+					}
+				}
+			}
+		}
+		// TODO: check SELECT statement in INSERT queries
+		if(insertQuery(into, valueLists, setOps, select, onDuplicateSetOps) := q.parsed){
+			if(into.dest is hole)  name = name + 1;
 			for(c <- into.columns){
 				if(isQueryHole(c)) name = name + 1;
 			}
@@ -165,15 +283,15 @@ public rel[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 				if(isQueryHole(v)) valuesClause = valuesClause + 1;
 			}
 			for(s <- setOps + onDuplicateSetOps){
-				if(isQueryHole(s.column)) nameHoles = nameHoles + 1;
+				if(isQueryHole(s.column)) name = name + 1;
 				if(isQueryHole(s.newValue)) setOpNewValue = setOpNewValue + 1;
 			}
 		}
 	}
 	
 	return {
-		<"Query Hole in SQL name", name>,
-		<"Query Holes on RHS of SET operation", setOpNewValue>,
-		<"Query Hole in VALUES clause", valuesClause>
+		<"Query Holes in SQL name", name>,
+		<"Query Holes in VALUES clause", valuesClause>,
+		<"Query Holes in WHERE clause", whereClause>
 	};
 }
