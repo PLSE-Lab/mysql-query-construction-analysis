@@ -42,11 +42,17 @@ public data Where = where(Condition condition)
 public data Having = having(Condition condition)
 				   | noHaving();
 				   
-public data Condition = condition(str exp)// TODO: hold more information about conditions rather than just their string representation
+public data Condition = condition(SimpleCondition condition)
 					  | and(Condition left, Condition right)
 					  | or(Condition left, Condition right)
 					  | xor(Condition left, Condition right)
-					  | not(Condition condition);
+					  | not(Condition negated);
+					  
+public data SimpleCondition = simpleComparison(str left, str op, str rightExp)
+							| compoundComparison(str left, str op, SimpleCondition rightCondition)
+							| between(bool not, str exp, str upper, str lower)
+							| isNull(bool not, str exp)
+							| unknown(str conditionText);//TODO: other condition types
 
 public data Limit = limit(str numRows)
 				  | limitWithOffset(str numRows, str offset)
