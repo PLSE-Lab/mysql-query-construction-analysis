@@ -50,7 +50,7 @@ public data Condition = condition(SimpleCondition condition)
 					  
 public data SimpleCondition = simpleComparison(str left, str op, str rightExp)
 							| compoundComparison(str left, str op, SimpleCondition rightCondition)
-							| between(bool not, str exp, str upper, str lower)
+							| between(bool not, str exp, str lower, str upper)
 							| isNull(bool not, str exp)
 							| unknown(str conditionText);//TODO: other condition types
 
