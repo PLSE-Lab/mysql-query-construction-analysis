@@ -52,6 +52,8 @@ public data SimpleCondition = simpleComparison(str left, str op, str rightExp)
 							| compoundComparison(str left, str op, SimpleCondition rightCondition)
 							| between(bool not, str exp, str lower, str upper)
 							| isNull(bool not, str exp)
+							| inValues(bool not, str exp, list[str] values)
+							| inSubquery(bool not, str exp, SQLQuery subquery)
 							| unknown(str conditionText);//TODO: other condition types
 
 public data Limit = limit(str numRows)
