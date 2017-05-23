@@ -299,6 +299,9 @@ public void printYields(rel[loc, SQLModel] models) {
 // TODO: Add code to visualize model as dot graph...
 public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "") {
 	nodes = m.fragmentRel<1> + m.fragmentRel<3>;
+	if (isEmpty(nodes)) {
+		nodes = { m.startFragment };
+	}
 	int i = 1;
 	nodeMap = ( );
 	for (n <- nodes) {
@@ -315,4 +318,16 @@ public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "") {
 				   '	<intercalate("\n",edges)>
 				   '}";
 	writeFile(writeTo,dotGraph);
+}
+
+public map[int,SQLModel] renderSQLModelsAsDot(set[SQLModel] ms) {
+	int id = 0;
+	map[int,SQLModel] res = ( );
+	for (SQLModel m <- ms) {
+		res[id] = m;
+		idStr = "<id>";
+		renderSQLModelAsDot(m, |file:///tmp/model<idStr>.dot|, title = "Model <id>");
+		id += 1;
+	}
+	return res;
 }
