@@ -2,6 +2,7 @@ module QCPAnalysis::AnalyzeQueries
 
 import lang::php::util::Corpus;
 import lang::php::util::Utils;
+import lang::php::util::Config;
 
 import QCPAnalysis::BuildQueries;
 import QCPAnalysis::AbstractQuery;
@@ -34,7 +35,7 @@ public lrel[str, int] countCallsSystem(){
 alias QueryMap = map[str, list[Query]];
 
 public QueryMap loadQueryMap() {
-	return readBinaryValueFile(#QueryMap, |project://QCPAnalysis/results/lists/queryMap|);
+	return readBinaryValueFile(#QueryMap, baseLoc + "serialized/qcp/queryMap");
 }
 
 @doc{gets all queries found by FunctionQueries.rsc (i.e., queries whose function is not mysql_query)}
@@ -105,12 +106,13 @@ public lrel[str, int] getQCPCounts(bool subcases, QueryMap queryMap = ( ), bool 
 @doc{since buildQueriesCorpus takes a long time to run, this function writes the results of it to a file for quick reference}
 public void writeQueries(){
 	queries = buildQueriesCorpus();
-	writeBinaryValueFile(|project://QCPAnalysis/results/lists/queryMap|, queries);
+	writeBinaryValueFile(baseLoc + "serialized/qcp/queryMap", queries);
 }
 
 @doc{function to write abstract sql queries to a file for manual inspection}
 public void writeParsed(QueryMap queryMap = ()){
-	writeFile(|project://QCPAnalysis/results/lists/qcp1|, "");
+	parsedLoc = baseLoc + "serialized/qcp/parsed";
+	writeFile(parsedLoc, "");
 	qcp1 = getQCP("QCP1", queryMap = loadQueryMap(), withFunctionQueries = true);
 	mixed = getQCP("QCP4", queryMap = loadQueryMap(), withFunctionQueries = true);
 	mixed += getQCP("QCP2", queryMap = loadQueryMap(), withFunctionQueries = true);
@@ -122,12 +124,12 @@ public void writeParsed(QueryMap queryMap = ()){
 	
 	
 	for(q <- qcp1){
-		appendToFile(|project://QCPAnalysis/results/lists/qcp1|,"<q.sql>\n<q.parsed>\n<q.callloc>\n\n");
+		appendToFile(parsedLoc,"<q.sql>\n<q.parsed>\n<q.callloc>\n\n");
 		if(q.parsed is parseError) parseErrorsQCP1 = parseErrorsQCP1 + 1;
 		if(q.parsed is unknownQuery) unknownQueriesQCP1 = unknownQueriesQCP1 + 1; 
 	}
 	for(q <- mixed){
-		appendToFile(|project://QCPAnalysis/results/lists/qcp1|,"<q.mixedQuery>\n<q.parsed>\n<q.callloc>\n\n");
+		appendToFile(parsedLoc,"<q.mixedQuery>\n<q.parsed>\n<q.callloc>\n\n");
 		if(q.parsed is parseError){
 			println(q.callloc);
 			parseErrorsQCP4 = parseErrorsQCP4 + 1;
