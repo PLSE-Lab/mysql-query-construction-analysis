@@ -212,6 +212,9 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 	// hole in FROM such as ... FROM ?0 ...
 	int fromHole = 0;
 	
+	// hole in tables in UPDATE query such as UPDATE ?0 ...
+	int updateTableHole = 0;
+	
 	// hole in group by column name
 	int groupByHole = 0;
 	
@@ -230,7 +233,13 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 	// hole in USING clause of a join (column name)
 	int usingHole = 0;
 	
-	// relation representing the counts of different hole types in conditions
+	// hole in LHS of Set operation
+	int setOpLHSHole = 0;
+	
+	// hole in RHS of Set operation
+	int setOpRHSHole = 0;
+	
+	// map representing the counts of different hole types in conditions
 	map[str, int] conditionHoles = (
 		"Comparison LHS": 0,
 		"Comparison Op": 0,
@@ -295,9 +304,37 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 				}
 				if(j is joinUsing){
 					for(u <- using){
-						if(isQueryHole(u)) usingHole += 1;
+						usingHole += holesInString(u);
 					}
 				}	
+			}
+		}
+		else if(updateQuery(tables, setOps, where, order, limit) := query.parsed){
+			for(t <- tables){
+				if(hole(_) := t){
+					updateTableHole += 1;
+				}
+			}
+			for(s <- setOps){
+				setOpLHSHole += holesInString(s.column);
+				setOpRHSHole += holesInString(s.newValue);
+			}
+			if(!(where is noWhere)){
+				conditionHoles = classifyConditionHoles(conditionHoles, where.condition);
+			}
+			if(!(order is noOrderBy)){
+				for(<exp, mode> <- order.orderings){
+					if(hole(_) := exp){
+						orderByHole += 1;
+					}
+				}
+			}
+			if(!(limit is noLimit)){
+				if(isQueryHole(limit.numRows)) limitHole += 1;
+				
+				if(limit is limitWithOffset && isQueryHole(limit.offset)){
+					limitHoles += 1;
+				}
 			}
 		}
 	}
@@ -310,7 +347,10 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 		"LIMIT": limitHole,
 		"JOIN Type ": joinTypeHole,
 		"JOIN Expr": joinExpHole,
-		"USING": usingHole
+		"USING": usingHole,
+		"UPDATE Table" : updateTableHole,
+		"SET LHS" : setOpLHSHole,
+		"SET RHS" : setOpRHSHole
 		
 	) + conditionHoles;
 }
