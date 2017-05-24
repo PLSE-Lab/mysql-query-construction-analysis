@@ -236,7 +236,7 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 	// hole in join expression (table name)
 	int joinExpHole = 0;
 	
-	// hole in USING clause of a join (column name)
+	// hole in USING clause of a join or DELETE statement
 	int usingHole = 0;
 	
 	// hole in LHS of Set operation
@@ -383,7 +383,36 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 			duplicateSetOpLHSHole += holesInString(s.column);
 			duplicateSetOpRHSHole += holesInString(s.newValue);
 		}
-	}	
+	}
+	
+	void classifyDeleteQueryHoles(SQLQuery query)
+		= classifyDeleteQueryHoles(query.from, query.using, query.where, query.order, query.limit);
+		
+	void classifyDeleteQueryHoles(list[Exp] from, list[str] using, Where where, OrderBy order, Limit limit){
+		for(f <- from){
+			if(hole(_) := f)  fromHole += 1;
+		}
+		for(u <- using){
+			usingHole += holesInString(u);
+		}
+		if(!(where is noWhere)){
+			conditionHoles += classifyConditionHoles(conditionHoles, where.condition);
+		}
+		if(!(order is noOrderBy)){
+			for(<exp, mode> <- order.orderings){
+				if(hole(_) := exp){
+					orderByHole += 1;
+				}
+			}
+		}
+		if(!(limit is noLimit)){
+			if(isQueryHole(limit.numRows)) limitHole += 1;
+			
+			if(limit is limitWithOffset && isQueryHole(limit.offset)){
+				limitHoles += 1;
+			}
+		}
+	}
 	
 	map[str, int] classifyConditionHoles(map[str, int] counts, Condition condition){
 		if(condition is and || condition is or || condition is xor){
@@ -433,12 +462,18 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 	for(query <- queriesWithHoles){
 		if(query.parsed is selectQuery){
 			classifySelectQueryHoles(query.parsed);
+			continue;
 		}
-		else if(query.parsed is updateQuery){
+		if(query.parsed is updateQuery){
 			classifyUpdateQueryHoles(query.parsed);
+			continue;
 		}
-		else if(query.parsed is insertQuery){
+		if(query.parsed is insertQuery){
 			classifyInsertQueryHoles(query.parsed);
+			continue;
+		}
+		if(query.parsed is deleteQuery){
+			classifyDeleteQueryHoles(query.parsed);
 		}
 	}
 	
