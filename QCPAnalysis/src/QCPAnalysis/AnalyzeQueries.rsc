@@ -197,7 +197,7 @@ public int holesInString(str subject){
 	return res;
 }
 
-@doc{traverses the queryMap and classifies the query holes contained in each SQLQuery type}
+@doc{traverses the queryMap and classifies the query holes contained in each SQLQuery}
 public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 	if (size(queryMap) == 0) {
 		queryMap = loadQueryMap();
@@ -214,6 +214,12 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 	
 	// hole in tables in UPDATE query such as UPDATE ?0 ...
 	int updateTableHole = 0;
+	
+	// hole in table name in INTO query such as INTO ?0
+	int intoTableHole = 0;
+	
+	// hole in INTO columns
+	int intoColumnHole = 0;
 	
 	// hole in group by column name
 	int groupByHole = 0;
@@ -239,6 +245,15 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 	// hole in RHS of Set operation
 	int setOpRHSHole = 0;
 	
+	// hole in LHS of ON DUPLICATE SET...
+	int duplicateSetOpLHSHole = 0;
+	
+	// hole in RHS of ON DUPLICATE SET...
+	int duplicateSetOpRHSHole = 0;
+	
+	// hole in VALUES clause
+	int valuesHole = 0;
+	
 	// map representing the counts of different hole types in conditions
 	map[str, int] conditionHoles = (
 		"Comparison LHS": 0,
@@ -254,88 +269,176 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 		"LIKE Pattern": 0
 	);
 	
-	for(query <- queriesWithHoles){
-		if(selectQuery(selectExpressions, from, where, group, having, order, limit, joins) := query.parsed){
-			for(s <- selectExpressions){
+	void classifySelectQueryHoles(SQLQuery query)
+		= classifySelectQueryHoles(query.selectExpressions, query.from, query.where, query.group, query.having, query.order, query.limit, query.joins);
+		
+	void classifySelectQueryHoles(list[Exp] selectExpressions, list[Exp] from, Where where, GroupBy group, Having having, OrderBy order, Limit limit, list[Join] joins){
+		for(s <- selectExpressions){
 				if(hole(_) := s) selectHole += 1;
-			}
-			for(f <- from){
-				if(hole(_) := f)  fromHole += 1;
-			}
+		}
+		for(f <- from){
+			if(hole(_) := f)  fromHole += 1;
+		}
 			
-			if(!(where is noWhere)){
-				conditionHoles = classifyConditionHoles(conditionHoles, where.condition);
-			}
+		if(!(where is noWhere)){
+			conditionHoles = classifyConditionHoles(conditionHoles, where.condition);
+		}
 			
-			if(!(group is noGroupBy)){
-				for(<exp, mode> <- group.groupings){
-					if(hole(_) := exp){
-						groupByHole += 1;
-					}
+		if(!(group is noGroupBy)){
+			for(<exp, mode> <- group.groupings){
+				if(hole(_) := exp){
+					groupByHole += 1;
 				}
-			}
-			
-			if(!(having is noHaving)){
-				conditionHoles = classifyConditionHoles(conditionHoles, having.condition);
-			}
-			
-			if(!(order is noOrderBy)){
-				for(<exp, mode> <- order.orderings){
-					if(hole(_) := exp){
-						orderByHole += 1;
-					}
-				}
-			}
-			
-			if(!(limit is noLimit)){
-				if(isQueryHole(limit.numRows)) limitHole += 1;
-				
-				if(limit is limitWithOffset && isQueryHole(limit.offset)){
-					limitHoles += 1;
-				}	
-			}
-			
-			for(j <- joins){
-				if(isQueryHole(j.joinType)) joinTypeHole += 1;
-				if(hole(_) := j.joinExp) joinExpHole += 1;
-				if(j is joinOn){
-					conditionHoles = classifyConditionHoles(conditionHoles, j.on);
-					continue;
-				}
-				if(j is joinUsing){
-					for(u <- using){
-						usingHole += holesInString(u);
-					}
-				}	
 			}
 		}
-		else if(updateQuery(tables, setOps, where, order, limit) := query.parsed){
-			for(t <- tables){
-				if(hole(_) := t){
-					updateTableHole += 1;
+			
+		if(!(having is noHaving)){
+			conditionHoles = classifyConditionHoles(conditionHoles, having.condition);
+		}
+			
+		if(!(order is noOrderBy)){
+			for(<exp, mode> <- order.orderings){
+				if(hole(_) := exp){
+					orderByHole += 1;
 				}
 			}
-			for(s <- setOps){
-				setOpLHSHole += holesInString(s.column);
-				setOpRHSHole += holesInString(s.newValue);
+		}
+			
+		if(!(limit is noLimit)){
+			if(isQueryHole(limit.numRows)) limitHole += 1;
+			
+			if(limit is limitWithOffset && isQueryHole(limit.offset)){
+				limitHoles += 1;
+			}	
+		}
+			
+		for(j <- joins){
+			if(isQueryHole(j.joinType)) joinTypeHole += 1;
+			if(hole(_) := j.joinExp) joinExpHole += 1;
+			if(j is joinOn){
+				conditionHoles = classifyConditionHoles(conditionHoles, j.on);
+				continue;
 			}
-			if(!(where is noWhere)){
-				conditionHoles = classifyConditionHoles(conditionHoles, where.condition);
+			if(j is joinUsing){
+				for(u <- using){
+					usingHole += holesInString(u);
+				}
+			}	
+		}
+	}
+	
+	void classifyUpdateQueryHoles(SQLQuery query)
+		=  classifyUpdateQueryHoles(query.tables, query.setOps, query.where, query.order, query.limit);
+		
+	void classifyUpdateQueryHoles(list[Exp] tables, list[SetOp] setOps, Where where, OrderBy order, Limit limit){
+		for(t <- tables){
+			if(hole(_) := t){
+				updateTableHole += 1;
 			}
-			if(!(order is noOrderBy)){
-				for(<exp, mode> <- order.orderings){
-					if(hole(_) := exp){
-						orderByHole += 1;
-					}
+		}
+		for(s <- setOps){
+			setOpLHSHole += holesInString(s.column);
+			setOpRHSHole += holesInString(s.newValue);
+		}
+		if(!(where is noWhere)){
+			conditionHoles = classifyConditionHoles(conditionHoles, where.condition);
+		}
+		if(!(order is noOrderBy)){
+			for(<exp, mode> <- order.orderings){
+				if(hole(_) := exp){
+					orderByHole += 1;
 				}
 			}
-			if(!(limit is noLimit)){
-				if(isQueryHole(limit.numRows)) limitHole += 1;
-				
-				if(limit is limitWithOffset && isQueryHole(limit.offset)){
-					limitHoles += 1;
-				}
+		}
+		if(!(limit is noLimit)){
+			if(isQueryHole(limit.numRows)) limitHole += 1;
+			
+			if(limit is limitWithOffset && isQueryHole(limit.offset)){
+				limitHoles += 1;
 			}
+		}
+	}
+	
+	void classifyInsertQueryHoles(SQLQuery query)
+		= classifyInsertQueryHoles(query.into, query.values, query.setOps, query.select, query.onDuplicateSetOps);
+	
+	void classifyInsertQueryHoles(Into into, list[list[str]] values, list[SetOp] setOps, SQLQuery select, list[SetOp] onDuplicateSetOps){
+		if(!(into is noInto)){
+			if(hole(_) := into.dest) intoTableHole += 1;
+			for(c <- into.columns){
+				intoColumnHole += holesInString(c);
+			}
+		}	
+		for(valueList <- values, v <- valueList){
+			valuesHole += holesInString(v);
+		}
+		for(s <- setOps){
+			setOpLHSHole += holesInString(s.column);
+			setOpRHSHole += holesInString(s.newValue);
+		}
+		if(!(select is noQuery)){
+			classifySelectQueryHoles(select);
+		}
+		for(s <- onDuplicateSetOps){
+			duplicateSetOpLHSHole += holesInString(s.column);
+			duplicateSetOpRHSHole += holesInString(s.newValue);
+		}
+	}	
+	
+	map[str, int] classifyConditionHoles(map[str, int] counts, Condition condition){
+		if(condition is and || condition is or || condition is xor){
+			counts = classifyConditionHoles(counts, condition.left);
+			counts = classifyConditionHoles(counts, condition.right);
+		}
+		else if(condition is not){
+			counts = classifyConditionHoles(condition.negated);
+		}
+		else{
+			cond = condition.condition;
+			if(cond is simpleComparison){
+				counts["Comparison LHS"] += holesInString(cond.left);
+				counts["Comparison Op"] += holesInString(cond.op);
+				counts["Comparison RHS"] += holesInString(cond.rightExp);
+			}
+			if(cond is compoundComparison){
+				counts["Comparison LHS"] += holesInString(cond.left);
+				counts["Comparison Op"] += holesInString(cond.op);
+				counts = classifyConditionHoles(counts, cond.rightCondition);
+			}
+			if(cond is between){
+				counts["Between Expr"] += holesInString(cond.exp);
+				counts["Between Lower"] += holesInString(cond.lower);
+				counts["Between Upper"] += holesInString(cond.upper);
+			}
+			if(cond is isNull){
+				counts["IS NULL Expr"] += holesInString(cond.exp);
+			}
+			if(cond is inValues){
+				counts["IN Expr"] += holesInString(cond.exp);
+				for(v <- cond.values){
+					counts["IN Values"] += holesInString(v);
+				}	
+			}
+			if(cond is inSubquery){
+				classifySelectQueryHoles(cond.subquery);
+			}
+			if(cond is like){
+				counts["LIKE Expr"] += holesInString(cond.exp);
+				counts["LIKE Pattern"] += holesInString(cond.pattern);
+			}
+		}
+		return counts;
+	}
+	
+	for(query <- queriesWithHoles){
+		if(query.parsed is selectQuery){
+			classifySelectQueryHoles(query.parsed);
+		}
+		else if(query.parsed is updateQuery){
+			classifyUpdateQueryHoles(query.parsed);
+		}
+		else if(query.parsed is insertQuery){
+			classifyInsertQueryHoles(query.parsed);
 		}
 	}
 	
@@ -350,53 +453,12 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 		"USING": usingHole,
 		"UPDATE Table" : updateTableHole,
 		"SET LHS" : setOpLHSHole,
-		"SET RHS" : setOpRHSHole
+		"SET RHS" : setOpRHSHole,
+		"DUPLICATE SET LHS" : duplicateSetOpLHSHole,
+		"DUPLICATE SET RHS" : duplicateSetOpRHSHole,
+		"INTO Table" : intoTableHole,
+		"INTO Column" : intoColumnHole,
+		"VALUES" : valuesHole
 		
 	) + conditionHoles;
-}
-
-public map[str, int] classifyConditionHoles(map[str, int] counts, Condition condition){
-	if(condition is and || condition is or || condition is xor){
-		counts = classifyConditionHoles(counts, condition.left);
-		counts = classifyConditionHoles(counts, condition.right);
-	}
-	else if(condition is not){
-		counts = classifyConditionHoles(condition.negated);
-	}
-	else{
-		cond = condition.condition;
-		if(cond is simpleComparison){
-			counts["Comparison LHS"] += holesInString(cond.left);
-			counts["Comparison Op"] += holesInString(cond.op);
-			counts["Comparison RHS"] += holesInString(cond.rightExp);
-		}
-		if(cond is compoundComparison){
-			counts["Comparison LHS"] += holesInString(cond.left);
-			counts["Comparison Op"] += holesInString(cond.op);
-			counts = classifyConditionHoles(counts, cond.rightCondition);
-		}
-		if(cond is between){
-			counts["Between Expr"] += holesInString(cond.exp);
-			counts["Between Lower"] += holesInString(cond.lower);
-			counts["Between Upper"] += holesInString(cond.upper);
-		}
-		if(cond is isNull){
-			counts["IS NULL Expr"] += holesInString(cond.exp);
-		}
-		if(cond is inValues){
-			counts["IN Expr"] += holesInString(cond.exp);
-			for(v <- cond.values){
-				counts["IN Values"] += holesInString(v);
-			}	
-		}
-		if(cond is inSubquery){
-			//TODO: count holes in subquery
-			continue;
-		}
-		if(cond is like){
-			counts["LIKE Expr"] += holesInString(cond.exp);
-			counts["LIKE Pattern"] += holesInString(cond.pattern);
-		}
-	}
-	return counts;
 }
