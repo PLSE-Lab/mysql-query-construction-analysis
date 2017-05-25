@@ -259,9 +259,9 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 		"Comparison LHS": 0,
 		"Comparison Op": 0,
 		"Comparison RHS": 0,
-		"Between Expr": 0,
-		"Between Lower": 0,
-		"Between Upper": 0,
+		"BETWEEN Expr": 0,
+		"BETWEEN Lower": 0,
+		"BETWEEN Upper": 0,
 		"IS NULL Expr": 0,
 		"IN Expr": 0,
 		"IN Values": 0,
@@ -435,9 +435,9 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 				counts = classifyConditionHoles(counts, cond.rightCondition);
 			}
 			if(cond is between){
-				counts["Between Expr"] += holesInString(cond.exp);
-				counts["Between Lower"] += holesInString(cond.lower);
-				counts["Between Upper"] += holesInString(cond.upper);
+				counts["BETWEEN Expr"] += holesInString(cond.exp);
+				counts["BETWEEN Lower"] += holesInString(cond.lower);
+				counts["BETWEEN Upper"] += holesInString(cond.upper);
 			}
 			if(cond is isNull){
 				counts["IS NULL Expr"] += holesInString(cond.exp);
@@ -496,4 +496,22 @@ public map[str, int] classifyQueryHoles(QueryMap queryMap = ( )){
 		"VALUES" : valuesHole
 		
 	) + conditionHoles;
+}
+
+@doc{groups query holes based on what role they play in the query (query text vs. parameter)}
+public map[str, int] groupByRole(){
+	holes = classifyQueryHoles(queryMap = loadQueryMap());
+ 	nameHoles = holes["Comparison LHS"] + holes["JOIN Expr"] + holes["BETWEEN Expr"] + holes["INTO Table"] + holes["INTO Column"]
+ 		+ holes["UPDATE Table"] + holes["LIKE Expr"] + holes["USING"] + holes["DUPLICATE SET LHS"] + holes["ORDER BY"]
+ 		+ holes["FROM"] + holes["IN Expr"] + holes["IS NULL Expr"] + holes["GROUP BY"] + holes["SET LHS"] + holes["SELECT Expr"];
+ 	
+ 	paramHoles = holes["VALUES"] + holes["Comparison RHS"] + holes["LIKE Pattern"] + holes["IN Values"] + holes["SET RHS"]
+ 		+ holes["DUPLICATE SET RHS"] + holes["BETWEEN Upper"] + holes["BETWEEN Lower"];
+ 	
+ 	//TODO: other types + LIMIT, Comparison Op
+ 	
+ 	return(
+ 		"NAME Holes" : nameHoles,
+ 		"PARAM Holes" : paramHoles
+ 	);
 }
