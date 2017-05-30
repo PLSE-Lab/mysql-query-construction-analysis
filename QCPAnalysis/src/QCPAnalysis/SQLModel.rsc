@@ -54,7 +54,12 @@ public str printQueryFragment(concatFragment(QueryFragment left, QueryFragment r
 public str printQueryFragment(globalFragment(Name name)) = "global name: <printName(name)>";
 public str printQueryFragment(inputParamFragment(Name name)) = "parameter name: <printName(name)>";
 
-data SQLModel = sqlModel(rel[Lab, QueryFragment, Lab, QueryFragment] fragmentRel, QueryFragment startFragment, Lab startLabel, loc callLoc);
+data EdgeInfo = nameInfo(Name name);
+
+public str printEdgeInfo(nameInfo(Name name)) = printName(name);
+
+alias FragmentRel = rel[Lab sourceLabel, QueryFragment sourceFragment, Lab targetLabel, QueryFragment targetFragment, EdgeInfo edgeInfo];
+data SQLModel = sqlModel(FragmentRel fragmentRel, QueryFragment startFragment, Lab startLabel, loc callLoc);
 
 @doc{Turn a specific expression into a possibly-nested query fragment.}
 public QueryFragment expr2qf(Expr ex, QCPSystemInfo qcpi, bool simplify=true) {
@@ -115,8 +120,8 @@ public QueryFragment expr2qf(Expr ex, QCPSystemInfo qcpi, bool simplify=true) {
 	return expr2qfAux(ex);
 }
 
-public rel[Lab, QueryFragment, Lab, QueryFragment] expandFragment(Lab l, QueryFragment qf, Uses u, Defs d, QCPSystemInfo qcpi) {
-	rel[Lab, QueryFragment, Lab, QueryFragment] res = { };
+public FragmentRel expandFragment(Lab l, QueryFragment qf, Uses u, Defs d, QCPSystemInfo qcpi) {
+	FragmentRel res = { };
 	
 	// TODO: Do we want all names in the fragment, or just leaf node names?
 	set[Name] usedNames = { n | /nameFragment(Name n) := qf };
@@ -125,11 +130,17 @@ public rel[Lab, QueryFragment, Lab, QueryFragment] expandFragment(Lab l, QueryFr
 	for (n <- usedNames, ul <- u[l, n], < de, dl > <- d[ul, n]) {
 		if (de is defExpr) {
 			newFragment = expr2qf(de.e, qcpi);
-			res = res + < l, qf, dl, newFragment >;
+			res = res + < l, qf, dl, newFragment, nameInfo(n) >;
+		} else if (de is defExprWOp) {
+			newFragment = expr2qf(de.e, qcpi);
+			if (de.usedOp is concat) {
+				newFragment = concatFragment(nameFragment(de.usedName),newFragment);
+			}
+			res = res + < l, qf, dl, newFragment, nameInfo(n) >;
 		} else if (de is inputParamDef) {
-			res = res + < l, qf, dl, inputParamFragment(de.paramName) >;
+			res = res + < l, qf, dl, inputParamFragment(de.paramName), nameInfo(n) >;
 		} else if (de is globalDef) {
-			res = res + < l, qf, dl, globalFragment(de.globalName) >;
+			res = res + < l, qf, dl, globalFragment(de.globalName), nameInfo(n) >;
 		}
 	}
 	
@@ -166,7 +177,7 @@ public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions =
 	
 	queryExp = queryParameter(inputNode);
 	startingFragment = expr2qf(queryExp, qcpi);
-	rel[Lab, QueryFragment, Lab, QueryFragment] res = { };
+	FragmentRel res = { };
 	solve(res) {
 		for ( < l, f > <- (res<2,3> + < inputNode.l, startingFragment>) ) {
 			res = res + expandFragment(l, f, u, d, qcpi);
@@ -206,14 +217,14 @@ public set[SQLYield] yields(SQLModel m) {
 	set[SQLYield] buildPieces(QueryFragment fragment, Lab l) {
 		if (fragment is nameFragment) {
 			// Get the labels of the defining nodes (nl) for names (fragment) used in this node (l)
-			nameLabels = { nl | < l, _, nl, fragment > <- m.fragmentRel };
+			nameLabels = { nl | < l, _, nl, fragment, _ > <- m.fragmentRel };
 			
 			// These are the labels and expressions that define the names used in this node
 			possibleExpansions = m.fragmentRel[nameLabels,fragment];
 			
 			// If we have expansions, try to further expand those
 			if (size(possibleExpansions) > 0) {
-				expansions = { *buildPieces(f,lf) | < lf, f > <- possibleExpansions };
+				expansions = { *buildPieces(f,lf) | < lf, f, _ > <- possibleExpansions };
 				finalExpansions = { };
 				for (e <- expansions) {
 					// If a name just expanded into a dynamic piece, it's more informative to just keep the name
@@ -296,6 +307,9 @@ public void printYields(rel[loc, SQLModel] models) {
 	} 
 }
 
+//public str getEdgeLabel(nameFragment(Name n)) = printName(n);
+//public default str getEdgeLabel(QueryFragment qf) = "";
+
 // TODO: Add code to visualize model as dot graph...
 public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "") {
 	nodes = m.fragmentRel<1> + m.fragmentRel<3>;
@@ -310,7 +324,7 @@ public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "") {
 	} 
 	
 	nodes = [ "\"<nodeMap[n]>\" [ label = \"<escapeForDot(printQueryFragment(n))>\", labeljust=\"l\" ];" | n <- nodes ];
-	edges = [ "\"<nodeMap[n1]>\" -\> \"<nodeMap[n2]>\" [ label = \" \"];" | < _, n1, _, n2 > <- m.fragmentRel ];
+	edges = [ "\"<nodeMap[n1]>\" -\> \"<nodeMap[n2]>\" [ label = \"<printEdgeInfo(ei)>\"];" | < _, n1, _, n2, ei > <- m.fragmentRel ];
 	str dotGraph = "digraph \"SQLModel\" {
 				   '	graph [ label = \"SQL Model<size(title)>0?" for <title>":"">\" ];
 				   '	node [ shape = box ];
