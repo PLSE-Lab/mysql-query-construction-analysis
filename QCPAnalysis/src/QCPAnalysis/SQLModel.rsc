@@ -44,6 +44,7 @@ data QueryFragment
 	| concatFragment(QueryFragment left, QueryFragment right)
 	| globalFragment(Name name)
 	| inputParamFragment(Name name)
+	| unknownFragment()
 	;
 
 public str printQueryFragment(literalFragment(str literalFragment)) = "literal: <literalFragment>";
@@ -53,12 +54,13 @@ public str printQueryFragment(compositeFragment(list[QueryFragment] fragments)) 
 public str printQueryFragment(concatFragment(QueryFragment left, QueryFragment right)) = "concat: ( <printQueryFragment(left)> ) . ( <printQueryFragment(right)> )";
 public str printQueryFragment(globalFragment(Name name)) = "global name: <printName(name)>";
 public str printQueryFragment(inputParamFragment(Name name)) = "parameter name: <printName(name)>";
+public str printQueryFragment(unknownFragment()) = "unknown";
 
 data EdgeInfo = nameInfo(Name name);
 
 public str printEdgeInfo(nameInfo(Name name)) = printName(name);
 
-alias FragmentRel = rel[Lab sourceLabel, QueryFragment sourceFragment, Lab targetLabel, QueryFragment targetFragment, EdgeInfo edgeInfo];
+alias FragmentRel = rel[Lab sourceLabel, QueryFragment sourceFragment, Name name, Lab targetLabel, QueryFragment targetFragment, EdgeInfo edgeInfo];
 data SQLModel = sqlModel(FragmentRel fragmentRel, QueryFragment startFragment, Lab startLabel, loc callLoc);
 
 @doc{Turn a specific expression into a possibly-nested query fragment.}
@@ -130,22 +132,27 @@ public FragmentRel expandFragment(Lab l, QueryFragment qf, Uses u, Defs d, QCPSy
 	for (n <- usedNames, ul <- u[l, n], < de, dl > <- d[ul, n]) {
 		if (de is defExpr) {
 			newFragment = expr2qf(de.e, qcpi);
-			res = res + < l, qf, dl, newFragment, nameInfo(n) >;
+			res = res + < l, qf, n, dl, newFragment, nameInfo(n) >;
 		} else if (de is defExprWOp) {
 			newFragment = expr2qf(de.e, qcpi);
 			if (de.usedOp is concat) {
 				newFragment = concatFragment(nameFragment(de.usedName),newFragment);
 			}
-			res = res + < l, qf, dl, newFragment, nameInfo(n) >;
+			res = res + < l, qf, n, dl, newFragment, nameInfo(n) >;
 		} else if (de is inputParamDef) {
-			res = res + < l, qf, dl, inputParamFragment(de.paramName), nameInfo(n) >;
+			res = res + < l, qf, n, dl, inputParamFragment(de.paramName), nameInfo(n) >;
 		} else if (de is globalDef) {
-			res = res + < l, qf, dl, globalFragment(de.globalName), nameInfo(n) >;
+			res = res + < l, qf, n, dl, globalFragment(de.globalName), nameInfo(n) >;
 		}
+	}
+	
+	for (n <- usedNames, n notin u[l]<0>) {
+		res = res + < l, qf, n, l, unknownFragment(), nameInfo(n) >;
 	}
 	
 	return res;
 } 
+
 public rel[loc callLoc, CFG graph] cfgsWithCalls(System s, set[str] functionNames = {}, set[str] methodNames = {}) {
 	rel[loc callLoc, CFG graph] res = { };
 	for (l <- s.files) {
@@ -172,14 +179,14 @@ public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions =
 
 	d = definitions(inputCFG);
 	u = uses(inputCFG, d);
-	slicedCFG = basicSlice(inputCFG, inputNode, u[inputNode.l]<0>);
+	//slicedCFG = basicSlice(inputCFG, inputNode, u[inputNode.l]<0>);
 	nodesForLabels = ( n.l : n | n <- inputCFG.nodes );
 	
 	queryExp = queryParameter(inputNode);
 	startingFragment = expr2qf(queryExp, qcpi);
 	FragmentRel res = { };
 	solve(res) {
-		for ( < l, f > <- (res<2,3> + < inputNode.l, startingFragment>) ) {
+		for ( < l, f > <- (res<3,4> + < inputNode.l, startingFragment>) ) {
 			res = res + expandFragment(l, f, u, d, qcpi);
 		} 
 	}
@@ -200,6 +207,7 @@ public set[SQLYield] yields(SQLModel m) {
 	SQLYield yieldForFragment(literalFragment(str s)) = [ staticPiece(s) ];
 	SQLYield yieldForFragment(nameFragment(Name n)) = [ yieldForName(n) ];
 	SQLYield yieldForFragment(dynamicFragment(Expr e)) = [ dynamicPiece() ];
+	SQLYield yieldForFragment(unknownFragment()) = [ dynamicPiece() ];
 	SQLYield yieldForFragment(compositeFragment(list[QueryFragment] fragments)) = [ *yieldForFragment(f) | f <- fragments ];
 	SQLYield yieldForFragment(concatFragment(QueryFragment left, QueryFragment right)) = yieldForFragment(left) + yieldForFragment(right);
 	SQLYield yieldForFragment(inputParamFragment(Name n)) = [ yieldForName(n) ];
@@ -214,49 +222,57 @@ public set[SQLYield] yields(SQLModel m) {
 	SQLPiece yieldForName(computedStaticPropertyName(str className, Expr computedPropertyName)) = namePiece("<className>::UNKNOWN_PROPERTY");
 	SQLPiece yieldForName(computedStaticPropertyName(Expr computedClassName, Expr computedPropertyName)) = namePiece("UNKNOWN_TARGET::UNKNOWN_PROPERTY");
 
-	set[SQLYield] buildPieces(QueryFragment fragment, Lab l) {
-		if (fragment is nameFragment) {
-			// Get the labels of the defining nodes (nl) for names (fragment) used in this node (l)
-			nameLabels = { nl | < l, _, nl, fragment, _ > <- m.fragmentRel };
-			
-			// These are the labels and expressions that define the names used in this node
-			possibleExpansions = m.fragmentRel[nameLabels,fragment];
-			
-			// If we have expansions, try to further expand those
-			if (size(possibleExpansions) > 0) {
-				expansions = { *buildPieces(f,lf) | < lf, f, _ > <- possibleExpansions };
-				finalExpansions = { };
-				for (e <- expansions) {
-					// If a name just expanded into a dynamic piece, it's more informative to just keep the name
-					if ([dynamicPiece()] := e) {
-						finalExpansions = finalExpansions + [ yieldForName(fragment.name) ];
-					} else {
-						finalExpansions = finalExpansions + e;
-					}
+	set[SQLYield] buildPieces(QueryFragment inputFragment, Lab l) {
+		// Get the possible expansions for each at this location
+		expansions = m.fragmentRel[l, inputFragment]<0,1,2>;
+		
+		set[SQLYield] performExpansion(QueryFragment fragment) {
+			if (fragment is nameFragment) {
+				if (isEmpty(expansions[fragment.name])) {
+					return { yieldForFragment(fragment); }
 				}
-				return finalExpansions;
+				
+				nameExpansions = { *buildPieces(lf,ll) | < ll, lf > <- expansions[fragment.name] };
+				return { ne | ne <- nameExpansions, [dynamicPiece()] !:= ne } + { yieldForFragment(fragment) | ne <- nameExpansions, [dynamicPiece()] := ne };
+			} else if (fragment is compositeFragment) {
+				compositeYield = performExpansion(fragment.fragments[0]);
+				for (f <- fragment.fragments[1..]) {
+					nextYield = performExpansion(f);
+					compositeYield = { cyi + nyi | cyi <- compositeYield, nyi <- nextYield };
+				}
+				return compositeYield;
+			} else if (fragment is concatFragment) {
+				leftYield = performExpansion(fragment.left);
+				rightYield = performExpansion(fragment.right);
+				concatYield = { lyi + ryi | lyi <- leftYield, ryi <- rightYield };
+				return concatYield;
 			} else {
-				// If we have no expansions, return the name instead
-				return { [ yieldForName(fragment.name) ] };
-			}
-		} else if (fragment is compositeFragment) {
-			compositeYield = buildPieces(fragment.fragments[0], l);
-			for (f <- fragment.fragments[1..]) {
-				nextYield = buildPieces(f, l);
-				compositeYield = { cyi + nyi | cyi <- compositeYield, nyi <- nextYield };
-			}
-			return compositeYield;
-		} else if (fragment is concatFragment) {
-			leftYield = buildPieces(fragment.left, l);
-			rightYield = buildPieces(fragment.right, l);
-			concatYield = { lyi + ryi | lyi <- leftYield, ryi <- rightYield };
-			return concatYield;
-		} else {
-			return { yieldForFragment(fragment) };
+				return { yieldForFragment(fragment) };
+			} 
 		}
+		
+		return performExpansion(inputFragment);
 	}
 		
-	return buildPieces(m.startFragment, m.startLabel);
+	SQLYield mergeStatics(SQLYield y) {
+		if ([*front,staticPiece(sp1),staticPiece(sp2),*back] := y) {
+			y = [*front,staticPiece(sp1+sp2),*back];
+		}
+		return y;
+	}
+	
+	SQLYield simplifyYield(SQLYield y) {
+		solve(y) {
+			y = mergeStatics(y);
+		}
+		return y;
+	}
+	
+	set[SQLYield] simplifyYields(set[SQLYield] ys) {
+		return { simplifyYield(y) | y <- ys };
+	}
+	
+	return simplifyYields(buildPieces(m.startFragment, m.startLabel));
 }
 
 @doc{converts a yield to a string parsable by the sql parser}
