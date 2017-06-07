@@ -276,22 +276,25 @@ public set[SQLYield] yields(SQLModel m) {
 }
 
 @doc{converts a yield to a string parsable by the sql parser}
-/*public str buildSQLString(SQLYield yield){
+public str yield2String(SQLYield yield){
 	str res = "";
 	int holeID = 0;
-	for(SQLPiece piece <- yield){
+	for(SQLPiece piece <- yield || piece is namePiece){
 		if(piece is dynamicPiece){
 			res = res +  "?<holeID>";
 			holeID = holeID + 1;
 			continue;
 		}
-		if(staticPiece(lit) := piece){
+		if(staticPiece(literal) := piece){
 			res = res + lit;
 			continue;
 		}
 	}
 	return res;
-}*/
+}
+
+@doc{converts a set of yelds to a set of parsable strings}
+public set[str] yields2Strings(set[SQLYield] yields) = { yield2String(y) | y <- yields };
 
 public void testcode() {
 	pt = loadBinary("Schoolmate", "1.5.4");
