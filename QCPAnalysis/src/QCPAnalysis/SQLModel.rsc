@@ -279,14 +279,14 @@ public set[SQLYield] yields(SQLModel m) {
 public str yield2String(SQLYield yield){
 	str res = "";
 	int holeID = 0;
-	for(SQLPiece piece <- yield || piece is namePiece){
-		if(piece is dynamicPiece){
+	for(SQLPiece piece <- yield){
+		if(piece is dynamicPiece || piece is namePiece){
 			res = res +  "?<holeID>";
 			holeID = holeID + 1;
 			continue;
 		}
 		if(staticPiece(literal) := piece){
-			res = res + lit;
+			res = res + literal;
 			continue;
 		}
 	}
