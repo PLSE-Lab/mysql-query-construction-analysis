@@ -173,13 +173,14 @@ public default Expr queryParameter(CFGNode n) { throw "Unexpected parameter <n>"
 public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions = { "mysql_query" }) {
 	inputSystem = qcpi.sys;
 	baseLoc = inputSystem.baseLoc;
+	inputCFGLoc = findContainingCFGLoc(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
 	inputCFG = findContainingCFG(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
 	iinfo = qcpi.iinfo;
 	inputNode = findNodeForExpr(inputCFG, callLoc);
 
-	d = definitions(inputCFG);
-	u = uses(inputCFG, d);
-	//slicedCFG = basicSlice(inputCFG, inputNode, u[inputNode.l]<0>);
+	d = getDefs(qcpi, callLoc.top, inputCFGLoc);
+	u = getUses(qcpi, callLoc.top, inputCFGLoc);
+	slicedCFG = basicSlice(inputCFG, inputNode, u[inputNode.l]<0>, d = d, u = u);
 	nodesForLabels = ( n.l : n | n <- inputCFG.nodes );
 	
 	queryExp = queryParameter(inputNode);
@@ -222,7 +223,7 @@ public set[SQLYield] yields(SQLModel m) {
 	SQLPiece yieldForName(computedStaticPropertyName(str className, Expr computedPropertyName)) = namePiece("<className>::UNKNOWN_PROPERTY");
 	SQLPiece yieldForName(computedStaticPropertyName(Expr computedClassName, Expr computedPropertyName)) = namePiece("UNKNOWN_TARGET::UNKNOWN_PROPERTY");
 
-	set[SQLYield] buildPieces(QueryFragment inputFragment, Lab l) {
+	set[SQLYield] buildPieces(QueryFragment inputFragment, Lab l, set[Lab] alreadyVisited) {
 		// Get the possible expansions for each at this location
 		expansions = m.fragmentRel[l, inputFragment]<0,1,2>;
 		
@@ -232,7 +233,8 @@ public set[SQLYield] yields(SQLModel m) {
 					return { yieldForFragment(fragment); }
 				}
 				
-				nameExpansions = { *buildPieces(lf,ll) | < ll, lf > <- expansions[fragment.name] };
+				nameExpansions = { *buildPieces(lf,ll,alreadyVisited+l) | < ll, lf > <- expansions[fragment.name], ll != l && ll notin alreadyVisited } +
+							     { [ dynamicPiece() ] | < ll, lf > <- expansions[fragment.name], ll == l || ll in alreadyVisited };
 				return { ne | ne <- nameExpansions, [dynamicPiece()] !:= ne } + { yieldForFragment(fragment) | ne <- nameExpansions, [dynamicPiece()] := ne };
 			} else if (fragment is compositeFragment) {
 				compositeYield = performExpansion(fragment.fragments[0]);
@@ -272,7 +274,7 @@ public set[SQLYield] yields(SQLModel m) {
 		return { simplifyYield(y) | y <- ys };
 	}
 	
-	return simplifyYields(buildPieces(m.startFragment, m.startLabel));
+	return simplifyYields(buildPieces(m.startFragment, m.startLabel, {}));
 }
 
 @doc{converts a yield to a string parsable by the sql parser}
