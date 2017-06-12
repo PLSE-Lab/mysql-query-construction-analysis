@@ -6,11 +6,12 @@ import lang::php::ast::System;
 
 import QCPAnalysis::SQLModel;
 import QCPAnalysis::QCPSystemInfo;
-import QCPAnalysis:: ParseSQL::AbstractSyntax;
+import QCPAnalysis::ParseSQL::AbstractSyntax;
 import QCPAnalysis::ParseSQL::RunSQLParser;
 
 import IO;
 import ValueIO;
+import Set;
 
 alias SQLModelMap = map[SQLModel model, rel[SQLYield yield, str queryWithHoles, SQLQuery parsed] yields];
 
@@ -25,13 +26,18 @@ loc modelLoc = baseLoc + "serialized/qcp/sqlmodels/";
 	step 4, parse strings
 */
 
-public SQLModelMap runDemo(str p = "WebChess" , str v = "0.9.0"){
+public SQLModelMap runDemo(str p = "WebChess" , str v = "0.9.0", rel[loc, SQLModel] modelsRel = {}){
 	SQLModelMap res = ( );
 	
 	// step 1
 	System sys = loadBinary(p, v);
 	QCPSystemInfo qcpi = readQCPSystemInfo(p, v);
-	set[SQLModel] models = buildModelsForSystem(sys, qcpi)<1>;
+	set[SQLModel] models = {};
+	if (isEmpty(modelsRel)) { 
+		models = buildModelsForSystem(sys, qcpi)<1>;
+	} else {
+		models = modelsRel<1>;
+	}
 	
 	for(model <- models){
 		// step 2
