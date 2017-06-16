@@ -15,8 +15,9 @@ import QCPAnalysis::QCPCorpus;
 import IO;
 import ValueIO;
 import Set;
+import Relation;
 
-alias SQLModelMap = map[SQLModel model, rel[SQLYield yield, str queryWithHoles, SQLQuery parsed] yields];
+alias SQLModelMap = map[SQLModel model, rel[SQLYield yield, str queryWithHoles, SQLQuery parsed] yieldsRel];
 
 loc modelLoc = baseLoc + "serialized/qcp/sqlmodels/";
 
@@ -73,5 +74,18 @@ public rel[SQLYield, str, SQLQuery] parseYields(set[SQLYield] yields){
 	
 	return res;
 }
+
+@doc{QCP1 (static query) recognizer}
+public bool matchesQCP1(SQLModel model) = size(model.fragmentRel) == 0 && model.startFragment is literalFragment;
  
- 
+public map[str, SQLModelMap] classifySQLModels(SQLModelMap modelMap){
+	res = ("QCP1" : ());
+	// TODO: other patterns
+	for(model <- modelMap){
+		if(matchesQCP1(model)){
+			res["QCP1"] += (model : modelMap[model]);
+		}
+	}
+	
+	return res;
+}
