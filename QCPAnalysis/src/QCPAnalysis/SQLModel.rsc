@@ -56,7 +56,7 @@ public str printQueryFragment(globalFragment(Name name)) = "global name: <printN
 public str printQueryFragment(inputParamFragment(Name name)) = "parameter name: <printName(name)>";
 public str printQueryFragment(unknownFragment()) = "unknown";
 
-data EdgeInfo = nameInfo(Name name);
+data EdgeInfo = nameInfo(Name name) | edgeConds(set[Expr] conds);
 
 public str printEdgeInfo(nameInfo(Name name)) = printName(name);
 
@@ -192,7 +192,120 @@ public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions =
 		} 
 	}
 	
+	res = addEdgeInfo(res, slicedCFG);
 	return sqlModel(res, startingFragment, inputNode.l, callLoc);
+}
+
+FragmentRel addEdgeInfo(FragmentRel frel, CFG slicedCFG) {
+	nodesForLabels = ( n.l : n | n <- slicedCFG.nodes );
+	entryNode = getEntryNode(slicedCFG);
+	rel[CFGNode,CFGNode] containedIn = { };
+	
+	// Get the labels of the target nodes in frel, we want to know if those
+	// nodes are only reachable under certain conditions
+	targetLabels = frel<3>;	
+
+	// Get the nodes for each of these labels
+	targetNodes = { n | n <- slicedCFG.nodes, n.l in targetLabels };
+	
+	// Get the information on which headers dominate the target nodes
+	containsRel = containers(slicedCFG);
+	
+	// Get a graph of the CFG to make it easier to find the proper
+	// nodes. Also get the inverse so we can isolate the path.
+	g = cfgAsGraph(slicedCFG);
+	ig = invert(g);
+	
+	// For each node, find the predicates that are required to reach it
+	map[Lab, set[Expr]] nodePredicates = ( );
+	for (tn <- targetNodes) {
+		// Get the nodes that reach this node in the CFG
+		reachedFrom = (ig*)[tn];
+		set[Expr] preds = { };
+		for (h <- containsRel[tn]) {
+			// Get the nodes the header nodes reaches in the CFG
+			reachableFrom = (g*)[h];
+			
+			// The path is nodes that are reached from the header (going forwards) and
+			// are reached from the target node (going backwards)
+			nodesOnPath = reachedFrom & reachableFrom;
+			
+			// Since we work with the labels, this makes it easy to see which we have on the path
+			labelsOnPath = { n.l | n <- nodesOnPath };
+			
+			// Get edges on the path, which have a source and target that are both on the
+			// path. Note that we used ig* and g* above, so the header and target nodes
+			// are possible sources and targets. 
+			edgesOnPath = { e | e <- slicedCFG.edges, e.from in labelsOnPath, e.to in labelsOnPath };
+			
+			// Winnow this down to just those edges that are tied back to the header.
+			conditionEdgesOnPath = { e | e <- edgesOnPath, e has header, e.header == h.l };
+			
+			// Extract the conditions from each edge and add that to the preds for this
+			// target node.
+			for (e <- conditionEdgesOnPath) {
+				if (e has why) preds = preds + e.why;
+				if (e has whyNot) preds = preds + unaryOperation(e.whyNot,booleanNot());
+				if (e has whys) preds = preds + toSet(e.whys);
+				if (e has whyNots) preds = preds + { unaryOperation(wn,booleanNot()) | wn <- e.whyNots };
+			}
+		}
+		nodePredicates[tn.l] = preds;
+	}
+	
+	// Since we really only care about conditions that do not impact all the target nodes, remove any
+	// labels that are common to all of them
+	commonConds = getOneFrom(nodePredicates<1>);
+	for (l <- nodePredicates) {
+		commonConds = commonConds & nodePredicates[l];
+	}
+	
+	// Now, using this information, add these conditions to any edges that target these nodes
+	for ( < l1, f1, n1, l2, f2, _ > <- frel, l2 in nodePredicates, !isEmpty(nodePredicates[l2])) {
+		frel = frel + < l1, f1, n1, l2, f2, edgeConds(nodePredicates[l2]) >;
+	}
+
+	return frel;		 
+}
+
+public rel[CFGNode,CFGNode] containers(CFG inputCFG) {
+	map[Lab, set[Lab]] resMap = ( );
+	nodesForLabels = ( n.l : n | n <- inputCFG.nodes );
+
+	g = cfgAsGraph(inputCFG);
+	gInverted = invert(g);
+	entry = getEntryNode(inputCFG);
+	  
+	list[CFGNode] worklist = buildForwardWorklist(inputCFG);
+	workset = toSet(worklist);
+	
+	while (!isEmpty(worklist)) {
+		n = worklist[0];
+		worklist = worklist[1..];
+		workset = workset - n;
+		resStart = resMap[n.l] ? {};
+		
+		set[Lab] inbound = { *(resMap[ni.l]? {}) | ni <- gInverted[n]};
+		set[Lab] outbound = inbound;
+		
+		if (n is footerNode) {
+			outbound = outbound - { l | l <- inbound, l == n.header };
+		} else if (n is headerNode) {
+			outbound = outbound + n.l;
+		}
+		
+		resMap[n.l] = outbound;
+		
+		resEnd = resMap[n.l] ? {};
+		
+		if (resStart != resEnd) {
+			newElements = [ gi | gi <- g[n], gi notin workset ];
+			worklist = newElements + worklist;
+			workset = workset + toSet(newElements);
+		}
+	}
+	
+	return { < nodesForLabels[l], nodesForLabels[h] > | l <- resMap, h <- resMap[l] }; 	
 }
 
 public QueryFragment testFragments(str exprText) {
