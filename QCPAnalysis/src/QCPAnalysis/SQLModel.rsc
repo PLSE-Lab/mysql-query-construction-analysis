@@ -56,10 +56,10 @@ public str printQueryFragment(globalFragment(Name name)) = "global name: <printN
 public str printQueryFragment(inputParamFragment(Name name)) = "parameter name: <printName(name)>";
 public str printQueryFragment(unknownFragment()) = "unknown";
 
-data EdgeInfo = noInfo() | nameInfo(Name name) | edgeCondsInfo(set[Expr] conds);
+data EdgeInfo = noInfo() | nameInfo(Name name) | edgeCondsInfo(set[Expr] conds, Lab l);
 
 public str printEdgeInfo(nameInfo(Name name)) = "Name: <printName(name)>";
-public str printEdgeInfo(edgeCondsInfo(set[Expr] conds)) = "Conditions: <intercalate(",", [pp(e) | e <- conds])>";
+public str printEdgeInfo(edgeCondsInfo(set[Expr] conds, Lab l)) = "Conditions: <intercalate(",", [pp(e) | e <- conds])>";
 public str printEdgeInfo(Name n, set[EdgeInfo] eis) {
 	eis = eis - noInfo();
 	if (isEmpty(eis)) {
@@ -238,7 +238,9 @@ FragmentRel addEdgeInfo(FragmentRel frel, CFG slicedCFG) {
 	ig = invert(g);
 	
 	// For each node, find the predicates that are required to reach it
-	map[Lab, set[Expr]] nodePredicates = ( );
+	map[Lab, tuple[set[Expr] preds, Lab l]] nodePredicates = ( );
+	nodesForLabels = ( n.l : n | n <- slicedCFG.nodes );
+	
 	for (tn <- targetNodes) {
 		// Get the nodes that reach this node in the CFG
 		reachedFrom = (ig*)[tn];
@@ -270,26 +272,36 @@ FragmentRel addEdgeInfo(FragmentRel frel, CFG slicedCFG) {
 				if (e has whys) preds = preds + toSet(e.whys);
 				if (e has whyNots) preds = preds + { unaryOperation(wn,booleanNot()) | wn <- e.whyNots };
 			}
+			
 		}
-		nodePredicates[tn.l] = preds;
+		// Find the header that is most precise, it will be nested in the others
+		if (!isEmpty(containsRel[tn])) {
+			mostPrecise = getOneFrom(containsRel[tn]);
+			for (n <- containsRel[tn]) {
+				if (nodesForLabels[n.l] < nodesForLabels[mostPrecise.l]) {
+					mostPrecise = n;
+				}
+			}
+			nodePredicates[tn.l] = < preds, mostPrecise.l >;
+		}
 	}
 	
 	// Since we really only care about conditions that do not impact all the target nodes, remove any
 	// labels that are common to all of them
 	commonConds = { };
-	if (!isEmpty(nodePredicates<1>)) {
-		commonConds = getOneFrom(nodePredicates<1>);
+	if (!isEmpty(nodePredicates<1>.preds)) {
+		commonConds = getOneFrom(nodePredicates<1>.preds);
 		for (l <- nodePredicates) {
-			commonConds = commonConds & nodePredicates[l];
+			commonConds = commonConds & nodePredicates[l].preds;
 		}
 		for (l <- nodePredicates) {
-			nodePredicates[l] = nodePredicates[l] - commonConds;
+			nodePredicates[l].preds = nodePredicates[l].preds - commonConds;
 		}
 	}
 	
 	// Now, using this information, add these conditions to any edges that target these nodes
-	for ( < l1, f1, n1, l2, f2, _ > <- frel, l2 in nodePredicates, !isEmpty(nodePredicates[l2])) {
-		frel = frel + < l1, f1, n1, l2, f2, edgeCondsInfo(nodePredicates[l2]) >;
+	for ( < l1, f1, n1, l2, f2, _ > <- frel, l2 in nodePredicates, < preds, headerLabel > := nodePredicates[l2]) {
+		frel = frel + < l1, f1, n1, l2, f2, edgeCondsInfo(preds, headerLabel) >;
 	}
 
 	return frel;		 
@@ -363,6 +375,10 @@ public set[SQLYield] yields(SQLModel m) {
 	SQLPiece yieldForName(computedStaticPropertyName(str className, Expr computedPropertyName)) = namePiece("<className>::UNKNOWN_PROPERTY");
 	SQLPiece yieldForName(computedStaticPropertyName(Expr computedClassName, Expr computedPropertyName)) = namePiece("UNKNOWN_TARGET::UNKNOWN_PROPERTY");
 
+	// Here are the different condition options -- a set of condition sets, plus the empty set for cases where
+	// there are no conditions.
+	conditionSets = { ei.conds | ei <- m.fragmentRel.edgeInfo, ei is edgeCondsInfo } + { { } };
+	
 	set[SQLYield] buildPieces(QueryFragment inputFragment, Lab l, set[Lab] alreadyVisited) {
 		// Get the possible expansions for each at this location
 		expansions = m.fragmentRel[l, inputFragment]<0,1,2>;
@@ -414,7 +430,9 @@ public set[SQLYield] yields(SQLModel m) {
 		return { simplifyYield(y) | y <- ys };
 	}
 	
-	return simplifyYields(buildPieces(m.startFragment, m.startLabel, {}));
+	yields = buildPieces(m.startFragment, m.startLabel, {});
+	
+	return simplifyYields(yields);
 }
 
 @doc{converts a yield to a string parsable by the sql parser}
