@@ -79,16 +79,16 @@ public void extractQCPSystemInfo() {
 	}
 }
 
-public Defs getDefs(QCPSystemInfo qcpi, loc fileLoc, loc cfgLoc) {
+public tuple[QCPSystemInfo qcpi, Defs d] getDefs(QCPSystemInfo qcpi, loc fileLoc, loc cfgLoc) {
 	if (qcpi.sys is namedVersionedSystem) {
 		return getDefs(qcpi.sys.name, qcpi.sys.version, qcpi, fileLoc, cfgLoc);
 	}
 	throw "getDefs must be called with the system name and version explicitly provided";
 }
 
-public Defs getDefs(str systemName, str systemVersion, QCPSystemInfo qcpi, loc fileLoc, loc cfgLoc) {
+public tuple[QCPSystemInfo qcpi, Defs d] getDefs(str systemName, str systemVersion, QCPSystemInfo qcpi, loc fileLoc, loc cfgLoc) {
 	if (fileLoc in qcpi.systemDefs && cfgLoc in qcpi.systemDefs[fileLoc]) {
-		return qcpi.systemDefs[fileLoc][cfgLoc];
+		return < qcpi, qcpi.systemDefs[fileLoc][cfgLoc] >;
 	}
 	d = definitions(qcpi.systemCFGs[fileLoc][cfgLoc]);
 	if (fileLoc notin qcpi.systemDefs) {
@@ -96,25 +96,26 @@ public Defs getDefs(str systemName, str systemVersion, QCPSystemInfo qcpi, loc f
 	}
 	qcpi.systemDefs[fileLoc][cfgLoc] = d;
 	writeQCPSystemInfo(systemName, systemVersion, qcpi);
-	return d;
+	return < qcpi, d >;
 }
 
-public Uses getUses(QCPSystemInfo qcpi, loc fileLoc, loc cfgLoc) {
+public tuple[QCPSystemInfo qcpi, Uses u] getUses(QCPSystemInfo qcpi, loc fileLoc, loc cfgLoc) {
 	if (qcpi.sys is namedVersionedSystem) {
 		return getUses(qcpi.sys.name, qcpi.sys.version, qcpi, fileLoc, cfgLoc);
 	}
 	throw "getUses must be called with the system name and version explicitly provided";
 }
 
-public Uses getUses(str systemName, str systemVersion, QCPSystemInfo qcpi, loc fileLoc, loc cfgLoc) {
+public tuple[QCPSystemInfo qcpi, Uses u] getUses(str systemName, str systemVersion, QCPSystemInfo qcpi, loc fileLoc, loc cfgLoc) {
 	if (fileLoc in qcpi.systemUses && cfgLoc in qcpi.systemUses[fileLoc]) {
-		return qcpi.systemUses[fileLoc][cfgLoc];
+		return < qcpi, qcpi.systemUses[fileLoc][cfgLoc] >;
 	}
-	u = uses(qcpi.systemCFGs[fileLoc][cfgLoc], getDefs(qcpi, fileLoc, cfgLoc));
+	< _, d > = getDefs(qcpi, fileLoc, cfgLoc);
+	u = uses(qcpi.systemCFGs[fileLoc][cfgLoc], d);
 	if (fileLoc notin qcpi.systemUses) {
 		qcpi.systemUses[fileLoc] = ( );
 	}
 	qcpi.systemUses[fileLoc][cfgLoc] = u;
 	writeQCPSystemInfo(systemName, systemVersion, qcpi);
-	return u;
+	return < qcpi, u >;
 }
