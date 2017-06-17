@@ -47,7 +47,7 @@ data QueryFragment
 	| unknownFragment()
 	;
 
-public str printQueryFragment(literalFragment(str literalFragment)) = "literal: <literalFragment>";
+public str printQueryFragment(literalFragment(str literalFragment)) = "literal: \"<literalFragment>\"";
 public str printQueryFragment(nameFragment(Name name)) = "name: <printName(name)>";
 public str printQueryFragment(dynamicFragment(Expr fragmentExpr)) = "dynamic: <pp(fragmentExpr)>";
 public str printQueryFragment(compositeFragment(list[QueryFragment] fragments)) = "composite: <intercalate(" . ", ["( <printQueryFragment(qf)> )" | qf <- fragments])>";
@@ -56,9 +56,18 @@ public str printQueryFragment(globalFragment(Name name)) = "global name: <printN
 public str printQueryFragment(inputParamFragment(Name name)) = "parameter name: <printName(name)>";
 public str printQueryFragment(unknownFragment()) = "unknown";
 
-data EdgeInfo = nameInfo(Name name) | edgeConds(set[Expr] conds);
+data EdgeInfo = noInfo() | nameInfo(Name name) | edgeCondsInfo(set[Expr] conds);
 
-public str printEdgeInfo(nameInfo(Name name)) = printName(name);
+public str printEdgeInfo(nameInfo(Name name)) = "Name: <printName(name)>";
+public str printEdgeInfo(edgeCondsInfo(set[Expr] conds)) = "Conditions: <intercalate(",", [pp(e) | e <- conds])>";
+public str printEdgeInfo(Name n, set[EdgeInfo] eis) {
+	eis = eis - noInfo();
+	if (isEmpty(eis)) {
+		return "Name: <printName(n)>";
+	} else {
+		return "Name: <printName(n)>\n<intercalate("\n",[printEdgeInfo(ei) | ei <- eis])>";
+	}	
+}
 
 alias FragmentRel = rel[Lab sourceLabel, QueryFragment sourceFragment, Name name, Lab targetLabel, QueryFragment targetFragment, EdgeInfo edgeInfo];
 data SQLModel = sqlModel(FragmentRel fragmentRel, QueryFragment startFragment, Lab startLabel, loc callLoc);
@@ -132,22 +141,22 @@ public FragmentRel expandFragment(Lab l, QueryFragment qf, Uses u, Defs d, QCPSy
 	for (n <- usedNames, ul <- u[l, n], < de, dl > <- d[ul, n]) {
 		if (de is defExpr) {
 			newFragment = expr2qf(de.e, qcpi);
-			res = res + < l, qf, n, dl, newFragment, nameInfo(n) >;
+			res = res + < l, qf, n, dl, newFragment, noInfo() >;
 		} else if (de is defExprWOp) {
 			newFragment = expr2qf(de.e, qcpi);
 			if (de.usedOp is concat) {
 				newFragment = concatFragment(nameFragment(de.usedName),newFragment);
 			}
-			res = res + < l, qf, n, dl, newFragment, nameInfo(n) >;
+			res = res + < l, qf, n, dl, newFragment, noInfo() >;
 		} else if (de is inputParamDef) {
-			res = res + < l, qf, n, dl, inputParamFragment(de.paramName), nameInfo(n) >;
+			res = res + < l, qf, n, dl, inputParamFragment(de.paramName), noInfo() >;
 		} else if (de is globalDef) {
-			res = res + < l, qf, n, dl, globalFragment(de.globalName), nameInfo(n) >;
+			res = res + < l, qf, n, dl, globalFragment(de.globalName), noInfo() >;
 		}
 	}
 	
 	for (n <- usedNames, n notin u[l]<0>) {
-		res = res + < l, qf, n, l, unknownFragment(), nameInfo(n) >;
+		res = res + < l, qf, n, l, unknownFragment(), noInfo() >;
 	}
 	
 	return res;
@@ -178,8 +187,8 @@ public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions =
 	iinfo = qcpi.iinfo;
 	inputNode = findNodeForExpr(inputCFG, callLoc);
 
-	d = getDefs(qcpi, callLoc.top, inputCFGLoc);
-	u = getUses(qcpi, callLoc.top, inputCFGLoc);
+	< qcpi, d > = getDefs(qcpi, callLoc.top, inputCFGLoc);
+	< qcpi, u > = getUses(qcpi, callLoc.top, inputCFGLoc);
 	slicedCFG = basicSlice(inputCFG, inputNode, u[inputNode.l]<0>, d = d, u = u);
 	nodesForLabels = ( n.l : n | n <- inputCFG.nodes );
 	
@@ -211,8 +220,20 @@ FragmentRel addEdgeInfo(FragmentRel frel, CFG slicedCFG) {
 	// Get the information on which headers dominate the target nodes
 	containsRel = containers(slicedCFG);
 	
+	// We are only interested in conditional containers (ifs and ternary
+	// expressions) since the loop headers don't add useful information.
+	// So, remove them for now -- we can always put them back later if
+	// they would be helpful.
+	containsRel = { < n, cn > | < n, cn > <- containsRel,
+								(headerNode(Stmt s,_,_) := cn && s is \if) ||
+								(headerNode(Expr e,_,_) := cn && e is ternary) };
+	
 	// Get a graph of the CFG to make it easier to find the proper
-	// nodes. Also get the inverse so we can isolate the path.
+	// nodes. Also get the inverse so we can isolate the path. We
+	// also remove the backedges so we don't get relationships that are
+	// reachable in the graph but not mirrored in the tree (e.g., an if
+	// inside a loop would attach both conditions to everything)
+	slicedCFG = removeBackEdges(slicedCFG);
 	g = cfgAsGraph(slicedCFG);
 	ig = invert(g);
 	
@@ -255,14 +276,20 @@ FragmentRel addEdgeInfo(FragmentRel frel, CFG slicedCFG) {
 	
 	// Since we really only care about conditions that do not impact all the target nodes, remove any
 	// labels that are common to all of them
-	commonConds = getOneFrom(nodePredicates<1>);
-	for (l <- nodePredicates) {
-		commonConds = commonConds & nodePredicates[l];
+	commonConds = { };
+	if (!isEmpty(nodePredicates<1>)) {
+		commonConds = getOneFrom(nodePredicates<1>);
+		for (l <- nodePredicates) {
+			commonConds = commonConds & nodePredicates[l];
+		}
+		for (l <- nodePredicates) {
+			nodePredicates[l] = nodePredicates[l] - commonConds;
+		}
 	}
 	
 	// Now, using this information, add these conditions to any edges that target these nodes
 	for ( < l1, f1, n1, l2, f2, _ > <- frel, l2 in nodePredicates, !isEmpty(nodePredicates[l2])) {
-		frel = frel + < l1, f1, n1, l2, f2, edgeConds(nodePredicates[l2]) >;
+		frel = frel + < l1, f1, n1, l2, f2, edgeCondsInfo(nodePredicates[l2]) >;
 	}
 
 	return frel;		 
@@ -446,7 +473,7 @@ public void printYields(rel[loc, SQLModel] models) {
 
 // TODO: Add code to visualize model as dot graph...
 public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "") {
-	nodes = m.fragmentRel<1> + m.fragmentRel<3>;
+	nodes = m.fragmentRel<1> + m.fragmentRel<4>;
 	if (isEmpty(nodes)) {
 		nodes = { m.startFragment };
 	}
@@ -458,7 +485,7 @@ public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "") {
 	} 
 	
 	nodes = [ "\"<nodeMap[n]>\" [ label = \"<escapeForDot(printQueryFragment(n))>\", labeljust=\"l\" ];" | n <- nodes ];
-	edges = [ "\"<nodeMap[n1]>\" -\> \"<nodeMap[n2]>\" [ label = \"<printEdgeInfo(ei)>\"];" | < _, n1, _, n2, ei > <- m.fragmentRel ];
+	edges = [ "\"<nodeMap[n1]>\" -\> \"<nodeMap[n2]>\" [ label = \"<printEdgeInfo(nm,m.fragmentRel[l1,n1,nm,l2,n2])>\"];" | < l1, n1, nm, l2, n2 > <- m.fragmentRel<0,1,2,3,4> ];
 	str dotGraph = "digraph \"SQLModel\" {
 				   '	graph [ label = \"SQL Model<size(title)>0?" for <title>":"">\" ];
 				   '	node [ shape = box ];
