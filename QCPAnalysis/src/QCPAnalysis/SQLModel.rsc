@@ -359,7 +359,7 @@ alias LabeledYield = list[LabeledPiece];
 data SQLPiece = staticPiece(str literal) | namePiece(str name) | dynamicPiece();
 alias SQLYield = list[SQLPiece];
 
-public set[SQLYield] yields(SQLModel m) {
+public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
 	SQLYield yieldForFragment(literalFragment(str s)) = [ staticPiece(s) ];
 	SQLYield yieldForFragment(nameFragment(Name n)) = [ yieldForName(n) ];
 	SQLYield yieldForFragment(dynamicFragment(Expr e)) = [ dynamicPiece() ];
@@ -446,7 +446,7 @@ public set[SQLYield] yields(SQLModel m) {
 						      [_*,labeledPiece(_,ei1),_*,labeledPiece(_,ei2),_*] := ly,
 						      {_*, edgeCondsInfo(conds1, h1), _*} := ei1, {_*, edgeCondsInfo(conds2,h1), _*} := ei2,
 						      (conds1 & conds2) != conds1 && (conds1 & conds2) != conds2};
-	feasibleYields = labeledYields - infeasibleYields;
+	feasibleYields = filterYields ? (labeledYields - infeasibleYields) : labeledYields;
 		
 	regularYields = stripLabels(feasibleYields);
 	return simplifyYields(regularYields);
