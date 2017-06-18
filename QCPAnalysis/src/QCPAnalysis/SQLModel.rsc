@@ -400,9 +400,9 @@ public set[SQLYield] yields(SQLModel m) {
 				nameExpansions = { *buildPieces(lf,ll,edgeInfo + expansionsWithConditions[fragment.name,ll,lf], alreadyVisited+l) 
 								 | < ll, lf > <- expansions[fragment.name], 
 								   ll != l && ll notin alreadyVisited } +
-							     { labeledPiece([ dynamicPiece() ], edgeInfo) | < ll, lf > <- expansions[fragment.name], ll == l || ll in alreadyVisited };
+							     { addLabels([ dynamicPiece() ], edgeInfo) | < ll, lf > <- expansions[fragment.name], ll == l || ll in alreadyVisited };
 				return { ne | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] !:= ne } + 
-				       { labeledPiece(yieldForFragment(fragment), edgeInfo) | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] := ne };
+				       { addLabels(yieldForFragment(fragment), edgeInfo) | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] := ne };
 			} else if (fragment is compositeFragment) {
 				compositeYield = performExpansion(fragment.fragments[0]);
 				for (f <- fragment.fragments[1..]) {
