@@ -353,6 +353,9 @@ public QueryFragment testFragments(str exprText) {
 	return expr2qf(inputExpr, qcpi);
 }
 
+data LabeledPiece = labeledPiece(SQLPiece piece, set[EdgeInfo] edgeInfo);
+alias LabeledYield = list[LabeledPiece];
+
 data SQLPiece = staticPiece(str literal) | namePiece(str name) | dynamicPiece();
 alias SQLYield = list[SQLPiece];
 
@@ -375,23 +378,31 @@ public set[SQLYield] yields(SQLModel m) {
 	SQLPiece yieldForName(computedStaticPropertyName(str className, Expr computedPropertyName)) = namePiece("<className>::UNKNOWN_PROPERTY");
 	SQLPiece yieldForName(computedStaticPropertyName(Expr computedClassName, Expr computedPropertyName)) = namePiece("UNKNOWN_TARGET::UNKNOWN_PROPERTY");
 
-	// Here are the different condition options -- a set of condition sets, plus the empty set for cases where
-	// there are no conditions.
-	conditionSets = { ei.conds | ei <- m.fragmentRel.edgeInfo, ei is edgeCondsInfo } + { { } };
+	LabeledPiece addLabels(SQLPiece piece, set[EdgeInfo] edgeInfo) = labeledPiece(piece, edgeInfo);
+	LabeledYield addLabels(SQLYield yield, set[EdgeInfo] edgeInfo) = [ addLabels(p,edgeInfo) | p <- yield ];
+	set[LabeledYield] addLabels(set[SQLYield] ys, set[EdgeInfo] edgeInfo) = { addLabels(li,edgeInfo) | li <- ys };
 	
-	set[SQLYield] buildPieces(QueryFragment inputFragment, Lab l, set[Lab] alreadyVisited) {
+	SQLPiece stripLabels(labeledPiece(SQLPiece piece, set[EdgeInfo] edgeInfo)) = piece;
+	SQLYield stripLabels(LabeledYield ly) = [ stripLabels(lp) | lp <- ly ];
+	set[SQLYield] stripLabels(set[LabeledYield] ls) = { stripLabels(li) | li <- ls };
+
+	set[LabeledYield] buildPieces(QueryFragment inputFragment, Lab l, set[EdgeInfo] edgeInfo, set[Lab] alreadyVisited) {
 		// Get the possible expansions for each at this location
-		expansions = m.fragmentRel[l, inputFragment]<0,1,2>;
+		expansionsWithConditions = m.fragmentRel[l, inputFragment];
+		expansions = expansionsWithConditions<0,1,2>;
 		
-		set[SQLYield] performExpansion(QueryFragment fragment) {
+		set[LabeledYield] performExpansion(QueryFragment fragment) {
 			if (fragment is nameFragment) {
 				if (isEmpty(expansions[fragment.name])) {
-					return { yieldForFragment(fragment); }
+					return { labeledPiece(yieldForFragment(fragment), edgeInfo); }
 				}
 				
-				nameExpansions = { *buildPieces(lf,ll,alreadyVisited+l) | < ll, lf > <- expansions[fragment.name], ll != l && ll notin alreadyVisited } +
-							     { [ dynamicPiece() ] | < ll, lf > <- expansions[fragment.name], ll == l || ll in alreadyVisited };
-				return { ne | ne <- nameExpansions, [dynamicPiece()] !:= ne } + { yieldForFragment(fragment) | ne <- nameExpansions, [dynamicPiece()] := ne };
+				nameExpansions = { *buildPieces(lf,ll,edgeInfo + expansionsWithConditions[fragment.name,ll,lf], alreadyVisited+l) 
+								 | < ll, lf > <- expansions[fragment.name], 
+								   ll != l && ll notin alreadyVisited } +
+							     { labeledPiece([ dynamicPiece() ], edgeInfo) | < ll, lf > <- expansions[fragment.name], ll == l || ll in alreadyVisited };
+				return { ne | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] !:= ne } + 
+				       { labeledPiece(yieldForFragment(fragment), edgeInfo) | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] := ne };
 			} else if (fragment is compositeFragment) {
 				compositeYield = performExpansion(fragment.fragments[0]);
 				for (f <- fragment.fragments[1..]) {
@@ -405,7 +416,7 @@ public set[SQLYield] yields(SQLModel m) {
 				concatYield = { lyi + ryi | lyi <- leftYield, ryi <- rightYield };
 				return concatYield;
 			} else {
-				return { yieldForFragment(fragment) };
+				return { addLabels(yieldForFragment(fragment), edgeInfo) };
 			} 
 		}
 		
@@ -430,9 +441,15 @@ public set[SQLYield] yields(SQLModel m) {
 		return { simplifyYield(y) | y <- ys };
 	}
 	
-	yields = buildPieces(m.startFragment, m.startLabel, {});
-	
-	return simplifyYields(yields);
+	labeledYields = buildPieces(m.startFragment, m.startLabel, {}, {});
+	infeasibleYields = { ly | ly <- labeledYields, 
+						      [_*,labeledPiece(_,ei1),_*,labeledPiece(_,ei2),_*] := ly,
+						      {_*, edgeCondsInfo(conds1, h1), _*} := ei1, {_*, edgeCondsInfo(conds2,h1), _*} := ei2,
+						      (conds1 & conds2) != conds1 && (conds1 & conds2) != conds2};
+	feasibleYields = labeledYields - infeasibleYields;
+		
+	regularYields = stripLabels(feasibleYields);
+	return simplifyYields(regularYields);
 }
 
 @doc{converts a yield to a string parsable by the sql parser}
@@ -463,6 +480,10 @@ public void testcode() {
 	locInWhile = |home:///PHPAnalysis/systems/Schoolmate/schoolmate_1.5.4/ManageGrades.php|(7737,98,<213,0>,<213,0>);
 	locInIf = |home:///PHPAnalysis/systems/Schoolmate/schoolmate_1.5.4/Registration.php|(860,115,<22,0>,<22,0>);
 	cfgs = cfgsWithCalls(pt,functionNames={"mysql_query"});
+}
+
+public rel[loc, SQLModel] buildModelsForSystem(str systemName, str systemVersion) {
+	return buildModelsForSystem(loadBinary(systemName, systemVersion), readQCPSystemInfo(systemName, systemVersion));
 }
 
 public rel[loc, SQLModel] buildModelsForSystem(System s, QCPSystemInfo qcpi) {
