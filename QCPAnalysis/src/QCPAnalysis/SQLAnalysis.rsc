@@ -16,12 +16,13 @@ import IO;
 import ValueIO;
 import Set;
 import Relation;
+import Map;
 
 alias SQLModelMap = map[SQLModel model, rel[SQLYield yield, str queryWithHoles, SQLQuery parsed] yieldsRel];
 
-loc modelLoc = baseLoc + "serialized/qcp/sqlmodels/";
+public loc modelLoc = baseLoc + "serialized/qcp/sqlmodels/";
 
-public map[str, SQLModelMap] buildModels(){
+public map[str, SQLModelMap] buildModelsCorpus(){
 	res = ( );
 	
 	Corpus corpus = getCorpus();
@@ -35,10 +36,6 @@ public map[str, SQLModelMap] buildModels(){
 	
 	return res;
 }
-
-public map[str, SQLModelMap] readModels() = readBinaryValueFile(#map[str, SQLModelMap], modelLoc + "corpus");
-
-public SQLModelMap readModel(str p, str v) = readBinaryValueFile(#SQLModelMap, modelLoc + "<p>_<v>");
 
 public SQLModelMap buildModelMap(str p , str v, rel[loc, SQLModel] modelsRel = {}){
 	SQLModelMap res = ( );
@@ -62,6 +59,10 @@ public SQLModelMap buildModelMap(str p , str v, rel[loc, SQLModel] modelsRel = {
 	return res;
 }
 
+public map[str, SQLModelMap] readModelsCorpus() = readBinaryValueFile(#map[str, SQLModelMap], modelLoc + "corpus");
+
+public SQLModelMap readModelsSystem(str p, str v) = readBinaryValueFile(#SQLModelMap, modelLoc + "<p>_<v>");
+
 public rel[SQLYield, str, SQLQuery] parseYields(set[SQLYield] yields){
 	res = {};
 	for(yield <- yields){
@@ -75,9 +76,25 @@ public rel[SQLYield, str, SQLQuery] parseYields(set[SQLYield] yields){
 	return res;
 }
 
+@doc{counts the number of calls that have been modeled and the number of yields parsed}
+public tuple[int,int] countCallsCorpus(){
+	corpusModels = readBinaryValueFile(#map[str, SQLModelMap], modelLoc + "corpus");
+	
+	numCalls = 0;
+	numParsed = 0;
+	for(sys <- corpusModels, models := corpusModels[sys]){
+		numCalls = numCalls + size(models);
+		for(model <- models, parsed := models[model]){
+			numParsed = numParsed + size(parsed);
+		}
+	}
+	
+	return <numCalls,numParsed>;
+}
+
 @doc{QCP1 (static query) recognizer}
 public bool matchesQCP1(SQLModel model) = size(model.fragmentRel) == 0 && model.startFragment is literalFragment;
- 
+
 public map[str, SQLModelMap] classifySQLModels(SQLModelMap modelMap){
 	res = ("QCP1" : ());
 	// TODO: other patterns
