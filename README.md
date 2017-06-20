@@ -1,3 +1,10 @@
+Note
+----
+
+We are in the process (as of June 20, 2017) of adding information here as well as
+adding a VirtualBox VM with running software. We are also going to provide a link
+to a video. This should be posted by the end of this week.
+
 Introduction
 ------------
 
@@ -44,4 +51,4 @@ For more details about how to set up PHP AiR, please [see the PHP AiR project re
 Running the Analysis
 --------------------
 
-Details on running the analysis will be posted here shortly.
+Details will be posted soon.
