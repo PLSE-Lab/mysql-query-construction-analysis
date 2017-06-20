@@ -32,7 +32,14 @@ modules.
 Downloading the Corpus
 ----------------------
 
-A link to the corpus will be posted here soon.
+Our current corpus can be downloaded [by clicking here][corpus]. Once downloaded,
+the easiest way to use it is to unzip it and then copy the directories into the
+`PHPAnalysis/systems` directory. If there is no `systems` directory yet, meaning
+you have not yet downloaded any PHP systems to analyze, you can also rename the `query-models-corpus`
+directory that the corpus unzips into to `systems` and copy that into `PHPAnalysis`.
+For more details about how to set up PHP AiR, please [see the PHP AiR project repository][PAiR].
+
+[corpus]: https://drive.google.com/open?id=0BzLdPikm-ppZb3d3eDNQN3ZTblU
 
 Running the Analysis
 --------------------
