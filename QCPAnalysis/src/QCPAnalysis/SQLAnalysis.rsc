@@ -93,14 +93,55 @@ public tuple[int,int] countCallsCorpus(){
 }
 
 @doc{QCP1 (static query) recognizer}
-public bool matchesQCP1(SQLModel model) = size(model.fragmentRel) == 0 && model.startFragment is literalFragment;
+public bool matchesQCP1(SQLModel model){
+	if(size(model.fragmentRel) == 0 && model.startFragment is literalFragment){
+		return true;
+	}
+	//TODO: QCP1b
+	else{
+		return false;
+	}
+}
+
+
+@doc{QCP2 (cascading concatenation assignments) recognizer}
+public bool matchesQCP2(SQLModel model){
+	//TODO: implement
+	return false;
+}
+
+@doc{QCP3 (query text based on control flow) recognizer}
+public bool matchesQCP3(SQLModel model){
+	//TODO: implement
+	return false;
+}
+
+@doc{QCP4 (dynamic) recognizer}
+public bool matchesQCP4(SQLModel model){
+	if(size(model.fragmentRel) == 0 && model.startFragment is compositeFragment || model.startFragment is concatFragment){
+		return true;
+	}
+	// TODO: QCP4c
+	else{
+		return false;
+	}
+}
 
 public map[str, SQLModelMap] classifySQLModels(SQLModelMap modelMap){
-	res = ("QCP1" : ());
+	res = ("QCP1" : (), "QCP2" : (), "QCP3" : (),  "QCP4" : ());
 	// TODO: other patterns
 	for(model <- modelMap){
 		if(matchesQCP1(model)){
 			res["QCP1"] += (model : modelMap[model]);
+		}
+		else if(matchesQCP2(model)){
+			res["QCP2"] += (model : modelMap[model]);
+		}
+		else if(matchesQCP3(model)){
+			res["QCP3"] += (model : modelMap[model]);
+		}
+		else if(matchesQCP4(model)){
+			res["QCP4"] += (model : modelMap[model]);
 		}
 	}
 	
