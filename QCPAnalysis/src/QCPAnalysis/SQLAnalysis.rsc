@@ -97,7 +97,12 @@ public bool matchesQCP1(SQLModel model){
 	if(size(model.fragmentRel) == 0 && model.startFragment is literalFragment){
 		return true;
 	}
-	//TODO: QCP1b
+	else if(size(model.fragmentRel) == 1 && nameFragment(varName(n)) := model.startFragment){
+		possibleLiteral = getOneFrom(model.fragmentRel);
+		
+		return varName(n) := possibleLiteral.name && possibleLiteral.targetFragment is literalFragment
+			&& possibleLiteral.sourceLabel == model.startLabel && possibleLiteral.sourceFragment == model.startFragment;
+	}
 	else{
 		return false;
 	}
