@@ -184,7 +184,6 @@ public default Expr queryParameter(CFGNode n) { throw "Unexpected parameter <n>"
  
 public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions = { "mysql_query" }) {
 	inputSystem = qcpi.sys;
-	baseLoc = inputSystem.baseLoc;
 	inputCFGLoc = findContainingCFGLoc(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
 	inputCFG = findContainingCFG(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
 	iinfo = qcpi.iinfo;
