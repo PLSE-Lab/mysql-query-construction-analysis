@@ -14,6 +14,8 @@ import lang::php::analysis::evaluators::Simplify;
 import lang::php::analysis::includes::QuickResolve;
 import lang::php::analysis::cfg::Visualize;
 import lang::php::pp::PrettyPrinter;
+import lang::php::util::Config;
+import lang::php::util::Corpus;
 
 import QCPAnalysis::Utils;
 import QCPAnalysis::QCPSystemInfo;
@@ -25,6 +27,7 @@ import List;
 import Map;
 import analysis::graphs::Graph;
 import String;
+import ValueIO;
 
 // TODO: Currently, this focuses just on function calls. We need to also add
 // support for method calls to pick up calls to new APIs, such as the PDO
@@ -136,7 +139,7 @@ public FragmentRel expandFragment(Lab l, QueryFragment qf, Uses u, Defs d, QCPSy
 	
 	// TODO: Do we want all names in the fragment, or just leaf node names?
 	set[Name] usedNames = { n | /nameFragment(Name n) := qf };
-	println("Found <size(usedNames)> names in fragment");
+	//println("Found <size(usedNames)> names in fragment");
 	
 	for (n <- usedNames, ul <- u[l, n], < de, dl > <- d[ul, n]) {
 		if (de is defExpr) {
@@ -495,6 +498,30 @@ public rel[loc, SQLModel] buildModelsForSystem(System s, QCPSystemInfo qcpi) {
 	}
 	return res;
 }
+
+loc modelsLoc = baseLoc + "serialized/sql/models";
+
+public void writeModels(str systemName, str systemVersion, rel[loc, SQLModel] modelsRel) {
+	writeBinaryValueFile(modelsLoc + "<systemName>-<systemVersion>.bin", modelsRel, compression=false);		
+}
+
+public rel[loc,SQLModel] readModels(str systemName, str systemVersion) {
+	return readBinaryValueFile(#rel[loc,SQLModel], modelsLoc + "<systemName>-<systemVersion>.bin");
+}
+
+public bool modelsFileExists(str systemName, str systemVersion) {
+	return exists(modelsLoc + "<systemName>-<systemVersion>.bin");
+}
+
+public void buildAndSaveModelsForCorpus(Corpus corpus, bool overwrite=false) {
+	for (systemName <- corpus, systemVersion := corpus[systemName]) {
+		if (!modelsFileExists(systemName, systemVersion) || overwrite) {
+			qcpi = readQCPSystemInfo(systemName, systemVersion);
+			mrel = buildModelsForSystem(qcpi.sys, qcpi);
+			writeModels(systemName, systemVersion, mrel);
+		}
+	}	
+} 
 
 public void printYields(rel[loc, SQLModel] models) {
 	for (<l, m> <- models) {
