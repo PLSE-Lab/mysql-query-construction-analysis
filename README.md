@@ -51,6 +51,7 @@ In summary, from inside the PHPAnalysis directory:
 * `cd sql-parser`
 * Download [Composer][composer] following the [Composer download instructions][composer-download]
 * `php composer.phar install`
+* You should now be able to import the QCPAnalysis project into Eclipse and start running the code!
 
 [mysql-parser]: https://github.com/ecu-pase-lab/sql-parser
 [composer]: https://getcomposer.org/
