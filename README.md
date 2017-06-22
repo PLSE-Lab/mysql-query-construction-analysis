@@ -28,22 +28,29 @@ end of this, you will have a working Rascal and PHP AiR installation.
 
 Once this is done, you should be able to just check out this GitHub repository
 using `git clone`, then import it into Eclipse by importing an existing
-Eclipse project. This will be in the same workspace as the `PHPAnalysis`
+Eclipse project. This will be in the same workspace as the PHPAnalysis
 project that you get from installing PHP AiR. You may also need to add the
-`PHPAnalysis` as a Project Reference. To do so, you should right-click on the
-`QCPAnalysis` project (the project for this repository), select Properties,
-select Project References, then check `PHPAnalysis`. You can tell you need to
-do this if the Rascal scripts in `QCPAnalysis` complain about missing Rascal
+PHPAnalysis as a Project Reference. To do so, you should right-click on the
+QCPAnalysis project (the project for this repository), select Properties,
+select Project References, then check PHPAnalysis. You can tell you need to
+do this if the Rascal scripts in QCPAnalysis complain about missing Rascal
 modules.
 
-Finally, to parser SQL queries, you will also want to check out our modified
+Finally, to parse SQL queries, you will also want to check out our modified
 MySQL parser. You find find the GitHub page for this parser [here][mysql-parser].
-You should `git clone` this into the `PHPAnalysis` directory, creating a new
-directory called `sql-parser`. Once you do this, you will also need to download
+You should `git clone` this into the PHPAnalysis directory, creating a new
+directory called sql-parser. Once you do this, you will also need to download
 [Composer][composer], a package manager for PHP. You can just follow the instructions
-on the [Composer download page][composer-download] to download it into the `sql-parser`
-directory. This will create a file `composer.phar`. Finally, run `php composer.phar install`
+on the [Composer download page][composer-download] to download it into the sql-parser
+directory. This will create a file composer.phar. Finally, run `php composer.phar install`
 to install the dependencies for the MySQL parser.
+
+In summary, from inside the PHPAnalysis directory:
+* `git clone https://github.com/ecu-pase-lab/mysql-query-construction-analysis.git`
+* `git clone https://github.com/ecu-pase-lab/sql-parser.git`
+* `cd sql-parser`
+* Download [Composer][composer] following the [Composer download instructions][composer-download]
+* `php composer.phar install`
 
 [mysql-parser]: https://github.com/ecu-pase-lab/sql-parser
 [composer]: https://getcomposer.org/
