@@ -16,11 +16,25 @@ APIs in the future.
 Running Our Software
 --------------------
 
+The easiest way to run the software is to download a [VirtualBox][vbox]
+virtual machine running Ubuntu that already has everything installed. You can
+find a copy of this virtual machine [here][vm]. Once you download this, just
+unzip it and you should be able to open and run it using VirtualBox. A 
+[walk-through video][video] is also available that will walk you through
+running the software in the VM. You can also use this to help you walk
+through the code if you install it yourself.
+
+
+[vbox]: https://www.virtualbox.org/
+[vm]: https://drive.google.com/open?id=0BzLdPikm-ppZQ1FqR3QxalV4ZFE
+[video]: https://drive.google.com/open?id=0BzLdPikm-ppZa1dvbDlLaEhLOFk
+
 The analysis code used here is written in [Rascal][rascal], a meta-programming
 language for program analysis and transformation. It also uses [PHP AiR][PAiR],
-a program analysis for PHP written in Rascal. You should start by following the
-installation instructions given on the [PHP AiR][PAiR] project page. At the
-end of this, you will have a working Rascal and PHP AiR installation.
+a program analysis for PHP written in Rascal. To install the software on your own
+machine, you should start by following the installation instructions given on the
+[PHP AiR][PAiR] project page. At the end of this, you will have a working Rascal 
+and PHP AiR installation.
 
 [rascal]: http://www.rascal-mpl.org
 [mysql-api]: http://php.net/manual/en/book.mysql.php
@@ -72,4 +86,4 @@ For more details about how to set up PHP AiR, please [see the PHP AiR project re
 Running the Analysis
 --------------------
 
-Details will be posted soon.
+Details will be posted soon. 
