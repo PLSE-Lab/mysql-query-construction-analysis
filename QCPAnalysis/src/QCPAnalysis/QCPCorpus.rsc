@@ -38,6 +38,38 @@ private Corpus newCorpus = (
 	"OcoMon"		: "2.0RC6"
 	);
 
+private map[str,int] systemNumbers = (
+	"AddressBook" : 1,
+	"faqforge" : 2,
+	"firesoftboard" : 3,
+	"geccBBlite" : 4,
+	"inoERP" : 5,
+	"LinPHA" : 6,
+	"MyPHPSchool" : 7,
+	"OcoMon" : 8,
+	"OMS" : 9,
+	"OpenClinic" : 10,
+	"PHPAgenda" : 11,
+	"PHPFusion" : 12,
+	"Schoolmate" : 13,
+	"Timeclock" : 14,
+	"UseBB" : 15,
+	"web2project" : 16,
+	"WebChess" : 17
+);
+
+public map[str,int] getSystemsWithNumbers() = systemNumbers;
+
+public map[int,str] getNumbersWithSystems() = invertUnique(systemNumbers);
+
+public str getSystemForNumber(int n) {
+	numbersAndSystems = getNumbersWithSystems();
+	if (n in numbersAndSystems) {
+		return numbersAndSystems[n];
+	}
+	return "There is no system with id <n>"; 
+}
+
 public str getSensibleName("faqforge") = "FAQ Forge";
 public str getSensibleName("firesoftboard") = "Fire-Soft-Board";
 public default str getSensibleName(str p) = p;
