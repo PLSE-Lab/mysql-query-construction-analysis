@@ -109,5 +109,11 @@ public set[SQLYield] showYieldsForNumberedCall(int systemNumber, int callNumber)
 @doc{Return the SQL queries for a specific call in a specific system}
 public rel[SQLYield yield, str queryWithHoles, SQLQuery parsed] showQueriesForNumberedCall(int systemNumber, int callNumber) {
 	ylds = showYieldsForNumberedCall(systemNumber, callNumber);
-	return parseYields(ylds);
+	rel[SQLYield yield, str queryWithHoles, SQLQuery parsed] res = { };
+	for (yld <- ylds) {
+		queryString = yield2String(yld);
+		parsed = runParser(queryString);
+		res += < yld, queryString, parsed >;
+	}
+	return res;
 }
