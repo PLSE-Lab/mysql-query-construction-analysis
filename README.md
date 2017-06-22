@@ -1,9 +1,10 @@
 Note
 ----
 
-We are in the process (as of June 20, 2017) of adding information here as well as
-adding a VirtualBox VM with running software. We are also going to provide a link
-to a video. This should be posted by the end of this week.
+We are still adding instructions for running the analysis on your own
+machine, but please look below for a link to a [VirtualBox][vbox] virtual
+machine with the software running as well as a video to walk through how
+to use it.
 
 Introduction
 ------------
