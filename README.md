@@ -87,4 +87,5 @@ For more details about how to set up PHP AiR, please [see the PHP AiR project re
 Running the Analysis
 --------------------
 
-Details will be posted soon. 
+Details will be posted soon. For examples of how to run the analysis you can also see the
+[walk-through video][video] which actually shows some of the commands that you can use.
