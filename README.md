@@ -78,7 +78,7 @@ the official libraries.
 For more details about how to set up PHP AiR, please [see the PHP AiR project repository][PAiR].
 
 [corpus]: https://drive.google.com/open?id=0BzLdPikm-ppZb3d3eDNQN3ZTblU
-[summar]es]: https://drive.google.com/open?id=0BzLdPikm-ppZTzhWZ2FKTEF2WlU
+[summaries]: https://drive.google.com/open?id=0BzLdPikm-ppZTzhWZ2FKTEF2WlU
 
 # Running the Analysis
 
