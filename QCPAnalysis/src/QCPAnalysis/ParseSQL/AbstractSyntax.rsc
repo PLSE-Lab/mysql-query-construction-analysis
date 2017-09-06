@@ -18,9 +18,6 @@ public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, 
 					 
 public data PartialStatement = connectiveWithoutWhere();
 
-public data PartialPart = clause(node clause)
-						| hole(int holeID)
-						| unknownText(str text);// piece of text that we cannot determine due to odd query hole placement
 
 public data Exp = name(SQLName name)
 			    | literal(str literalVal)
