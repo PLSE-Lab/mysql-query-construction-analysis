@@ -123,13 +123,8 @@ public bool matchesQCP3(SQLModel model){
 
 @doc{QCP4 (dynamic) recognizer}
 public bool matchesQCP4(SQLModel model){
-	if(size(model.fragmentRel) == 0 && model.startFragment is compositeFragment || model.startFragment is concatFragment){
-		return true;
-	}
-	// TODO: QCP4c
-	else{
-		return false;
-	}
+	return size(model.fragmentRel) == 1 && (model.startFragment is compositeFragment || model.startFragment is concatFragment)
+		&& size(yields(model)) == 1;
 }
 
 public map[str, SQLModelMap] classifySQLModels(SQLModelMap modelMap){
