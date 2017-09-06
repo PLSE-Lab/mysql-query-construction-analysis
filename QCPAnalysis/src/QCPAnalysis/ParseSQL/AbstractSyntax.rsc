@@ -13,15 +13,10 @@ public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, 
 					 | truncateQuery(Exp table)
 					 | noQuery()// only here for queries that have the option to contain a SELECT query inside them
 					 | unknownQuery()// logic to translate this query type into rascal is not yet implemented 
-					 | partialQuery(PartialQuery partial)// part of the query text is contained in one or more query holes
+					 | partialStatement(PartialStatement statement)// part of the query text is contained in one or more query holes
 					 | parseError();// query did not parse
 					 
-public data PartialQuery = partialSelect(list[PartialPart] parts)
-						 | partialUpdate(list[PartialPart] parts)
-						 | partialInsert(list[PartialPart] parts)
-						 | partialDelete(list[PartialPart] parts)
-						 | unknownPartial(list[PartialPart] parts);// the type of query is hidden in a hole
-						 // TODO: other query types
+public data PartialStatement = connectiveWithoutWhere();
 
 public data PartialPart = clause(node clause)
 						| hole(int holeID)
