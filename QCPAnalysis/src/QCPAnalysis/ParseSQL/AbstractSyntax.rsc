@@ -16,8 +16,9 @@ public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, 
 					 | partialStatement(PartialStatement statement)// part of the query text is contained in one or more query holes
 					 | parseError();// query did not parse
 					 
-public data PartialStatement = connectiveWithoutWhere();
-
+public data PartialStatement = unknownStatementType() // SELECT/DELETE/INSERT cannot be determined
+							 | connectiveWithoutWhere();
+						
 
 public data Exp = name(SQLName name)
 			    | literal(str literalVal)

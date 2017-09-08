@@ -128,21 +128,34 @@ public bool matchesQCP4(SQLModel model){
 }
 
 public map[str, SQLModelMap] classifySQLModels(SQLModelMap modelMap){
-	res = ("QCP1" : (), "QCP2" : (), "QCP3" : (),  "QCP4" : ());
+	loc dotLoc = baseLoc + "/dots";
+	res = ("QCP1" : (), "QCP2" : (), "QCP3" : (),  "QCP4" : (), "unclassified" : ());
+	int modelid = 0;
 	// TODO: other patterns
 	for(model <- modelMap){
 		if(matchesQCP1(model)){
 			res["QCP1"] += (model : modelMap[model]);
+			renderSQLModelAsDot(model, dotLoc + "/qcp1//<modelid>");
 		}
 		else if(matchesQCP2(model)){
 			res["QCP2"] += (model : modelMap[model]);
+			renderSQLModelAsDot(model, dotLoc + "/qcp2/<modelid>");
+			
 		}
 		else if(matchesQCP3(model)){
 			res["QCP3"] += (model : modelMap[model]);
+			renderSQLModelAsDot(model, dotLoc + "/qcp3/<modelid>");
 		}
 		else if(matchesQCP4(model)){
 			res["QCP4"] += (model : modelMap[model]);
+			renderSQLModelAsDot(model, dotLoc + "/qcp4/<modelid>");
 		}
+		else{
+			res["unclassified"] += (model : modelMap[model]);
+			renderSQLModelAsDot(model, dotLoc + "/unclassified/<modelid>");
+			
+		}
+		modelid = modelid + 1;
 	}
 	
 	return res;
