@@ -123,40 +123,49 @@ public bool matchesQCP3(SQLModel model){
 
 @doc{QCP4 (dynamic) recognizer}
 public bool matchesQCP4(SQLModel model){
-	return size(model.fragmentRel) == 1 && (model.startFragment is compositeFragment || model.startFragment is concatFragment)
-		&& size(yields(model)) == 1;
+	//TODO:implement
+	return false;
 }
 
-public map[str, SQLModelMap] classifySQLModels(SQLModelMap modelMap){
-	loc dotLoc = baseLoc + "/dots";
-	res = ("QCP1" : (), "QCP2" : (), "QCP3" : (),  "QCP4" : (), "unclassified" : ());
-	int modelid = 0;
-	// TODO: other patterns
-	for(model <- modelMap){
-		if(matchesQCP1(model)){
-			res["QCP1"] += (model : modelMap[model]);
-			renderSQLModelAsDot(model, dotLoc + "/qcp1//<modelid>");
-		}
-		else if(matchesQCP2(model)){
-			res["QCP2"] += (model : modelMap[model]);
-			renderSQLModelAsDot(model, dotLoc + "/qcp2/<modelid>");
-			
-		}
-		else if(matchesQCP3(model)){
-			res["QCP3"] += (model : modelMap[model]);
-			renderSQLModelAsDot(model, dotLoc + "/qcp3/<modelid>");
-		}
-		else if(matchesQCP4(model)){
-			res["QCP4"] += (model : modelMap[model]);
-			renderSQLModelAsDot(model, dotLoc + "/qcp4/<modelid>");
-		}
-		else{
-			res["unclassified"] += (model : modelMap[model]);
-			renderSQLModelAsDot(model, dotLoc + "/unclassified/<modelid>");
-			
-		}
-		modelid = modelid + 1;
-	}
-	
-	return res;
+@doc{classify a single model}
+public str classifySQLModel(SQLModel model){
+	return matchesQCP1(model) ? "QCP1" : matchesQCP2(model) 
+							  ? "QCP2" : matchesQCP3(model) 
+							  ? "QCP3" : matchesQCP4(model) 
+							  ? "QCP4" : "unclassified";
 }
+
+
+//public map[str, SQLModelMap] classifySQLModels(SQLModelMap modelMap){
+//	loc dotLoc = baseLoc + "/dots";
+//	res = ("QCP1" : (), "QCP2" : (), "QCP3" : (),  "QCP4" : (), "unclassified" : ());
+//	int modelid = 0;
+//	// TODO: other patterns
+//	for(model <- modelMap){
+//		if(matchesQCP1(model)){
+//			res["QCP1"] += (model : modelMap[model]);
+//			renderSQLModelAsDot(model, dotLoc + "/qcp1//<modelid>");
+//		}
+//		else if(matchesQCP2(model)){
+//			res["QCP2"] += (model : modelMap[model]);
+//			renderSQLModelAsDot(model, dotLoc + "/qcp2/<modelid>");
+//			
+//		}
+//		else if(matchesQCP3(model)){
+//			res["QCP3"] += (model : modelMap[model]);
+//			renderSQLModelAsDot(model, dotLoc + "/qcp3/<modelid>");
+//		}
+//		else if(matchesQCP4(model)){
+//			res["QCP4"] += (model : modelMap[model]);
+//			renderSQLModelAsDot(model, dotLoc + "/qcp4/<modelid>");
+//		}
+//		else{
+//			res["unclassified"] += (model : modelMap[model]);
+//			renderSQLModelAsDot(model, dotLoc + "/unclassified/<modelid>");
+//			
+//		}
+//		modelid = modelid + 1;
+//	}
+//	
+//	return res;
+//}

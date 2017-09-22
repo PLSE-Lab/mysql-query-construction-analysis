@@ -10,6 +10,7 @@ import QCPAnalysis::QCPSystemInfo;
 import QCPAnalysis::ParseSQL::AbstractSyntax;
 import QCPAnalysis::ParseSQL::RunSQLParser;
 import QCPAnalysis::QCPCorpus;
+import QCPAnalysis::SQLAnalysis;
 
 import IO;
 import ValueIO;
@@ -116,4 +117,10 @@ public rel[SQLYield yield, str queryWithHoles, SQLQuery parsed] showQueriesForNu
 		res += < yld, queryString, parsed >;
 	}
 	return res;
+}
+
+@doc{classify a particular model based on our current patterns}
+public str classifyModelForNumberedCall(int systemNumber, int callNumber){
+	callModel = buildModelForNumberedCall(systemNumber, callNumber);
+	return classifySQLModel(callModel);
 }
