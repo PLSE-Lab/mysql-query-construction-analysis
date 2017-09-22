@@ -124,3 +124,11 @@ public str classifyModelForNumberedCall(int systemNumber, int callNumber){
 	callModel = buildModelForNumberedCall(systemNumber, callNumber);
 	return classifySQLModel(callModel);
 }
+
+@doc{build a dot graph for a specified call and save it to a specified location}
+public void buildDotForNumberedCall(int systemNumber, int callNumber, 
+		loc writeTo = baseLoc + "/dots/<systemNumber>_<callNumber>"){
+		
+	callModel = buildModelForNumberedCall(systemNumber, callNumber);
+	renderSQLModelAsDot(callModel, writeTo, title = "System: <systemNumber> Call: <callNumber>");
+}
