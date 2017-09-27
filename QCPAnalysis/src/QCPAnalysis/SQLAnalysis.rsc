@@ -108,25 +108,35 @@ public bool matchesQCP1(SQLModel model){
 	}
 }
 
-
-@doc{QCP2 (cascading concatenation assignments) recognizer}
+//TODO: split into sub patterns
+@doc{QCP2 (mixture of static query text and dynamic inputs)}
 public bool matchesQCP2(SQLModel model){
-	//TODO: implement
+	//todo: implement
 	return false;
 }
 
-@doc{QCP3 (query text based on control flow) recognizer}
+//TODO: split into sub patterns
+@doc{QCP3 (query text based on control flow)}
 public bool matchesQCP3(SQLModel model){
-	//TODO: implement
-	return false;
+	bool foundAMatchingEdge = false;
+	bool foundAnotherMatchingEdge = false;
+	for(<sourceLabel, sourceFragment, fragmentName, targetName, targetFragment, edgeInfo>
+			<- model.fragmentRel){
+	
+		if(sourceLabel := model.startLabel && sourceFragment := model.startFragment){
+			if(foundAMatchingEdge){
+				foundAnotherMatchingEdge = true;
+			}
+			else{
+				foundAMatchingEdge = true;
+			}
+		}
+	}
+	return foundAMatchingEdge && foundAnotherMatchingEdge;
 }
 
-@doc{QCP4 (dynamic) recognizer}
-public bool matchesQCP4(SQLModel model){
-	//TODO:implement
-	return false;
-}
 
+//TODO: split into sub patterns
 @doc{classify a single model}
 public str classifySQLModel(SQLModel model){
 	return matchesQCP1(model) ? "QCP1" : matchesQCP2(model) 
