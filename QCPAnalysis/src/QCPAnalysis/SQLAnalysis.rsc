@@ -111,8 +111,27 @@ public bool matchesQCP1(SQLModel model){
 //TODO: split into sub patterns
 @doc{QCP2 (mixture of static query text and dynamic inputs)}
 public bool matchesQCP2(SQLModel model){
-	//todo: implement
-	return false;
+	if(model.startFragment is compositeFragment){
+		return true;
+	}
+	else if(model.startFragment is concatFragment){
+		return true;
+	}
+	else if(nameFragment(vn:varName(n)) := model.startFragment){
+		// first, make sure there is only one edge from the startFragment and that edge leads to a compositeFragment
+		// or concatFragment
+		edges = {x | x <- model.fragmentRel, vn := x.name};
+		if(size(edges) != 1){
+			return false;
+		}
+		else{
+			edge = getOneFrom(edges);
+			return edge.targetFragment is compositeFragment || edge.targetFragment is concatFragment;
+		}
+	}
+	else{
+		return false;
+	}
 }
 
 //TODO: split into sub patterns
