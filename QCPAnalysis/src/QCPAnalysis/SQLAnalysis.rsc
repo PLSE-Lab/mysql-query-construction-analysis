@@ -141,8 +141,7 @@ public bool matchesQCP3(SQLModel model){
 public str classifySQLModel(SQLModel model){
 	return matchesQCP1(model) ? "QCP1" : matchesQCP2(model) 
 							  ? "QCP2" : matchesQCP3(model) 
-							  ? "QCP3" : matchesQCP4(model) 
-							  ? "QCP4" : "unclassified";
+							  ? "QCP3" : "unclassified";
 }
 
 
