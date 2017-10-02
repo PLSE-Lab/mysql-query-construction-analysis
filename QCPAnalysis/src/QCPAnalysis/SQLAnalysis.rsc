@@ -92,8 +92,8 @@ public tuple[int,int] countCallsCorpus(){
 	return <numCalls,numParsed>;
 }
 
-@doc{QCP1 (static query) recognizer}
-public bool matchesQCP1(SQLModel model){
+@doc{static query ecognizer}
+public bool matchesLiteral(SQLModel model){
 	if(size(model.fragmentRel) == 0 && model.startFragment is literalFragment){
 		return true;
 	}
@@ -109,12 +109,9 @@ public bool matchesQCP1(SQLModel model){
 }
 
 //TODO: split into sub patterns
-@doc{QCP2 (mixture of static query text and dynamic inputs)}
-public bool matchesQCP2(SQLModel model){
-	if(model.startFragment is compositeFragment){
-		return true;
-	}
-	else if(model.startFragment is concatFragment){
+@doc{Dynamic Query (mixture of static query text and dynamic inputs)}
+public bool matchesDynamic(SQLModel model){
+	if(model.startFragment is compositeFragment || model.startFragment is concatFragment){
 		return true;
 	}
 	else if(nameFragment(vn:varName(n)) := model.startFragment){
@@ -135,8 +132,8 @@ public bool matchesQCP2(SQLModel model){
 }
 
 //TODO: split into sub patterns
-@doc{QCP3 (query text based on control flow)}
-public bool matchesQCP3(SQLModel model){
+@doc{ControlFlow (query text based on control flow)}
+public bool matchesControlFlow(SQLModel model){
 	bool foundAMatchingEdge = false;
 	bool foundAnotherMatchingEdge = false;
 	for(<sourceLabel, sourceFragment, fragmentName, targetName, targetFragment, edgeInfo>
@@ -154,46 +151,17 @@ public bool matchesQCP3(SQLModel model){
 	return foundAMatchingEdge && foundAnotherMatchingEdge;
 }
 
+@doc{query comes from a function or method parameter}
+public bool matchesFunctionParam(SQLModel model){
+	return size(model.fragmentRel) == 1 && 
+		<startLabel, nameFragment(n), n, _, inputParamFragment(n), _> := getOneFrom(model.fragmentRel);
+}
 
 //TODO: split into sub patterns
 @doc{classify a single model}
 public str classifySQLModel(SQLModel model){
-	return matchesQCP1(model) ? "QCP1" : matchesQCP2(model) 
-							  ? "QCP2" : matchesQCP3(model) 
-							  ? "QCP3" : "unclassified";
+	return matchesLiteral(model) ? "Literal" : matchesDynamic(model) 
+							  ? "Dynamic" : matchesControlFlow(model) 
+							  ? "ControlFlow" : matchesFunctionParam(model)
+							  ? "FunctionParam" : "unclassified";
 }
-
-
-//public map[str, SQLModelMap] classifySQLModels(SQLModelMap modelMap){
-//	loc dotLoc = baseLoc + "/dots";
-//	res = ("QCP1" : (), "QCP2" : (), "QCP3" : (),  "QCP4" : (), "unclassified" : ());
-//	int modelid = 0;
-//	// TODO: other patterns
-//	for(model <- modelMap){
-//		if(matchesQCP1(model)){
-//			res["QCP1"] += (model : modelMap[model]);
-//			renderSQLModelAsDot(model, dotLoc + "/qcp1//<modelid>");
-//		}
-//		else if(matchesQCP2(model)){
-//			res["QCP2"] += (model : modelMap[model]);
-//			renderSQLModelAsDot(model, dotLoc + "/qcp2/<modelid>");
-//			
-//		}
-//		else if(matchesQCP3(model)){
-//			res["QCP3"] += (model : modelMap[model]);
-//			renderSQLModelAsDot(model, dotLoc + "/qcp3/<modelid>");
-//		}
-//		else if(matchesQCP4(model)){
-//			res["QCP4"] += (model : modelMap[model]);
-//			renderSQLModelAsDot(model, dotLoc + "/qcp4/<modelid>");
-//		}
-//		else{
-//			res["unclassified"] += (model : modelMap[model]);
-//			renderSQLModelAsDot(model, dotLoc + "/unclassified/<modelid>");
-//			
-//		}
-//		modelid = modelid + 1;
-//	}
-//	
-//	return res;
-//}
