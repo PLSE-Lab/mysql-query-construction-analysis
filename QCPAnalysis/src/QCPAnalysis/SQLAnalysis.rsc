@@ -157,6 +157,8 @@ public bool matchesFunctionParam(SQLModel model){
 		<startLabel, nameFragment(n), n, _, inputParamFragment(n), _> := getOneFrom(model.fragmentRel);
 }
 
+
+
 //TODO: split into sub patterns
 @doc{classify a single model}
 public str classifySQLModel(SQLModel model){
@@ -164,4 +166,112 @@ public str classifySQLModel(SQLModel model){
 							  ? "Dynamic" : matchesControlFlow(model) 
 							  ? "ControlFlow" : matchesFunctionParam(model)
 							  ? "FunctionParam" : "unclassified";
+}
+
+data DynamicQueryInfo = dynamicQueryInfo(
+							SQLYield yield,
+							SQLQuery parsed,
+					  		int numStaticParts,
+					  		int numDynamicParts,
+					  		HoleInfo holeInfo
+					  );
+
+alias HoleInfo = map[str, int];
+				 
+@doc{further classifies a Dynamic query into sub pattern(s)}
+public set[DynamicQueryInfo] classifyDynamicQuery(SQLModel model){
+	if(!matchesDynamic(model)){
+		throw "error calling classifyDynamicQuery on non dynamic query";
+	}
+	
+	res = {};
+	
+	for(yield <- yields(model)){
+		int staticParts = 0;
+		int dynamicParts = 0;
+		
+		for(piece <- yield){
+			if(piece is staticPiece){
+				staticParts += 1;
+			}
+			else{
+				dynamicParts += 1;
+			}
+		}
+		parsed = runParser(yield2String(yield));
+		
+		holeInfo = extractHoleInfo(parsed);
+		
+		res += dynamicQueryInfo(yield, parsed, staticParts, dynamicParts, holeInfo);
+	}
+	
+	return res;
+}
+
+@doc{extracts info about a dynamic query's holes}
+public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, having, order, limit, joins)){
+	res = ("name" : 0, "param" : 0);
+	
+	whereInfo = extractWhereHoleInfo(where);
+	res["name"] += whereInfo[0];
+	res["param"] += whereInfo[1];
+	
+	return res;
+	
+}
+public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)){
+	res = ("name" : 0, "param" : 0);
+	
+	// TODO: implement
+	
+	return res;
+}
+public HoleInfo extractHoleInfo(insertQuery(into, values, setOps, select, onDuplicate)){
+	res = ("name" : 0, "param" : 0);
+	
+	// TODO: implement
+	
+	return res;
+}
+public HoleInfo extractHoleInfo(deleteQuery(from, using, where, order, limit)){
+	res = ("name" : 0, "param" : 0);
+	
+	// TODO: implement
+	
+	return res;
+}
+public default HoleInfo extractHoleInfo(SQLQuery query){
+	return ("unhandled query type" : 0);
+}
+
+public bool isHole(str string) = /^\?\d+$/ := string;
+
+private tuple[int nameHoles, int paramHoles] extractWhereHoleInfo(Where where){
+	res = <0,0>;
+	top-down visit(where){
+		case simpleComparison(left, op, right) : {
+			if(isHole(left)) res[0] += 1;
+			if(isHole(right)) res[1] += 1;
+		}
+		case between(not, exp, lower, upper) : {
+			if(isHole(exp)) res[0] += 1;
+			if(isHole(lower)) res[1] += 1;
+			if(isHole(upper)) res[1] += 1;
+		}
+		case isNull(not, exp) : {
+			if(isHole(exp)) res[0] += 1;
+		}
+		case inValues(not, exp, values) : {
+			if(isHole(exp)) res[0] += 1;
+			for(v <- values){
+				if(isHole(v)) res[1] += 1;
+			}
+		}
+		case like(not, exp, pattern) : {
+			if(isHole(exp)) res[0] += 1;
+			if(isHole(pattern)) res[1] += 1;
+		}
+		//todo: other condition types
+	}
+	return res;
 }
