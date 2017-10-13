@@ -17,6 +17,7 @@ import ValueIO;
 import Set;
 import Relation;
 import Map;
+import String;
 
 alias SQLModelMap = map[SQLModel model, rel[SQLYield yield, str queryWithHoles, SQLQuery parsed] yieldsRel];
 
@@ -229,7 +230,9 @@ public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)
 public HoleInfo extractHoleInfo(insertQuery(into, values, setOps, select, onDuplicate)){
 	res = ("name" : 0, "param" : 0);
 	
-	// TODO: implement
+	for(valueList <- values, v <- valueList){
+		res["param"] += holesInString(v);
+	}
 	
 	return res;
 }
@@ -244,34 +247,61 @@ public default HoleInfo extractHoleInfo(SQLQuery query){
 	return ("unhandled query type" : 0);
 }
 
-public bool isHole(str string) = /^\?\d+$/ := string;
-
 private tuple[int nameHoles, int paramHoles] extractWhereHoleInfo(Where where){
 	res = <0,0>;
 	top-down visit(where){
 		case simpleComparison(left, op, right) : {
-			if(isHole(left)) res[0] += 1;
-			if(isHole(right)) res[1] += 1;
+			res[0] += holesInString(left);
+			res[1] += holesInString(right);
 		}
 		case between(not, exp, lower, upper) : {
-			if(isHole(exp)) res[0] += 1;
-			if(isHole(lower)) res[1] += 1;
-			if(isHole(upper)) res[1] += 1;
+			res[0] += holesInString(exp);
+			res[1] += holesInString(lower);
+			res[1] += holesInString(upper);
 		}
 		case isNull(not, exp) : {
-			if(isHole(exp)) res[0] += 1;
+			res[0] += holesInString(exp);
 		}
 		case inValues(not, exp, values) : {
-			if(isHole(exp)) res[0] += 1;
+			res[0] += holesInString(exp);
 			for(v <- values){
-				if(isHole(v)) res[1] += 1;
+				res[1] += holesInString(v);
 			}
 		}
 		case like(not, exp, pattern) : {
-			if(isHole(exp)) res[0] += 1;
-			if(isHole(pattern)) res[1] += 1;
+			res[0] += holesInString(exp);
+			res[1] += holesInString(pattern);
 		}
 		//todo: other condition types
 	}
+	return res;
+}
+
+@doc{returns the number of query holes found in the subject string}
+public int holesInString(str subject){
+	res = 0;
+	
+	possibleMatches = findAll(subject, "?");
+
+	// for each possible match (? character), check if the next character or the next two characters make up a number
+	// (making the reasonable assumption that all queries have <=99 holes)
+	for(p <- possibleMatches){
+		try{
+			int d = toInt(substring(subject, p + 1, p + 3));
+			res = res + 1;
+			continue;
+		}
+		catch: {
+			try{
+				int d = toInt(substring(subject, p + 1, p + 2));
+				res = res + 1;
+				continue;
+			}
+			catch: {
+				continue;
+			}
+		}	
+	}
+	
 	return res;
 }
