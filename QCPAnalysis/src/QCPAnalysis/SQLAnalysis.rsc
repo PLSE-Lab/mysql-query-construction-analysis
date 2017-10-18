@@ -213,12 +213,69 @@ public set[DynamicQueryInfo] classifyDynamicQuery(SQLModel model){
 public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, having, order, limit, joins)){
 	res = ("name" : 0, "param" : 0);
 	
-	whereInfo = extractWhereHoleInfo(where);
-	res["name"] += whereInfo[0];
-	res["param"] += whereInfo[1];
+	// TODO: refactor some of this into methods, other query types have the same clauses
+	
+	for(s <- selectExpr){
+		if(hole(_) := s) res["name"] += 1;
+	}
+	
+	for(f <- from){
+		if(hole(_) := f)  res["name"] += 1;
+	}
+	
+	
+	if(!(where is noWhere)){
+		whereInfo = extractWhereHoleInfo(where);
+		res["name"] += whereInfo[0];
+		res["param"] += whereInfo[1];
+	}
+	
+	if(!(group is noGroupBy)){
+		for(<exp, mode> <- group.groupings){
+			if(hole(_) := exp){
+				res["name"] += 1;
+			}
+		}
+	}
+	
+	if(!(having is noHaving)){
+		whereInfo = extractWhereHoleInfo(having);
+		res["name"] += whereInfo[0];
+		res["param"] += whereInfo[1];
+	}
+	
+	if(!(order is noOrderBy)){
+		for(<exp, mode> <- order.orderings){
+			if(hole(_) := exp){
+				res["name"] += 1;
+			}
+		}
+	}
+	
+	if(!(limit is noLimit)){
+		res["name"] += holesInString(limit.numRows);
+		if(limit is limitWithOffset){
+			res["name"] += holesInString(limit.offset);
+		}
+	}
+	
+	for(j <- joins){
+		res["name"] += holesInString(j.joinType);
+		if(hole(_) := j.joinExp) res["name"] += 1;
+		if(j is joinOn){
+			whereInfo = extractWhereHoleInfo(on);
+			res["name"] += whereInfo[0];
+			res["param"] += whereInfo[1];
+			continue;
+		}
+		if(j is joinUsing){
+			for(u <- using){
+				res["name"] += holesInString(u);
+			}
+		}	
+	}
 	
 	return res;
-	
 }
 public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)){
 	res = ("name" : 0, "param" : 0);
