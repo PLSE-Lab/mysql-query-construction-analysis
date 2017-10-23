@@ -280,7 +280,37 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)){
 	res = ("name" : 0, "param" : 0);
 	
-	// TODO: implement
+	for(t <- tables){
+		if(hole(_) := t){
+			res["name"] += 1;
+		}
+	}
+	
+	for(s <- setOps){
+		res["name"] += holesInString(s.column);
+		res["param"] += holesInString(s.newValue);
+	}
+	
+	if(!(where is noWhere)){
+		whereInfo = extractWhereHoleInfo(where);
+		res["name"] += whereInfo[0];
+		res["param"] += whereInfo[1];
+	}
+	
+	if(!(order is noOrderBy)){
+		for(<exp, mode> <- order.orderings){
+			if(hole(_) := exp){
+				orderByHole += 1;
+			}
+		}
+	}
+	if(!(limit is noLimit)){
+		if(isQueryHole(limit.numRows)) limitHole += 1;
+		
+		if(limit is limitWithOffset && isQueryHole(limit.offset)){
+			limitHoles += 1;
+		}
+	}
 	
 	return res;
 }
