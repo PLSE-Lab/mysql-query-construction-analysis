@@ -324,7 +324,23 @@ public HoleInfo extractHoleInfo(insertQuery(into, values, setOps, select, onDupl
 public HoleInfo extractHoleInfo(deleteQuery(from, using, where, order, limit)){
 	res = ("name" : 0, "param" : 0);
 	
-	// TODO: implement
+	for(f <- from){
+		if(hole(_) := f)  res["name"] += 1;
+	}
+	
+	for(u <- using){
+		res["name"] += holesInString(u);
+	}
+	
+	if(!(where is noWhere)){
+		whereInfo = extractWhereHoleInfo(where);
+		res["name"] += whereInfo[0];
+		res["param"] += whereInfo[1];
+	}
+	
+	res["name"] += extractOrderByHoleInfo(order);
+	
+	res["param"] += extractLimitHoleInfo(limit);
 	
 	return res;
 }
