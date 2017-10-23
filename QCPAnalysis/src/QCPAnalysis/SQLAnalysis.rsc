@@ -225,7 +225,7 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 	
 	
 	if(!(where is noWhere)){
-		whereInfo = extractWhereHoleInfo(where);
+		whereInfo = extractConditionHoleInfo(where.condition);
 		res["name"] += whereInfo[0];
 		res["param"] += whereInfo[1];
 	}
@@ -239,9 +239,9 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 	}
 	
 	if(!(having is noHaving)){
-		whereInfo = extractWhereHoleInfo(having);
-		res["name"] += whereInfo[0];
-		res["param"] += whereInfo[1];
+		havingInfo = extractConditionHoleInfo(having.condition);
+		res["name"] += havingInfo[0];
+		res["param"] += havingInfo[1];
 	}
 	
 	res["name"] += extractOrderByHoleInfo(order);
@@ -252,9 +252,9 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 		res["name"] += holesInString(j.joinType);
 		if(hole(_) := j.joinExp) res["name"] += 1;
 		if(j is joinOn){
-			whereInfo = extractWhereHoleInfo(on);
-			res["name"] += whereInfo[0];
-			res["param"] += whereInfo[1];
+			onInfo = extractConditionHoleInfo(on);
+			res["name"] += onInfo[0];
+			res["param"] += onInfo[1];
 			continue;
 		}
 		if(j is joinUsing){
@@ -280,7 +280,7 @@ public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)
 	res["param"] += setOpInfo[1];
 	
 	if(!(where is noWhere)){
-		whereInfo = extractWhereHoleInfo(where);
+		whereInfo = extractConditionHoleInfo(where.condition);
 		res["name"] += whereInfo[0];
 		res["param"] += whereInfo[1];
 	}
@@ -333,7 +333,7 @@ public HoleInfo extractHoleInfo(deleteQuery(from, using, where, order, limit)){
 	}
 	
 	if(!(where is noWhere)){
-		whereInfo = extractWhereHoleInfo(where);
+		whereInfo = extractConditionHoleInfo(where.condition);
 		res["name"] += whereInfo[0];
 		res["param"] += whereInfo[1];
 	}
@@ -348,34 +348,59 @@ public default HoleInfo extractHoleInfo(SQLQuery query){
 	return ("unhandled query type" : 0);
 }
 
-private tuple[int nameHoles, int paramHoles] extractWhereHoleInfo(Where where){
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(and(left, right)){
+	leftHoles = extractConditionHoleInfo(left);
+	rightHoles = extractConditionHoleInfo(right);
+	return <leftHoles["name"] + rightHoles["name"], leftHoles["param"] + rightHoles["param"]>;
+}
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(or(left, right)){
+	leftHoles = extractConditionHoleInfo(left);
+	rightHoles = extractConditionHoleInfo(right);
+	return <leftHoles["name"] + rightHoles["name"], leftHoles["param"] + rightHoles["param"]>;
+}
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(xor(left, right)){
+	leftHoles = extractConditionHoleInfo(left);
+	rightHoles = extractConditionHoleInfo(right);
+	return <leftHoles["name"] + rightHoles["name"], leftHoles["param"] + rightHoles["param"]>;
+}
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(not(negated)){
+	holes = extractConditionHoleInfo(negated);
+	return <holes["name"], holes["param"]>;
+}
+
+// do we need a case where the comparison operator is a hole? I hope developers dont do this...	
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(simpleComparison(left, op, right))
+	= <holesInString(left), holesInString(right)>;
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(compoundComparison(left, op, right)){
+	rightHoles = extractConditionHoleInfo(right);
+	return <holesInString(left) + rightHoles["name"], rightHoles["param"]>;
+}
+
+// do we need a case where the NOT is a hole?
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(between(_, exp, lower, upper))
+	= <holesInString(exp), holesInString(lower) + holesInString(upper)>;
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(isNull(_, exp))
+	= <holesInString(exp), 0>;
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(inValues(_, exp, values)){
 	res = <0,0>;
-	top-down visit(where){
-		case simpleComparison(left, op, right) : {
-			res[0] += holesInString(left);
-			res[1] += holesInString(right);
-		}
-		case between(not, exp, lower, upper) : {
-			res[0] += holesInString(exp);
-			res[1] += holesInString(lower);
-			res[1] += holesInString(upper);
-		}
-		case isNull(not, exp) : {
-			res[0] += holesInString(exp);
-		}
-		case inValues(not, exp, values) : {
-			res[0] += holesInString(exp);
-			for(v <- values){
-				res[1] += holesInString(v);
-			}
-		}
-		case like(not, exp, pattern) : {
-			res[0] += holesInString(exp);
-			res[1] += holesInString(pattern);
-		}
-		//todo: other condition types
+	res[0] += holesInString(exp);
+	for(v <- values){
+		res[1] += holesInString(v);
 	}
 	return res;
+}
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(inSubquery(_, exp, subquery)){
+	res = <0,0>;
+	res[0] += holesInString(exp);
+	selectInfo = extractHoleInfo(subquery);
+	res[0] += selectInfo["name"];
+	res[1] += selectInfo["param"];
+	return res;
+}
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(like(_, exp, pattern))
+	= <holesInString(exp), holesInString(pattern)>;
+private default tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition){
+	throw "unhandled condition type encountered";
 }
 
 private int extractOrderByHoleInfo(OrderBy order){
