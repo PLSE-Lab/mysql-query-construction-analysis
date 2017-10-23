@@ -244,20 +244,9 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 		res["param"] += whereInfo[1];
 	}
 	
-	if(!(order is noOrderBy)){
-		for(<exp, mode> <- order.orderings){
-			if(hole(_) := exp){
-				res["name"] += 1;
-			}
-		}
-	}
+	res["name"] += extractOrderByHoleInfo(order);
 	
-	if(!(limit is noLimit)){
-		res["name"] += holesInString(limit.numRows);
-		if(limit is limitWithOffset){
-			res["name"] += holesInString(limit.offset);
-		}
-	}
+	res["param"] += extractLimitHoleInfo(limit);
 	
 	for(j <- joins){
 		res["name"] += holesInString(j.joinType);
@@ -297,20 +286,9 @@ public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)
 		res["param"] += whereInfo[1];
 	}
 	
-	if(!(order is noOrderBy)){
-		for(<exp, mode> <- order.orderings){
-			if(hole(_) := exp){
-				orderByHole += 1;
-			}
-		}
-	}
-	if(!(limit is noLimit)){
-		if(isQueryHole(limit.numRows)) limitHole += 1;
-		
-		if(limit is limitWithOffset && isQueryHole(limit.offset)){
-			limitHoles += 1;
-		}
-	}
+	res["name"] += extractOrderByHoleInfo(order);
+	
+	res["param"] += extractLimitHoleInfo(limit);
 	
 	return res;
 }
@@ -363,6 +341,29 @@ private tuple[int nameHoles, int paramHoles] extractWhereHoleInfo(Where where){
 	}
 	return res;
 }
+
+private int extractOrderByHoleInfo(OrderBy order){
+	res = 0;
+	if(!(order is noOrderBy)){
+		for(<exp, mode> <- order.orderings){
+			if(hole(_) := exp){
+				res += 1;
+			}
+		}
+	}
+	return res;
+}
+
+private int extractLimitHoleInfo(Limit limit){
+	res = 0;
+	if(!(limit is noLimit)){
+		if(isQueryHole(limit.numRows)) res += 1;
+		
+		if(limit is limitWithOffset && isQueryHole(limit.offset)){
+			res += 1;
+		}
+	}
+}	
 
 @doc{returns the number of query holes found in the subject string}
 public int holesInString(str subject){
