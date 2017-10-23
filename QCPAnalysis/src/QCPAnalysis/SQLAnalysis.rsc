@@ -369,19 +369,19 @@ private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(not(negate
 }
 
 // do we need a case where the comparison operator is a hole? I hope developers dont do this...	
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(simpleComparison(left, op, right))
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(simpleComparison(left, op, right)))
 	= <holesInString(left), holesInString(right)>;
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(compoundComparison(left, op, right)){
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(compoundComparison(left, op, right))){
 	rightHoles = extractConditionHoleInfo(right);
 	return <holesInString(left) + rightHoles["name"], rightHoles["param"]>;
 }
 
 // do we need a case where the NOT is a hole?
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(between(_, exp, lower, upper))
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(between(_, exp, lower, upper)))
 	= <holesInString(exp), holesInString(lower) + holesInString(upper)>;
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(isNull(_, exp))
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(isNull(_, exp)))
 	= <holesInString(exp), 0>;
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(inValues(_, exp, values)){
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(inValues(_, exp, values))){
 	res = <0,0>;
 	res[0] += holesInString(exp);
 	for(v <- values){
@@ -389,7 +389,7 @@ private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(inValues(_
 	}
 	return res;
 }
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(inSubquery(_, exp, subquery)){
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(inSubquery(_, exp, subquery))){
 	res = <0,0>;
 	res[0] += holesInString(exp);
 	selectInfo = extractHoleInfo(subquery);
@@ -397,11 +397,12 @@ private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(inSubquery
 	res[1] += selectInfo["param"];
 	return res;
 }
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(like(_, exp, pattern))
+private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(like(_, exp, pattern)))
 	= <holesInString(exp), holesInString(pattern)>;
-private default tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition){
-	throw "unhandled condition type encountered";
-}
+
+private default tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition){ 
+  throw "unhandled condition type encountered"; 
+} 
 
 private int extractOrderByHoleInfo(OrderBy order){
 	res = 0;
@@ -424,6 +425,7 @@ private int extractLimitHoleInfo(Limit limit){
 			res += 1;
 		}
 	}
+	return res;
 }	
 
 private tuple[int nameHoles, int paramHoles] extractSetOpHoleInfo(list[SetOp] setOps){
