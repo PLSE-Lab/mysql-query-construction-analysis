@@ -275,10 +275,9 @@ public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)
 		}
 	}
 	
-	for(s <- setOps){
-		res["name"] += holesInString(s.column);
-		res["param"] += holesInString(s.newValue);
-	}
+	setOpInfo = extractSetOpHoleInfo(setOps);
+	res["name"] += setOpInfo[0];
+	res["param"] += setOpInfo[1];
 	
 	if(!(where is noWhere)){
 		whereInfo = extractWhereHoleInfo(where);
@@ -295,9 +294,30 @@ public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)
 public HoleInfo extractHoleInfo(insertQuery(into, values, setOps, select, onDuplicate)){
 	res = ("name" : 0, "param" : 0);
 	
+	if(!(into is noInto)){
+		if(hole(_) := into.dest) res["name"] += 1;
+		for(c <- into.columns){
+			intoColumnHole += res["name"] += 1;
+		}
+	}	
+	
 	for(valueList <- values, v <- valueList){
 		res["param"] += holesInString(v);
 	}
+	
+	setOpInfo = extractSetOpHoleInfo(setOps);
+	res["name"] += setOpInfo[0];
+	res["param"] += setOpInfo[1];
+	
+	if(select is selectQuery){
+		selectHoleInfo = extractHoleInfo(select);
+		res["name"] += selectHoleInfo["name"];
+		res["param"] += selectHoleInfo["param"];
+	}
+	
+	duplicateInfo = extractSetOpHoleInfo(onDuplicate);
+	res["name"] += duplicateInfo[0];
+	res["param"] += duplicateInfo[1];
 	
 	return res;
 }
@@ -364,6 +384,17 @@ private int extractLimitHoleInfo(Limit limit){
 		}
 	}
 }	
+
+private tuple[int nameHoles, int paramHoles] extractSetOpHoleInfo(list[SetOp] setOps){
+	res = <0,0>;
+	
+	for(s <- setOps){
+		res[0] += holesInString(s.column);
+		res[1] += holesInString(s.newValue);
+	}
+	
+	return res;
+}
 
 @doc{returns the number of query holes found in the subject string}
 public int holesInString(str subject){
