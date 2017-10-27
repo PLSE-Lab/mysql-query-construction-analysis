@@ -5,6 +5,7 @@ import lang::php::util::Utils;
 import lang::php::util::Config;
 import lang::php::ast::System;
 import lang::php::util::Corpus;
+import lang::php::ast::AbstractSyntax;
 
 import QCPAnalysis::SQLModel;
 import QCPAnalysis::QCPSystemInfo;
@@ -18,6 +19,7 @@ import Set;
 import Relation;
 import Map;
 import String;
+import List;
 
 alias SQLModelMap = map[SQLModel model, rel[SQLYield yield, str queryWithHoles, SQLQuery parsed] yieldsRel];
 
@@ -169,6 +171,40 @@ public str classifySQLModel(SQLModel model){
 							  ? "FunctionParam" : "unclassified";
 }
 
+@doc{group models in a whole system based on pattern}
+public map[str ,list[SQLModel]] groupSQLModels(str p, str v){
+	res = ( );
+	
+	pt = loadBinary(p, v);
+	
+	// Find all calls to the mysql_query function in the system ASTs
+	allCalls = { c | /c:call(name(name("mysql_query")),_) := pt.files };
+	
+	QCPSystemInfo qcpi = readQCPSystemInfo(p, v);
+	
+	for(aCall <- allCalls){
+		callModel = buildModel(qcpi, aCall@at);
+		pattern = classifySQLModel(callModel);
+		if(pattern in res){
+			res[pattern] += callModel;
+		}
+		else{
+			res += (pattern : [callModel]);
+		}
+	}
+	
+	return res;
+}
+
+@doc{group the locations of models in a whole system based on pattern}
+public map[str, list[loc]] groupSQLModelLocs(str p, str v)
+	= (pattern : [m.callLoc | m <- models] | modelMap := groupSQLModels(p, v), 
+		pattern <- modelMap, models := modelMap[pattern]);
+		
+@doc{return just the counts of each pattern in a system}
+public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
+		pattern <- modelMap, models := modelMap[pattern]);
+		
 data DynamicQueryInfo = dynamicQueryInfo(
 							SQLYield yield,
 							SQLQuery parsed,
