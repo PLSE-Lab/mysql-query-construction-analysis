@@ -25,6 +25,16 @@ alias SQLModelMap = map[SQLModel model, rel[SQLYield yield, str queryWithHoles, 
 
 public loc modelLoc = baseLoc + "serialized/qcp/sqlmodels/";
 
+data DynamicQueryInfo = dynamicQueryInfo(
+							SQLYield yield,
+							SQLQuery parsed,
+					  		int numStaticParts,
+					  		int numDynamicParts,
+					  		HoleInfo holeInfo
+					  );
+
+alias HoleInfo = map[str, int];
+
 public map[str, SQLModelMap] buildModelsCorpus(){
 	res = ( );
 	
@@ -134,6 +144,63 @@ public bool matchesDynamic(SQLModel model){
 	}
 }
 
+//TODO: the next 3 functions could be made into 1 function
+@doc{Dynamic query with only parameter holes}
+public bool matchesDynamicParameters(SQLModel model){
+	if(! matchesDynamic(model)){
+		return false;
+	}
+	else{
+		info = classifyDynamicQuery(model);
+		// loop in case dynamic query has multiple yields
+		for(i <- info){
+			if(i.holeInfo["name"] > 0){
+				return false;
+			}
+			else if(i.holeInfo["param"] > 0){
+				continue;
+			}
+			else{
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
+@doc{Dynamic query with at least one name hole}
+public bool matchesDynamicName(SQLModel model){
+	if(! matchesDynamic(model)){
+		return false;
+	}
+	else{
+		info = classifyDynamicQuery(model);
+		// loop in case dynamic query has multiple yields
+		for(i <- info){
+			if(i.holeInfo["name"] > 0){
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
+@doc{case where dynamic query type is not select, update, insert, or delete}
+public bool matchesUnhandledDynamicQueryType(model){
+	if(! matchesDynamic(model)){
+		return false;
+	}
+	else{
+		info = classifyDynamicQuery(model);
+		for(i <- info){
+			if("unhandled query type" in i.holeInfo){
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
 //TODO: split into sub patterns
 @doc{ControlFlow (query text based on control flow)}
 public bool matchesControlFlow(SQLModel model){
@@ -165,10 +232,29 @@ public bool matchesFunctionParam(SQLModel model){
 //TODO: split into sub patterns
 @doc{classify a single model}
 public str classifySQLModel(SQLModel model){
-	return matchesLiteral(model) ? "Literal" : matchesDynamic(model) 
-							  ? "Dynamic" : matchesControlFlow(model) 
-							  ? "ControlFlow" : matchesFunctionParam(model)
-							  ? "FunctionParam" : "unclassified";
+	if(matchesLiteral(model)){
+		return "Literal";
+	}
+	else if(matchesDynamic(model)){
+		if(matchesUnhandledDynamicQueryType(model)){
+			return "Unhandled Dynamic Query Type";
+		}
+		if(matchesDynamicParameters(model)){
+			return "Dynamic Parameters";
+		}
+		if(matchesDynamicName(model)){
+			return "Dynamic Name";
+		}	
+	}
+	else if(matchesControlFlow(model)){
+		return "Control Flow";
+	}
+	else if(matchesFunctionParam(model)){
+		return "Function Parameter";
+	}
+	else{
+		return "unclassified";
+	}
 }
 
 @doc{group models in a whole system based on pattern}
@@ -204,16 +290,6 @@ public map[str, list[loc]] groupSQLModelLocs(str p, str v)
 @doc{return just the counts of each pattern in a system}
 public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
 		pattern <- modelMap, models := modelMap[pattern]);
-		
-data DynamicQueryInfo = dynamicQueryInfo(
-							SQLYield yield,
-							SQLQuery parsed,
-					  		int numStaticParts,
-					  		int numDynamicParts,
-					  		HoleInfo holeInfo
-					  );
-
-alias HoleInfo = map[str, int];
 				 
 @doc{further classifies a Dynamic query into sub pattern(s)}
 public set[DynamicQueryInfo] classifyDynamicQuery(SQLModel model){
