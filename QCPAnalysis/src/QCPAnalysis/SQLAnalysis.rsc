@@ -35,76 +35,6 @@ data DynamicQueryInfo = dynamicQueryInfo(
 
 alias HoleInfo = map[str, int];
 
-public map[str, SQLModelMap] buildModelsCorpus(){
-	res = ( );
-	
-	Corpus corpus = getCorpus();
-	
-	for(p <- corpus, v := corpus[p]){
-		modelMap = buildModelMap(p, v);
-		res = res + ("<p>_<v>" : modelMap);
-	}
-	
-	writeBinaryValueFile(modelLoc + "corpus", res);
-	
-	return res;
-}
-
-public SQLModelMap buildModelMap(str p , str v, rel[loc, SQLModel] modelsRel = {}){
-	SQLModelMap res = ( );
-	
-	System sys = loadBinary(p, v);
-	QCPSystemInfo qcpi = readQCPSystemInfo(p, v);
-	set[SQLModel] models = {};
-	if (isEmpty(modelsRel)) { 
-		models = buildModelsForSystem(sys, qcpi)<1>;
-	} else {
-		models = modelsRel<1>;
-	}
-	
-	for(model <- models){
-		res = res + (model : parseYields(yields(model)));
-	}
-	
-	iprintToFile(modelLoc + "<p>_<v>.txt", res);
-	writeBinaryValueFile(modelLoc + "<p>_<v>", res);
-	
-	return res;
-}
-
-public map[str, SQLModelMap] readModelsCorpus() = readBinaryValueFile(#map[str, SQLModelMap], modelLoc + "corpus");
-
-public SQLModelMap readModelsSystem(str p, str v) = readBinaryValueFile(#SQLModelMap, modelLoc + "<p>_<v>");
-
-public rel[SQLYield, str, SQLQuery] parseYields(set[SQLYield] yields){
-	res = {};
-	for(yield <- yields){
-		queryString = yield2String(yield);
-		
-		parsed = runParser(queryString);
-		
-		res = res + <yield, queryString, parsed>;
-	}
-	
-	return res;
-}
-
-@doc{counts the number of calls that have been modeled and the number of yields parsed}
-public tuple[int,int] countCallsCorpus(){
-	corpusModels = readBinaryValueFile(#map[str, SQLModelMap], modelLoc + "corpus");
-	
-	numCalls = 0;
-	numParsed = 0;
-	for(sys <- corpusModels, models := corpusModels[sys]){
-		numCalls = numCalls + size(models);
-		for(model <- models, parsed := models[model]){
-			numParsed = numParsed + size(parsed);
-		}
-	}
-	
-	return <numCalls,numParsed>;
-}
-
 @doc{static query ecognizer}
 public bool matchesLiteral(SQLModel model){
 	if(size(model.fragmentRel) == 0 && model.startFragment is literalFragment){
@@ -235,7 +165,7 @@ public str classifySQLModel(SQLModel model){
 	if(matchesLiteral(model)){
 		return "Literal";
 	}
-	else if(matchesDynamic(model)){
+	if(matchesDynamic(model)){
 		if(matchesUnhandledDynamicQueryType(model)){
 			return "Unhandled Dynamic Query Type";
 		}
@@ -246,36 +176,36 @@ public str classifySQLModel(SQLModel model){
 			return "Dynamic Name";
 		}	
 	}
-	else if(matchesControlFlow(model)){
+	if(matchesControlFlow(model)){
 		return "Control Flow";
 	}
-	else if(matchesFunctionParam(model)){
+ 	if(matchesFunctionParam(model)){
 		return "Function Parameter";
 	}
-	else{
-		return "unclassified";
-	}
+	
+	return "unclassified";
 }
 
 @doc{group models in a whole system based on pattern}
 public map[str ,list[SQLModel]] groupSQLModels(str p, str v){
 	res = ( );
+	models = {};
 	
-	pt = loadBinary(p, v);
+ 	if(modelsFileExists(p, v)){
+ 		models = readModels(p, v);
+ 	}
+ 	else{
+ 		models = buildModelsForSystem(p, v);
+ 		writeModels(p, v, models);
+ 	}
 	
-	// Find all calls to the mysql_query function in the system ASTs
-	allCalls = { c | /c:call(name(name("mysql_query")),_) := pt.files };
-	
-	QCPSystemInfo qcpi = readQCPSystemInfo(p, v);
-	
-	for(aCall <- allCalls){
-		callModel = buildModel(qcpi, aCall@at);
-		pattern = classifySQLModel(callModel);
+	for(<location, model> <- models){
+		pattern = classifySQLModel(model);
 		if(pattern in res){
-			res[pattern] += callModel;
+			res[pattern] += model;
 		}
 		else{
-			res += (pattern : [callModel]);
+			res += (pattern : [model]);
 		}
 	}
 	
@@ -364,7 +294,7 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 		res["name"] += holesInString(j.joinType);
 		if(hole(_) := j.joinExp) res["name"] += 1;
 		if(j is joinOn){
-			onInfo = extractConditionHoleInfo(on);
+			onInfo = extractConditionHoleInfo(j.on);
 			res["name"] += onInfo[0];
 			res["param"] += onInfo[1];
 			continue;
@@ -463,21 +393,20 @@ public default HoleInfo extractHoleInfo(SQLQuery query){
 private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(and(left, right)){
 	leftHoles = extractConditionHoleInfo(left);
 	rightHoles = extractConditionHoleInfo(right);
-	return <leftHoles["name"] + rightHoles["name"], leftHoles["param"] + rightHoles["param"]>;
+	return <leftHoles<0> + rightHoles<0>, leftHoles<1> + rightHoles<1>>;
 }
 private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(or(left, right)){
 	leftHoles = extractConditionHoleInfo(left);
 	rightHoles = extractConditionHoleInfo(right);
-	return <leftHoles["name"] + rightHoles["name"], leftHoles["param"] + rightHoles["param"]>;
+	return <leftHoles<0> + rightHoles<0>, leftHoles<1> + rightHoles<1>>;
 }
 private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(xor(left, right)){
 	leftHoles = extractConditionHoleInfo(left);
 	rightHoles = extractConditionHoleInfo(right);
-	return <leftHoles["name"] + rightHoles["name"], leftHoles["param"] + rightHoles["param"]>;
+	return <leftHoles<0> + rightHoles<0>, leftHoles<1> + rightHoles<1>>;
 }
 private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(not(negated)){
-	holes = extractConditionHoleInfo(negated);
-	return <holes["name"], holes["param"]>;
+	return extractConditionHoleInfo(negated);
 }
 
 // do we need a case where the comparison operator is a hole? I hope developers dont do this...	
@@ -531,10 +460,9 @@ private int extractOrderByHoleInfo(OrderBy order){
 private int extractLimitHoleInfo(Limit limit){
 	res = 0;
 	if(!(limit is noLimit)){
-		if(isQueryHole(limit.numRows)) res += 1;
-		
-		if(limit is limitWithOffset && isQueryHole(limit.offset)){
-			res += 1;
+		res += holesInString(limit.numRows);
+		if(limit is limitWithOffset){
+			res += holesInString(limit.offset);
 		}
 	}
 	return res;
