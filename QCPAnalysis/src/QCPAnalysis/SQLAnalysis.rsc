@@ -75,6 +75,7 @@ public bool matchesDynamic(SQLModel model){
 }
 
 //TODO: the next 3 functions could be made into 1 function
+// TODO: distinction between param holes and condition holes?
 @doc{Dynamic query with only parameter holes}
 public bool matchesDynamicParameters(SQLModel model){
 	if(! matchesDynamic(model)){
@@ -88,6 +89,9 @@ public bool matchesDynamicParameters(SQLModel model){
 				return false;
 			}
 			else if(i.holeInfo["param"] > 0){
+				continue;
+			}
+			else if(i.holeInfo["condition"] > 0){
 				continue;
 			}
 			else{
@@ -253,7 +257,7 @@ public set[DynamicQueryInfo] classifyDynamicQuery(SQLModel model){
 
 @doc{extracts info about a dynamic query's holes}
 public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, having, order, limit, joins)){
-	res = ("name" : 0, "param" : 0);
+	res = ("name" : 0, "param" : 0, "condition" : 0);
 	
 	// TODO: refactor some of this into methods, other query types have the same clauses
 	
@@ -267,9 +271,7 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 	
 	
 	if(!(where is noWhere)){
-		whereInfo = extractConditionHoleInfo(where.condition);
-		res["name"] += whereInfo[0];
-		res["param"] += whereInfo[1];
+		res["condition"] = extractConditionHoleInfo(where.condition);
 	}
 	
 	if(!(group is noGroupBy)){
@@ -281,9 +283,7 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 	}
 	
 	if(!(having is noHaving)){
-		havingInfo = extractConditionHoleInfo(having.condition);
-		res["name"] += havingInfo[0];
-		res["param"] += havingInfo[1];
+		res["condition"] = extractConditionHoleInfo(having.condition);
 	}
 	
 	res["name"] += extractOrderByHoleInfo(order);
@@ -294,9 +294,7 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 		res["name"] += holesInString(j.joinType);
 		if(hole(_) := j.joinExp) res["name"] += 1;
 		if(j is joinOn){
-			onInfo = extractConditionHoleInfo(j.on);
-			res["name"] += onInfo[0];
-			res["param"] += onInfo[1];
+			res["condition"] = extractConditionHoleInfo(j.on);
 			continue;
 		}
 		if(j is joinUsing){
@@ -309,7 +307,7 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 	return res;
 }
 public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)){
-	res = ("name" : 0, "param" : 0);
+	res = ("name" : 0, "param" : 0, "condition" : 0);
 	
 	for(t <- tables){
 		if(hole(_) := t){
@@ -322,9 +320,7 @@ public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)
 	res["param"] += setOpInfo[1];
 	
 	if(!(where is noWhere)){
-		whereInfo = extractConditionHoleInfo(where.condition);
-		res["name"] += whereInfo[0];
-		res["param"] += whereInfo[1];
+		res["condition"] = extractConditionHoleInfo(where.condition);
 	}
 	
 	res["name"] += extractOrderByHoleInfo(order);
@@ -334,7 +330,7 @@ public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)
 	return res;
 }
 public HoleInfo extractHoleInfo(insertQuery(into, values, setOps, select, onDuplicate)){
-	res = ("name" : 0, "param" : 0);
+	res = ("name" : 0, "param" : 0, "condition" : 0);
 	
 	if(!(into is noInto)){
 		if(hole(_) := into.dest) res["name"] += 1;
@@ -364,7 +360,7 @@ public HoleInfo extractHoleInfo(insertQuery(into, values, setOps, select, onDupl
 	return res;
 }
 public HoleInfo extractHoleInfo(deleteQuery(from, using, where, order, limit)){
-	res = ("name" : 0, "param" : 0);
+	res = ("name" : 0, "param" : 0, "condition" : 0);
 	
 	for(f <- from){
 		if(hole(_) := f)  res["name"] += 1;
@@ -375,9 +371,7 @@ public HoleInfo extractHoleInfo(deleteQuery(from, using, where, order, limit)){
 	}
 	
 	if(!(where is noWhere)){
-		whereInfo = extractConditionHoleInfo(where.condition);
-		res["name"] += whereInfo[0];
-		res["param"] += whereInfo[1];
+		res["condition"] = extractConditionHoleInfo(where.condition);
 	}
 	
 	res["name"] += extractOrderByHoleInfo(order);
@@ -390,56 +384,62 @@ public default HoleInfo extractHoleInfo(SQLQuery query){
 	return ("unhandled query type" : 0);
 }
 
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(and(left, right)){
+private int extractConditionHoleInfo(and(left, right)){
 	leftHoles = extractConditionHoleInfo(left);
 	rightHoles = extractConditionHoleInfo(right);
-	return <leftHoles<0> + rightHoles<0>, leftHoles<1> + rightHoles<1>>;
+	return leftHoles + rightHoles;
 }
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(or(left, right)){
+private int extractConditionHoleInfo(or(left, right)){
 	leftHoles = extractConditionHoleInfo(left);
 	rightHoles = extractConditionHoleInfo(right);
-	return <leftHoles<0> + rightHoles<0>, leftHoles<1> + rightHoles<1>>;
+	return leftHoles + rightHoles;
 }
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(xor(left, right)){
+private int extractConditionHoleInfo(xor(left, right)){
 	leftHoles = extractConditionHoleInfo(left);
 	rightHoles = extractConditionHoleInfo(right);
-	return <leftHoles<0> + rightHoles<0>, leftHoles<1> + rightHoles<1>>;
+	return leftHoles + rightHoles;
 }
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(not(negated)){
+private int extractConditionHoleInfo(not(negated)){
 	return extractConditionHoleInfo(negated);
 }
 
 // do we need a case where the comparison operator is a hole? I hope developers dont do this...	
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(simpleComparison(left, op, right)))
-	= <holesInString(left), holesInString(right)>;
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(compoundComparison(left, op, right))){
+private int extractConditionHoleInfo(condition(simpleComparison(left, op, right)))
+	= holesInString(left) + holesInString(right);
+	
+private int extractConditionHoleInfo(condition(compoundComparison(left, op, right))){
 	rightHoles = extractConditionHoleInfo(right);
-	return <holesInString(left) + rightHoles["name"], rightHoles["param"]>;
+	return holesInString(left) + rightHoles;
 }
 
 // do we need a case where the NOT is a hole?
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(between(_, exp, lower, upper)))
-	= <holesInString(exp), holesInString(lower) + holesInString(upper)>;
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(isNull(_, exp)))
-	= <holesInString(exp), 0>;
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(inValues(_, exp, values))){
-	res = <0,0>;
-	res[0] += holesInString(exp);
+private int extractConditionHoleInfo(condition(between(_, exp, lower, upper)))
+	= holesInString(exp) + holesInString(lower) + holesInString(upper);
+	
+private int extractConditionHoleInfo(condition(isNull(_, exp)))
+	= holesInString(exp);
+	
+private int extractConditionHoleInfo(condition(inValues(_, exp, values))){
+	res = 0;
+	res  += holesInString(exp);
 	for(v <- values){
-		res[1] += holesInString(v);
+		res += holesInString(v);
 	}
 	return res;
 }
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(inSubquery(_, exp, subquery))){
-	res = <0,0>;
-	res[0] += holesInString(exp);
-	selectInfo = extractHoleInfo(subquery);
-	res[0] += selectInfo["name"];
-	res[1] += selectInfo["param"];
-	return res;
-}
-private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(like(_, exp, pattern)))
-	= <holesInString(exp), holesInString(pattern)>;
+
+// revisit this, do we need the distinction between name and param holes that are in subqueries used for filtering?
+//private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(inSubquery(_, exp, subquery))){
+//	res = <0,0>;
+//	res[0] += holesInString(exp);
+//	selectInfo = extractHoleInfo(subquery);
+//	res[0] += selectInfo["name"];
+//	res[1] += selectInfo["param"];
+//	return res;
+//}
+
+private int extractConditionHoleInfo(condition(like(_, exp, pattern)))
+	= holesInString(exp) + holesInString(pattern);
 
 private default tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition){ 
   throw "unhandled condition type encountered"; 
