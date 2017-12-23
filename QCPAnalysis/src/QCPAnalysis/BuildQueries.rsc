@@ -123,7 +123,7 @@ public Query buildEasyCaseQuery(Expr c, int index){
 		println("Index not available for call at location <c@at>");
 		return unclassified(c@at, 1);
 	}
-	if(actualParameter(scalar(string(s)),false) := c.parameters[index]){
+	if(actualParameter(scalar(string(s)), false, false) := c.parameters[index]){
 		SQLQuery parsed;
 		sql = replaceAll(replaceAll(s, "\n", " "), "\t", " ");
 		try parsed = runParser(sql);
@@ -131,7 +131,7 @@ public Query buildEasyCaseQuery(Expr c, int index){
 		return QCP1a(c@at, sql, parsed);
 	}
 	// check for QCP4a (encapsed string)
-	else if(actualParameter(s:scalar(encapsed(parts)), false) := c.parameters[index]){
+	else if(actualParameter(s:scalar(encapsed(parts)), false, false) := c.parameters[index]){
 		mixed = replaceAll(replaceAll(buildMixedSnippets(s), "\n", " "), "\t", " ");
 		holeID = 0;
 		SQLQuery parsed;
@@ -141,7 +141,7 @@ public Query buildEasyCaseQuery(Expr c, int index){
 	}
 		
 	// check for QCP4b (concatenation)
-	else if(actualParameter(b:binaryOperation(left, right, concat()), false) := c.parameters[index]){
+	else if(actualParameter(b:binaryOperation(left, right, concat()), false, false) := c.parameters[index]){
 		mixed = replaceAll(replaceAll(buildMixedSnippets(b), "\n", " "), "\t", " ");
 		holeID = 0;
 		SQLQuery parsed;
@@ -161,7 +161,7 @@ public Query buildLiteralVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 		return unclassified(c@at,1);
 	}
 
-	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){
+	if(actualParameter(var(name(name(queryVar))), false, false) := c.parameters[index]){
 	
 		containingScript = qcpi.sys.files[c@at.top];
 		containingCFG = findContainingCFG(containingScript, qcpi.systemCFGs[c@at.top], c@at);
@@ -230,7 +230,7 @@ public Query buildMixedVariableQuery(QCPSystemInfo qcpi, Expr c, int index){
 		return unclassified(c@at,1);
 	}
 
-	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){
+	if(actualParameter(var(name(name(queryVar))), false, false) := c.parameters[index]){
 		containingScript = qcpi.sys.files[c@at.top];
 		containingCFG = findContainingCFG(containingScript, qcpi.systemCFGs[c@at.top], c@at);
 		callNode = findNodeForExpr(containingCFG, c);
@@ -352,9 +352,9 @@ public set[ConcatBuilder] concatAssignments(QCPSystemInfo qcpi, str functionName
 		// Find calls to functionName in this script that use a variable to store the query. We want to
 		// check to see which queries formed using concatenations reach this query.
 		queryCalls = { < queryCall, varName, queryCall@at > | 
-			/queryCall:call(name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]) := scr 
-			|| /queryCall:methodCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]) := scr 
-			|| /queryCall:staticCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]) := scr};
+			/queryCall:call(name(name(functionName)), [actualParameter(var(name(name(varName))),_,_),*_]) := scr 
+			|| /queryCall:methodCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_,_),*_]) := scr 
+			|| /queryCall:staticCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_,_),*_]) := scr};
 		
 		for ( varName <- queryCalls<1>) {
 			// Are there assignments with following appends into the query variable?
@@ -376,22 +376,22 @@ public set[ConcatBuilder] concatAssignments(QCPSystemInfo qcpi, str functionName
 					// Now, make sure the query is actually reachable
 					// bool(CFGNode cn) pred, bool(CFGNode cn) stop, &T (CFGNode cn) gather
 					bool foundQueryCall(CFGNode cn) {
-						if (exprNode(call(name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]),_) := cn
-							|| exprNode(methodCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]),_) := cn
-							|| exprNode(staticCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]),_) := cn) {
+						if (exprNode(call(name(name(functionName)), [actualParameter(var(name(name(varName))),_,_),*_]),_) := cn
+							|| exprNode(methodCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_,_),*_]),_) := cn
+							|| exprNode(staticCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_,_),*_]),_) := cn) {
 							return true;
 						} else {
 							return false;
 						}
 					}
 					tuple[Expr,loc] collectQueryCall(CFGNode cn) {
-						if (exprNode(exprToCollect:call(name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]),_) := cn) {
+						if (exprNode(exprToCollect:call(name(name(functionName)), [actualParameter(var(name(name(varName))),_,_),*_]),_) := cn) {
 							return < exprToCollect, exprToCollect@at >;
 						} 
-						else if(exprNode(exprToCollect:methodCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]),_) := cn){
+						else if(exprNode(exprToCollect:methodCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_,_),*_]),_) := cn){
 							return < exprToCollect, exprToCollect@at >;
 						}
-						else if(exprNode(exprToCollect:staticCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_),*_]),_) := cn){
+						else if(exprNode(exprToCollect:staticCall(_,name(name(functionName)), [actualParameter(var(name(name(varName))),_,_),*_]),_) := cn){
 							return < exprToCollect, exprToCollect@at >;
 						}
 						else {

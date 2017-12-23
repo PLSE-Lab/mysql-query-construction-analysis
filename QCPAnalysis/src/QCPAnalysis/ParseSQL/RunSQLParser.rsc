@@ -8,12 +8,15 @@ import lang::php::util::Config;
 import ValueIO;
 import IO;
 
+@doc{The base install location for the sql parser}
+public loc sqlParserLoc = |file:///Users/mhills/PHPAnalysis/sql-parser/src/Rascal|;
+
 public SQLQuery runParser(str query){
 	println("Now parsing <query>\n");
-	sqlParserLoc = lang::php::util::Config::baseLoc + "sql-parser/src/Rascal";
+	sqlParserFile = (sqlParserLoc + "SQL2Rascal.php").path;
 	
-	args = ["SQL2Rascal.php", query];
+	args = [sqlParserFile, query];
 	phpOut = executePHP(args, sqlParserLoc);
-	
+	writeFile(|file:///tmp/parsed.txt|, phpOut);
 	return readTextValueString(#SQLQuery, phpOut);
 }

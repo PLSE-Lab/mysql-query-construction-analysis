@@ -26,7 +26,7 @@ public void showSystems() {
 }
 
 @doc{Sort a set of calls by the locations of the calls}
-private lrel[Expr callExpr, loc callLoc] sortCalls(rel[Expr callExpr, loc callLoc] calls) {
+public lrel[Expr callExpr, loc callLoc] sortCalls(rel[Expr callExpr, loc callLoc] calls) {
 	bool compareCall(<Expr c1Call, loc c1Loc>, <Expr c2Call, loc c2Loc>) {
 		if (c1Loc.path == c2Loc.path) {
 			return c1Loc.offset < c2Loc.offset;

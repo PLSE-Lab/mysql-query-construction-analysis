@@ -35,7 +35,7 @@ public Query buildQCP5Query(QCPSystemInfo qcpi, set[ConcatBuilder] ca, Expr c, i
 
 	seenBefore = seenBefore + functionName;
 	
-	if(actualParameter(var(name(name(queryVar))),false) := c.parameters[index]){	
+	if(actualParameter(var(name(name(queryVar))),false,false) := c.parameters[index]){	
 	
 		containingScript = qcpi.sys.files[c@at.top];
 		containingCFG = findContainingCFG(containingScript, qcpi.systemCFGs[c@at.top], c@at);

@@ -176,7 +176,7 @@ public rel[loc callLoc, CFG graph] cfgsWithCalls(System s, set[str] functionName
 	return res;
 }
 
-public Expr getQueryExpr(call(name(name("mysql_query")),[actualParameter(Expr e,_),*_])) = e;
+public Expr getQueryExpr(call(name(name("mysql_query")),[actualParameter(Expr e,_,false),*_])) = e;
 public default Expr getQueryExpr(Expr e) { throw "Unhandled query expression <e>"; }
  
 public Expr queryParameter(exprNode(Expr e,_)) = getQueryExpr(e);
@@ -265,7 +265,7 @@ FragmentRel addEdgeInfo(FragmentRel frel, CFG slicedCFG) {
 			edgesOnPath = { e | e <- slicedCFG.edges, e.from in labelsOnPath, e.to in labelsOnPath };
 			
 			// Winnow this down to just those edges that are tied back to the header.
-			conditionEdgesOnPath = { e | e <- edgesOnPath, e has header, e.header == h.l };
+			conditionEdgesOnPath = edgesOnPath; // { e | e <- edgesOnPath, e has header, e.header == h.l };
 			
 			// Extract the conditions from each edge and add that to the preds for this
 			// target node.
