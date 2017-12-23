@@ -9,14 +9,16 @@ import ValueIO;
 import IO;
 
 @doc{The base install location for the sql parser}
-public loc sqlParserLoc = |file:///Users/mhills/PHPAnalysis/sql-parser/src/Rascal|;
+private loc sqlParserLoc = lang::php::util::Config::baseLoc + "sql-parser/src/Rascal";
 
 public SQLQuery runParser(str query){
 	println("Now parsing <query>\n");
-	sqlParserFile = (sqlParserLoc + "SQL2Rascal.php").path;
 	
-	args = [sqlParserFile, query];
-	phpOut = executePHP(args, sqlParserLoc);
-	writeFile(|file:///tmp/parsed.txt|, phpOut);
+	absoluteLoc = resolveLocation(sqlParserLoc);
+	parserFile = absoluteLoc + "SQL2Rascal.php";
+	
+	args = [parserFile.path, query];
+	phpOut = executePHP(args, absoluteLoc);
+	
 	return readTextValueString(#SQLQuery, phpOut);
 }
