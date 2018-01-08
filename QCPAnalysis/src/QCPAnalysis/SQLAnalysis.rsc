@@ -25,169 +25,106 @@ alias SQLModelMap = map[SQLModel model, rel[SQLYield yield, str queryWithHoles, 
 
 public loc modelLoc = baseLoc + "serialized/qcp/sqlmodels/";
 
-data DynamicQueryInfo = dynamicQueryInfo(
-							SQLYield yield,
-							SQLQuery parsed,
-					  		int numStaticParts,
-					  		int numDynamicParts,
-					  		HoleInfo holeInfo
-					  );
+@doc{single yield, single static piece}
+public str qcp0 = "static";
 
-alias HoleInfo = map[str, int];
+@doc{multiple yields, each containing a single static piece}
+public str qcp1 = "static yields";
 
-@doc{static query ecognizer}
-public bool matchesLiteral(SQLModel model){
-	if(size(model.fragmentRel) == 0 && model.startFragment is literalFragment){
-		return true;
-	}
-	else if(size(model.fragmentRel) == 1 && nameFragment(varName(n)) := model.startFragment){
-		possibleLiteral = getOneFrom(model.fragmentRel);
+@doc{single yield, mixture of static and dynamic pieces, all dynamic pieces are parameters}
+public str qcp2 = "dynamic parameters";
+
+@doc{single yield with at least one dynamic piece that is not a parameter}
+public str qcp3 = "dynamic";
+
+@doc{multiple yields, at least one yield has at least one dynamic piece}
+public str qcp4 = "dynamic yields";
+
+@doc{model matches no patterns}
+public str unknown = "unknown";
+
+@doc{"ranking" for each pattern indicating ease of transformation}
+// note: qcp4 is not included as its score requires some computation
+public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 1, qcp3 : 2, unknown : 3);
+
+@doc{gets the "ranking" for this model, indicating how easy it will be to transform}
+public int getTransformationRanking(SQLModel model){
+	pattern = classifySQLModel(model);
+	
+	// for qcp4, the ranking is the ranking of the "worst" yield
+	if(pattern == qcp4){
+		int max = 0;
+		yields = yields(model);
 		
-		return varName(n) := possibleLiteral.name && possibleLiteral.targetFragment is literalFragment
-			&& possibleLiteral.sourceLabel == model.startLabel && possibleLiteral.sourceFragment == model.startFragment;
-	}
-	else{
-		return false;
-	}
-}
-
-//TODO: split into sub patterns
-@doc{Dynamic Query (mixture of static query text and dynamic inputs)}
-public bool matchesDynamic(SQLModel model){
-	if(model.startFragment is compositeFragment || model.startFragment is concatFragment){
-		return true;
-	}
-	else if(nameFragment(vn:varName(n)) := model.startFragment){
-		// first, make sure there is only one edge from the startFragment and that edge leads to a compositeFragment
-		// or concatFragment
-		edges = {x | x <- model.fragmentRel, vn := x.name};
-		if(size(edges) != 1){
-			return false;
+		for(yield <- yields){
+			int rank = rankings[classifyYield(yield)];
+			if(rank > max) max = rank;
 		}
-		else{
-			edge = getOneFrom(edges);
-			return edge.targetFragment is compositeFragment || edge.targetFragment is concatFragment;
-		}
+		
+		return max;
 	}
-	else{
-		return false;
-	}
-}
-
-//TODO: the next 3 functions could be made into 1 function
-// TODO: distinction between param holes and condition holes?
-@doc{Dynamic query with only parameter holes}
-public bool matchesDynamicParameters(SQLModel model){
-	if(! matchesDynamic(model)){
-		return false;
-	}
-	else{
-		info = classifyDynamicQuery(model);
-		// loop in case dynamic query has multiple yields
-		for(i <- info){
-			if(i.holeInfo["name"] > 0){
-				return false;
-			}
-			else if(i.holeInfo["param"] > 0){
-				continue;
-			}
-			else if(i.holeInfo["condition"] > 0){
-				continue;
-			}
-			else{
-				return false;
-			}
-		}
-		return true;
-	}
-}
-
-@doc{Dynamic query with at least one name hole}
-public bool matchesDynamicName(SQLModel model){
-	if(! matchesDynamic(model)){
-		return false;
-	}
-	else{
-		info = classifyDynamicQuery(model);
-		// loop in case dynamic query has multiple yields
-		for(i <- info){
-			if(i.holeInfo["name"] > 0){
-				return true;
-			}
-		}
-		return false;
-	}
-}
-
-@doc{case where dynamic query type is not select, update, insert, or delete}
-public bool matchesUnhandledDynamicQueryType(model){
-	if(! matchesDynamic(model)){
-		return false;
-	}
-	else{
-		info = classifyDynamicQuery(model);
-		for(i <- info){
-			if("unhandled query type" in i.holeInfo){
-				return true;
-			}
-		}
-		return false;
-	}
-}
-
-//TODO: split into sub patterns
-@doc{ControlFlow (query text based on control flow)}
-public bool matchesControlFlow(SQLModel model){
-	bool foundAMatchingEdge = false;
-	bool foundAnotherMatchingEdge = false;
-	for(<sourceLabel, sourceFragment, fragmentName, targetName, targetFragment, edgeInfo>
-			<- model.fragmentRel){
 	
-		if(sourceLabel := model.startLabel && sourceFragment := model.startFragment){
-			if(foundAMatchingEdge){
-				foundAnotherMatchingEdge = true;
-			}
-			else{
-				foundAMatchingEdge = true;
-			}
-		}
-	}
-	return foundAMatchingEdge && foundAnotherMatchingEdge;
+	// otherwise, look up ranking in the map
+	return rankings[classifyYield(yield)];
 }
 
-@doc{query comes from a function or method parameter}
-public bool matchesFunctionParam(SQLModel model){
-	return size(model.fragmentRel) == 1 && 
-		<startLabel, nameFragment(n), n, _, inputParamFragment(n), _> := getOneFrom(model.fragmentRel);
-}
-
-
-
-//TODO: split into sub patterns
-@doc{classify a single model}
+@doc{determine which pattern matches a SQLModel}
 public str classifySQLModel(SQLModel model){
-	if(matchesLiteral(model)){
-		return "Literal";
+	yields = yields(model);
+	
+	if(size(yields) == 1){
+		return classifyYield(getOneFrom(yields));
 	}
-	if(matchesDynamic(model)){
-		if(matchesUnhandledDynamicQueryType(model)){
-			return "Unhandled Dynamic Query Type";
-		}
-		if(matchesDynamicParameters(model)){
-			return "Dynamic Parameters";
-		}
-		if(matchesDynamicName(model)){
-			return "Dynamic Name";
-		}	
+	else{
+		return classifyYields(yields);
 	}
-	if(matchesControlFlow(model)){
-		return "Control Flow";
-	}
- 	if(matchesFunctionParam(model)){
-		return "Function Parameter";
+}
+
+@doc{classify a single yield}
+private str classifyYield(SQLYield yield){
+	if(size(yield) == 1 && staticPiece(_) := head(yield)){
+		return qcp0;
 	}
 	
-	return "unclassified";
+	if(hasDynamicPiece(yield)){
+		holeInfo = extractHoleInfo(runSQLParser(yield2String(yield)));
+		if(holeInfo["name"] > 0){
+			return qcp3;
+		}
+		if(holeInfo["param"] > 0 || holeInfo["condition"] > 0){
+			return qcp2;
+		}
+	}
+	
+	return unknown;
+}
+
+@doc{clasify a collection of yields}
+private str classifyYields(set[SQLYield] yields){
+	bool allStatic = true;
+	
+	for(yield <- yields){
+		if(classifyYield(yeild) != qcp0){
+			allStatic = false;
+		}
+	}
+	
+	if(allStatic){
+		return qcp1;
+	}
+	
+	return qcp4;
+}
+
+@doc{return whether at least one piece in a SQLYield is dynamic}
+private bool hasDynamicPiece(SQLYield yield){
+	for(piece <- yield){
+		if(dynamicPiece() := piece || namePiece(_) := piece){
+			return true;
+		}
+	}
+	
+	return false;
 }
 
 @doc{group models in a whole system based on pattern}
