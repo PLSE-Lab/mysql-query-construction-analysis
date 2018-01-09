@@ -162,35 +162,6 @@ public map[str, list[loc]] groupSQLModelLocs(str p, str v)
 public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
 		pattern <- modelMap, models := modelMap[pattern]);
 				 
-@doc{further classifies a Dynamic query into sub pattern(s)}
-public set[DynamicQueryInfo] classifyDynamicQuery(SQLModel model){
-	if(!matchesDynamic(model)){
-		throw "error calling classifyDynamicQuery on non dynamic query";
-	}
-	
-	res = {};
-	
-	for(yield <- yields(model)){
-		int staticParts = 0;
-		int dynamicParts = 0;
-		
-		for(piece <- yield){
-			if(piece is staticPiece){
-				staticParts += 1;
-			}
-			else{
-				dynamicParts += 1;
-			}
-		}
-		parsed = runParser(yield2String(yield));
-		
-		holeInfo = extractHoleInfo(parsed);
-		
-		res += dynamicQueryInfo(yield, parsed, staticParts, dynamicParts, holeInfo);
-	}
-	
-	return res;
-}
 
 @doc{extracts info about a dynamic query's holes}
 public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, having, order, limit, joins)){
