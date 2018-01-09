@@ -49,15 +49,15 @@ public str unknown = "unknown";
 public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 1, qcp3 : 2, unknown : 3);
 
 @doc{gets the "ranking" for this model, indicating how easy it will be to transform}
-public int getTransformationRanking(SQLModel model){
+public int getRanking(SQLModel model){
 	pattern = classifySQLModel(model);
 	
 	// for qcp4, the ranking is the ranking of the "worst" yield
 	if(pattern == qcp4){
 		int max = 0;
-		yields = yields(model);
+		modelYields = yields(model);
 		
-		for(yield <- yields){
+		for(yield <- modelYields){
 			int rank = rankings[classifyYield(yield)];
 			if(rank > max) max = rank;
 		}
@@ -66,7 +66,31 @@ public int getTransformationRanking(SQLModel model){
 	}
 	
 	// otherwise, look up ranking in the map
-	return rankings[classifyYield(yield)];
+	return rankings[pattern];
+}
+
+@doc{gets the average score of all models in a system}
+public real rankSystem(str p, str v){
+	models = {};
+	int count = 0;
+	real total = 0.0;
+	
+ 	if(modelsFileExists(p, v)){
+ 		models = readModels(p, v);
+ 	}
+ 	else{
+ 		models = buildModelsForSystem(p, v);
+ 		writeModels(p, v, models);
+ 	}
+ 	
+	for(<location, model> <- models){
+		pattern = classifySQLModel(model);
+		int score = getRanking(model);
+		total += score;
+		count = count + 1;
+	}
+	
+	return total / count;
 }
 
 @doc{determine which pattern matches a SQLModel}
@@ -129,7 +153,7 @@ private bool hasDynamicPiece(SQLYield yield){
 }
 
 @doc{group models in a whole system based on pattern}
-public map[str ,list[SQLModel]] groupSQLModels(str p, str v){
+public map[str, list[SQLModel]] groupSQLModels(str p, str v){
 	res = ( );
 	models = {};
 	
