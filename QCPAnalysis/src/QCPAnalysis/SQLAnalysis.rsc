@@ -22,6 +22,7 @@ import String;
 import List;
 
 alias SQLModelMap = map[SQLModel model, rel[SQLYield yield, str queryWithHoles, SQLQuery parsed] yieldsRel];
+alias HoleInfo = map[str, int];
 
 public loc modelLoc = baseLoc + "serialized/qcp/sqlmodels/";
 
@@ -70,13 +71,13 @@ public int getTransformationRanking(SQLModel model){
 
 @doc{determine which pattern matches a SQLModel}
 public str classifySQLModel(SQLModel model){
-	yields = yields(model);
+	modelYields = yields(model);
 	
-	if(size(yields) == 1){
-		return classifyYield(getOneFrom(yields));
+	if(size(modelYields) == 1){
+		return classifyYield(getOneFrom(modelYields));
 	}
 	else{
-		return classifyYields(yields);
+		return classifyYields(modelYields);
 	}
 }
 
@@ -87,7 +88,7 @@ private str classifyYield(SQLYield yield){
 	}
 	
 	if(hasDynamicPiece(yield)){
-		holeInfo = extractHoleInfo(runSQLParser(yield2String(yield)));
+		holeInfo = extractHoleInfo(runParser(yield2String(yield)));
 		if(holeInfo["name"] > 0){
 			return qcp3;
 		}
@@ -104,7 +105,7 @@ private str classifyYields(set[SQLYield] yields){
 	bool allStatic = true;
 	
 	for(yield <- yields){
-		if(classifyYield(yeild) != qcp0){
+		if(classifyYield(yield) != qcp0){
 			allStatic = false;
 		}
 	}
@@ -139,7 +140,6 @@ public map[str ,list[SQLModel]] groupSQLModels(str p, str v){
  		models = buildModelsForSystem(p, v);
  		writeModels(p, v, models);
  	}
-	
 	for(<location, model> <- models){
 		pattern = classifySQLModel(model);
 		if(pattern in res){
@@ -162,7 +162,6 @@ public map[str, list[loc]] groupSQLModelLocs(str p, str v)
 public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
 		pattern <- modelMap, models := modelMap[pattern]);
 				 
-
 @doc{extracts info about a dynamic query's holes}
 public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, having, order, limit, joins)){
 	res = ("name" : 0, "param" : 0, "condition" : 0);
