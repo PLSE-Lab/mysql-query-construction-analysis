@@ -29,31 +29,28 @@ public loc modelLoc = baseLoc + "serialized/qcp/sqlmodels/";
 @doc{single yield, single static piece}
 public str qcp0 = "static";
 
-@doc{multiple yields, each containing a single static piece}
-public str qcp1 = "static yields";
-
 @doc{single yield, mixture of static and dynamic pieces, all dynamic pieces are parameters}
-public str qcp2 = "dynamic parameters";
+public str qcp1 = "dynamic parameters";
 
 @doc{single yield with at least one dynamic piece that is not a parameter}
-public str qcp3 = "dynamic";
+public str qcp2 = "dynamic";
 
-@doc{multiple yields, at least one yield has at least one dynamic piece}
-public str qcp4 = "dynamic yields";
+@doc{query has multiple yields based on control flow}
+public str qcp3 = "multiple yields";
 
 @doc{model matches no patterns}
 public str unknown = "unknown";
 
 @doc{"ranking" for each pattern indicating ease of transformation}
-// note: qcp4 is not included as its score requires some computation
-public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 1, qcp3 : 2, unknown : 3);
+// note: qcp3 is not included as its score requires some computation
+public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 2, unknown : 3);
 
 @doc{gets the "ranking" for this model, indicating how easy it will be to transform}
 public int getRanking(SQLModel model){
 	pattern = classifySQLModel(model);
 	
-	// for qcp4, the ranking is the ranking of the "worst" yield
-	if(pattern == qcp4){
+	// for qcp3, the ranking is the ranking of the "worst" yield
+	if(pattern == qcp3){
 		int max = 0;
 		modelYields = yields(model);
 		
@@ -101,7 +98,7 @@ public str classifySQLModel(SQLModel model){
 		return classifyYield(getOneFrom(modelYields));
 	}
 	else{
-		return classifyYields(modelYields);
+		return qcp3;
 	}
 }
 
@@ -114,34 +111,15 @@ private str classifyYield(SQLYield yield){
 	if(hasDynamicPiece(yield)){
 		holeInfo = extractHoleInfo(runParser(yield2String(yield)));
 		if(holeInfo["name"] > 0){
-			return qcp3;
+			return qcp2;
 		}
 		if(holeInfo["param"] > 0 || holeInfo["condition"] > 0){
-			return qcp2;
+			return qcp1;
 		}
 	}
 	
 	return unknown;
 }
-
-@doc{clasify a collection of yields}
-private str classifyYields(set[SQLYield] yields){
-	bool allStatic = true;
-	
-	for(yield <- yields){
-		if(classifyYield(yield) != qcp0){
-			allStatic = false;
-		}
-	}
-	
-	if(allStatic){
-		return qcp1;
-	}
-	
-	return qcp4;
-}
-
-
 
 @doc{return whether at least one piece in a SQLYield is dynamic}
 private bool hasDynamicPiece(SQLYield yield){
