@@ -141,6 +141,8 @@ private str classifyYields(set[SQLYield] yields){
 	return qcp4;
 }
 
+
+
 @doc{return whether at least one piece in a SQLYield is dynamic}
 private bool hasDynamicPiece(SQLYield yield){
 	for(piece <- yield){
@@ -266,7 +268,7 @@ public HoleInfo extractHoleInfo(insertQuery(into, values, setOps, select, onDupl
 	if(!(into is noInto)){
 		if(hole(_) := into.dest) res["name"] += 1;
 		for(c <- into.columns){
-			intoColumnHole += res["name"] += 1;
+			res["name"] += holesInString(c);
 		}
 	}	
 	
