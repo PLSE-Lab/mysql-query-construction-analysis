@@ -173,42 +173,48 @@ public SystemQueryInfo collectSystemQueryInfo(str p, str v){
 		modelYields = yields(m);
 		if(size(modelYields) == 1){
 			parsed = runParser(yield2String(getOneFrom(modelYields)));
-			if(parsed is selectQuery){
-				res.selectInfo.numSelectQueries += 1;
-				if(parsed.where is where) res.selectInfo.numWhere += 1;
-				if(parsed.group is groupBy) res.selectInfo.numGroupBy += 1;
-				if(parsed.having is having) res.selectInfo.numHaving += 1;
-				if(parsed.order is orderBy) res.selectInfo.numOrderBy += 1;
-				if(!parsed.limit is noLimit) res.selectInfo.numLimit += 1;
-				if(!isEmpty(parsed.joins)) res.selectInfo.numJoin += 1;
-			}
-			else if(parsed is updateQuery){
-				res.updateInfo.numUpdateQueries += 1;
-				if(parsed.where is where) res.updateInfo.numWhere += 1;
-				if(parsed.order is orderBy) res.updateInfo.numOrderBy += 1;
-				if(!parsed.limit is noLimit) res.updateInfo.numLimit += 1;
-			}
-			else if(parsed is insertQuery){
-				res.insertInfo.numInsertQueries += 1;
-				if(!isEmpty(parsed.values)) res.insertInfo.numValues += 1;
-				if(!isEmpty(parsed.setOps)) res.insertInfo.numSetOp += 1;
-				if(parsed.select is selectQuery) res.insertInfo.numSelect += 1;
-				if(!isEmpty(parsed.onDuplicateSetOps)) res.insertInfo.numOnDuplicate += 1;
-			}
-			else if(parsed is deleteQuery){
-				res.deleteInfo.numDeleteQueries += 1;
-				if(!isEmpty(parsed.using)) res.deleteInfo.numUsing += 1;
-				if(parsed.where is where) res.deleteInfo.numWhere += 1;
-				if(parsed.order is orderBy) res.deleteInfo.numOrderBy += 1;
-				if(!parsed.limit is noLimit) res.deleteInfo.numLimit += 1;
-			}
-			else{
-				res.other.numOtherQueryTypes += 1;
-			}
+			res = extractQueryInfo(parsed, res);
 		}
 	}
 	
 	return res;
+}
+
+@doc{extracts clause and query type counts from a single query}
+private SystemQueryInfo extractQueryInfo(SQLQuery parsed, SystemQueryInfo info){
+	if(parsed is selectQuery){
+		info.selectInfo.numSelectQueries += 1;
+		if(parsed.where is where) info.selectInfo.numWhere += 1;
+		if(parsed.group is groupBy) info.selectInfo.numGroupBy += 1;
+		if(parsed.having is having) info.selectInfo.numHaving += 1;
+		if(parsed.order is orderBy) info.selectInfo.numOrderBy += 1;
+		if(!parsed.limit is noLimit) info.selectInfo.numLimit += 1;
+		if(!isEmpty(parsed.joins)) info.selectInfo.numJoin += 1;
+	}
+	else if(parsed is updateQuery){
+		info.updateInfo.numUpdateQueries += 1;
+		if(parsed.where is where) info.updateInfo.numWhere += 1;
+		if(parsed.order is orderBy) info.updateInfo.numOrderBy += 1;
+		if(!parsed.limit is noLimit) info.updateInfo.numLimit += 1;
+	}
+	else if(parsed is insertQuery){
+		info.insertInfo.numInsertQueries += 1;
+		if(!isEmpty(parsed.values)) info.insertInfo.numValues += 1;
+		if(!isEmpty(parsed.setOps)) info.insertInfo.numSetOp += 1;
+		if(parsed.select is selectQuery) info.insertInfo.numSelect += 1;
+		if(!isEmpty(parsed.onDuplicateSetOps)) info.insertInfo.numOnDuplicate += 1;
+	}
+	else if(parsed is deleteQuery){
+		info.deleteInfo.numDeleteQueries += 1;
+		if(!isEmpty(parsed.using)) info.deleteInfo.numUsing += 1;
+		if(parsed.where is where) info.deleteInfo.numWhere += 1;
+		if(parsed.order is orderBy) info.deleteInfo.numOrderBy += 1;
+		if(!parsed.limit is noLimit) info.deleteInfo.numLimit += 1;
+	}
+	else{
+		info.other.numOtherQueryTypes += 1;
+	}
+	return info;
 }
 			 
 @doc{extracts info about a dynamic query's holes}
