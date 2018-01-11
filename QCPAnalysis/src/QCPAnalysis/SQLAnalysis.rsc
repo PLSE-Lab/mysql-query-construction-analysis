@@ -68,17 +68,9 @@ public int getRanking(SQLModel model){
 
 @doc{gets the average score of all models in a system}
 public real rankSystem(str p, str v){
-	models = {};
+	models = getModels(p, v);
 	int count = 0;
 	real total = 0.0;
-	
- 	if(modelsFileExists(p, v)){
- 		models = readModels(p, v);
- 	}
- 	else{
- 		models = buildModelsForSystem(p, v);
- 		writeModels(p, v, models);
- 	}
  	
 	for(<location, model> <- models){
 		pattern = classifySQLModel(model);
@@ -135,15 +127,8 @@ private bool hasDynamicPiece(SQLYield yield){
 @doc{group models in a whole system based on pattern}
 public map[str, list[SQLModel]] groupSQLModels(str p, str v){
 	res = ( );
-	models = {};
+	models = getModels(p, v);
 	
- 	if(modelsFileExists(p, v)){
- 		models = readModels(p, v);
- 	}
- 	else{
- 		models = buildModelsForSystem(p, v);
- 		writeModels(p, v, models);
- 	}
 	for(<location, model> <- models){
 		pattern = classifySQLModel(model);
 		if(pattern in res){
@@ -165,7 +150,67 @@ public map[str, list[loc]] groupSQLModelLocs(str p, str v)
 @doc{return just the counts of each pattern in a system}
 public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
 		pattern <- modelMap, models := modelMap[pattern]);
-				 
+	
+data QueryInfo = selectInfo(int numSelectQueries, int numWhere, int numGroupBy, int numHaving, int numOrderBy, int numLimit, int numJoin)
+					 | updateInfo(int numUpdateQueries, int numWhere, int numOrderBy, int numLimit)
+					 | insertInfo(int numInsertQueries, int numValues, int numSetOp, int numSelect, int numOnDuplicate)
+					 | deleteInfo(int numDeleteQueries, int numUsing, int numWhere, int numOrderBy, int numLimit)
+					 | other(int numOtherQueryTypes, int numQueriesWithVaryingTypes);
+					 
+data SystemQueryInfo = systemQueryInfo(QueryInfo selectInfo, QueryInfo updateInfo, QueryInfo insertInfo, QueryInfo deleteInfo, QueryInfo otherInfo);
+								
+@doc{analyzes the queries in a system and returns counts for query types, clauses, etc.}
+public SystemQueryInfo collectSystemQueryInfo(str p, str v){
+	res = systemQueryInfo(selectInfo(0,0,0,0,0,0,0),
+						  updateInfo(0,0,0,0),
+						  insertInfo(0,0,0,0,0),
+						  deleteInfo(0,0,0,0,0),
+						  other(0,0));
+						  
+	models = getModels(p, v);
+	
+	for(<l,m> <- models){
+		modelYields = yields(m);
+		if(size(modelYields) == 1){
+			parsed = runParser(yield2String(getOneFrom(modelYields)));
+			if(parsed is selectQuery){
+				res.selectInfo.numSelectQueries += 1;
+				if(parsed.where is where) res.selectInfo.numWhere += 1;
+				if(parsed.group is groupBy) res.selectInfo.numGroupBy += 1;
+				if(parsed.having is having) res.selectInfo.numHaving += 1;
+				if(parsed.order is orderBy) res.selectInfo.numOrderBy += 1;
+				if(!parsed.limit is noLimit) res.selectInfo.numLimit += 1;
+				if(!isEmpty(parsed.joins)) res.selectInfo.numJoin += 1;
+			}
+			else if(parsed is updateQuery){
+				res.updateInfo.numUpdateQueries += 1;
+				if(parsed.where is where) res.updateInfo.numWhere += 1;
+				if(parsed.order is orderBy) res.updateInfo.numOrderBy += 1;
+				if(!parsed.limit is noLimit) res.updateInfo.numLimit += 1;
+			}
+			else if(parsed is insertQuery){
+				res.insertInfo.numInsertQueries += 1;
+				if(!isEmpty(parsed.values)) res.insertInfo.numValues += 1;
+				if(!isEmpty(parsed.setOps)) res.insertInfo.numSetOp += 1;
+				if(parsed.select is selectQuery) res.insertInfo.numSelect += 1;
+				if(!isEmpty(parsed.onDuplicateSetOps)) res.insertInfo.numOnDuplicate += 1;
+			}
+			else if(parsed is deleteQuery){
+				res.deleteInfo.numDeleteQueries += 1;
+				if(!isEmpty(parsed.using)) res.deleteInfo.numUsing += 1;
+				if(parsed.where is where) res.deleteInfo.numWhere += 1;
+				if(parsed.order is orderBy) res.deleteInfo.numOrderBy += 1;
+				if(!parsed.limit is noLimit) res.deleteInfo.numLimit += 1;
+			}
+			else{
+				res.other.numOtherQueryTypes += 1;
+			}
+		}
+	}
+	
+	return res;
+}
+			 
 @doc{extracts info about a dynamic query's holes}
 public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, having, order, limit, joins)){
 	res = ("name" : 0, "param" : 0, "condition" : 0);
@@ -417,4 +462,16 @@ public int holesInString(str subject){
 	}
 	
 	return res;
+}
+
+public rel[loc, SQLModel] getModels(str p, str v){
+	models = {};
+	if(modelsFileExists(p, v)){
+ 		models = readModels(p, v);
+ 	}
+ 	else{
+ 		models = buildModelsForSystem(p, v);
+ 		writeModels(p, v, models);
+ 	}
+ 	return models;
 }
