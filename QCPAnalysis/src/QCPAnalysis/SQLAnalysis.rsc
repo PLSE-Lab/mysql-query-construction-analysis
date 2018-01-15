@@ -36,8 +36,14 @@ public str qcp1 = "dynamic parameters";
 @doc{single yield with at least one dynamic piece that is not a parameter}
 public str qcp2 = "dynamic";
 
-@doc{query has multiple yields based on control flow}
-public str qcp3 = "multiple yields";
+@doc{query has multiple yields, but all yields lead to the same parsed query}
+public str qcp3a = "multiple yields, same parsed query";
+
+@doc{query has multiple yields, all yields are the same type of query (select, insert, etc)}
+public str qcp3b = "multiple yields, same query type";
+
+@doc{query has multiple yields, yields are of differing query types}
+public str qcp3c = "multiple yields, different query types";
 
 @doc{model matches no patterns}
 public str unknown = "unknown";
@@ -50,8 +56,14 @@ public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 2, unknown : 3);
 public int getRanking(SQLModel model){
 	pattern = classifySQLModel(model);
 	
-	// for qcp3, the ranking is the ranking of the "worst" yield
-	if(pattern == qcp3){
+	// for qcp3a, check whether this is dynamic parameters or completely dynamic
+	if(pattern == qcp3a){
+		yield = getOneFrom(yields(model));
+		return rankings[classifyYield(yield)];
+	}
+	
+	// for qcp3b and qcp3c, the ranking is the ranking of the "worst" yield
+	if(pattern == qcp3b || pattern == qcp3c){
 		int max = 0;
 		modelYields = yields(model);
 		
@@ -91,7 +103,27 @@ public str classifySQLModel(SQLModel model){
 		return classifyYield(getOneFrom(modelYields));
 	}
 	else{
-		return qcp3;
+		return classifyQCP3Query(modelYields);
+	}
+}
+
+@doc{determines which sub pattern a QCP3 query belongs to}
+public str classifyQCP3Query(set[SQLYield] modelYields){
+	parsed = { runParser(yield2String(y)) | y <- modelYields};
+	// check if these different yields actually lead to different parsed queries
+	// in many cases, the yields only differ in hole source and not query type, clauses, etc.
+	if(size(parsed) == 1){
+		return qcp3a;
+	}
+	
+	someType = getName(getOneFrom(parsed));
+	sameType = (true | it && getName(p) == someType | p <- parsed);
+	
+	if(sameType){
+		return qcp3b;
+	}
+	else{
+		return qcp3c;
 	}
 }
 
@@ -110,6 +142,11 @@ private str classifyYield(SQLYield yield){
 			return qcp1;
 		}
 	}
+	
+	// uncommenting this stops the program when an unknown model is found (for inspection)
+	// println(yield);
+	// println(runParser(yield2String(yield)));
+	// throw "stop";
 	
 	return unknown;
 }
