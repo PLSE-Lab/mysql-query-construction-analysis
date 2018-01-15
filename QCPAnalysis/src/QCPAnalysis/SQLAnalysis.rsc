@@ -193,9 +193,9 @@ data QueryInfo = selectInfo(int numSelectQueries, int numWhere, int numGroupBy, 
 					 | updateInfo(int numUpdateQueries, int numWhere, int numOrderBy, int numLimit)
 					 | insertInfo(int numInsertQueries, int numValues, int numSetOp, int numSelect, int numOnDuplicate)
 					 | deleteInfo(int numDeleteQueries, int numUsing, int numWhere, int numOrderBy, int numLimit)
-					 | otherInfo(int numOtherQueryTypes, int numAllYieldsSameQuery, int numAllYieldsSameType, int numQueriesWithVaryingTypes);
+					 | otherInfo(int numOtherQueryTypes);
 					 
-data SystemQueryInfo = systemQueryInfo(QueryInfo selectInfo, QueryInfo updateInfo, QueryInfo insertInfo, QueryInfo deleteInfo, QueryInfo otherInfo);
+data SystemQueryInfo = systemQueryInfo(QueryInfo selectInfo, QueryInfo updateInfo, QueryInfo insertInfo, QueryInfo deleteInfo, int numOtherQueryTypes);
 								
 @doc{analyzes the queries in a system and returns counts for query types, clauses, etc.}
 public SystemQueryInfo collectSystemQueryInfo(str p, str v){
@@ -203,28 +203,24 @@ public SystemQueryInfo collectSystemQueryInfo(str p, str v){
 						  updateInfo(0,0,0,0),
 						  insertInfo(0,0,0,0,0),
 						  deleteInfo(0,0,0,0,0),
-						  otherInfo(0,0,0,0));
+						  0);
 						  
 	models = getModels(p, v);
 	
 	for(<l,m> <- models){
-		modelYields = yields(m);
-		if(size(modelYields) == 1){
-			parsed = runParser(yield2String(getOneFrom(modelYields)));
+		pattern = classifySQLModel(m);
+		if(pattern == qcp0 || pattern == qcp1 || pattern == qcp2 || pattern == qcp3a){
+			parsed = runParser(yield2String(getOneFrom(yields(m))));
 			res = extractQueryInfo(parsed, res);
 		}
 		else{
-			parsed = { runParser(yield2String(y)) | y <- modelYields};
-			// check if these different yields actually lead to different parsed queries
-			// in many cases, the yields only differ in hole source and not query type, clauses, etc.
-			if(size(parsed) == 1){
-				res.otherInfo.numAllYieldsSameQuery += 1;
-				res = extractQueryInfo(getOneFrom(parsed), res);
+			if(pattern == qcp3b){
+				// TODO: compare yields, only count once for clauses that are the same
+				continue;
 			}
-			else{
-				// in this case, the yields actually lead to different parsed queries, so we will
-				// treat them separately
-				res = extractQueryInfo(parsed, res);
+			if(pattern == qcp3c){
+				// TODO: for yields that are different query types, count the clauses of each yield
+				continue;
 			}
 		}
 	}
@@ -269,28 +265,28 @@ private SystemQueryInfo extractQueryInfo(SQLQuery parsed, SystemQueryInfo info){
 	return info;
 }
 
-@doc{for queries with multiple yields, extracts query type and clause counts}
-private SystemQueryInfo extractQueryInfo(set[SQLQuery] parsed, SystemQueryInfo info){
-	// first, check if all yields are the same query type
-	someType = getName(getOneFrom(parsed));
-	sameType = (true | it && getName(p) == someType | p <- parsed);
-	
-	// uncommenting this stops the program when a query with multiple possible parsed queries is 
-	// found and prints the parsed yields (for inspection)
-	// iprintln(parsed);
-	// throw "stop";
-	
-	if(sameType){
-		info.otherInfo.numAllYieldsSameType += 1;
-	}
-	else{
-		info.otherInfo.numQueriesWithVaryingTypes += 1;
-	}
-	
-	//TODO: look into this more, see where the yields actually differ
-	
-	return info;
-} 
+//@doc{for queries with multiple yields, extracts query type and clause counts}
+//private SystemQueryInfo extractQueryInfo(set[SQLQuery] parsed, SystemQueryInfo info){
+//	// first, check if all yields are the same query type
+//	someType = getName(getOneFrom(parsed));
+//	sameType = (true | it && getName(p) == someType | p <- parsed);
+//	
+//	// uncommenting this stops the program when a query with multiple possible parsed queries is 
+//	// found and prints the parsed yields (for inspection)
+//	// iprintln(parsed);
+//	// throw "stop";
+//	
+//	if(sameType){
+//		info.otherInfo.numAllYieldsSameType += 1;
+//	}
+//	else{
+//		info.otherInfo.numQueriesWithVaryingTypes += 1;
+//	}
+//	
+//	//TODO: look into this more, see where the yields actually differ
+//	
+//	return info;
+//} 
 			 
 @doc{extracts info about a dynamic query's holes}
 public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, having, order, limit, joins)){
