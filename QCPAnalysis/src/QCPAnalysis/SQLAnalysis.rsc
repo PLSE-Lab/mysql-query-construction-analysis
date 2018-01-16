@@ -116,10 +116,11 @@ public str classifyQCP3Query(set[SQLYield] modelYields){
 		return qcp3a;
 	}
 	
-	someType = getName(getOneFrom(parsed));
-	sameType = (true | it && getName(p) == someType | p <- parsed);
+	// in these cases, the yields actually lead to different parsed queries, so we compare them
+	// to see how they differ
+	yieldInfo = compareYields(parsed);
 	
-	if(sameType){
+	if(yieldInfo is sameType){
 		return qcp3b;
 	}
 	else{
@@ -149,6 +150,97 @@ private str classifyYield(SQLYield yield){
 	// throw "stop";
 	
 	return unknown;
+}
+
+@doc{represents the differences in yields for a specific set of model yields}
+// until we actually see QCP3c, differentType will only keep track of what the query types are
+data YieldInfo = sameType(ClauseInfo clauseInfo)
+			   | differentTypes(set[str] types);
+			   
+@doc{for yields of the same type, represents information about how the parsed yields differ}  
+data ClauseInfo = selectClauses(bool sameSelect, bool sameFrom, bool sameWhere, bool sameGroupBy, 
+					bool sameHaving, bool sameOrderBy, bool sameLimit, bool sameJoin)
+				| updateClauses(bool sameTables, bool sameSetOps, bool sameWhere, bool sameOrderBy, 
+					bool sameLimit)
+				| insertClauses(bool sameInto, bool sameValues, bool sameSetOps, bool sameSelect,
+					bool sameOnDuplicateSetOps)
+				| deleteClauses(bool sameFrom, bool sameUsing, bool sameWhere, bool sameOrderBy, 
+					bool sameLimit);
+
+@doc{determine how a set of parsed queries are different}
+public YieldInfo compareYields(set[SQLQuery] parsed){
+	someType = getName(getOneFrom(parsed));
+	types = {getName(p) | p <- parsed};
+	
+	if(size(types) == 1){
+		return compareYields(someType, parsed);
+	}
+	else{
+		// todo: collect more information about what this case generally looks like
+		return differentTypes(types);
+	}
+}
+private YieldInfo compareYields("selectQuery", set[SQLQuery] parsed){
+	res = selectClauses(true, true, true, true, true, true, true, true);
+	
+	someYield = getOneFrom(parsed);
+	for(p <- parsed){
+		res.sameSelect = res.sameSelect && p.selectExpressions == someYield.selectExpressions;
+		res.sameFrom = res.sameFrom && p.from == someYield.from;
+		res.sameWhere = res.sameWhere && p.where == someYield.where;
+		res.sameGroupBy = res.sameGroupBy && p.group == someYield.group;
+		res.sameHaving = res.sameHaving && p.having == someYield.having;
+		res.sameOrderBy = res.sameOrderBy && p.order == someYield.order;
+		res.sameLimit = res.sameLimit && p.limit == someYield.limit;
+		res.sameJoin = res.sameJoin && p.joins == someYield.joins;
+	}
+	
+	return sameType(res);
+}
+private YieldInfo compareYields("updateQuery", set[SQLQuery] parsed){
+	res = updateClauses(true, true, true, true, true);
+	
+	someYield = getOneFrom(parsed);
+	for(p <- parsed){
+		res.sameTables = res.sameTables && p.tables == someYield.tables;
+		res.sameSetOps = res.sameSetOps && p.setOps == someYield.setOps;
+		res.sameWhere = res.sameWhere && p.where == someYield.where;
+		res.sameOrderBy = res.sameOrderBy && p.order == someYield.order;
+		res.sameLimit = res.sameLimit && p.limit == someYield.limit;
+	}
+	
+	return sameType(res);
+}
+private YieldInfo compareYields("insertQuery", set[SQLQuery] parsed){
+	res = insertClauses(true, true, true, true, true);
+	
+	someYield = getOneFrom(parsed);
+	for(p <- parsed){
+		res.sameInto = res.sameInto && p.into == someYield.into;
+		res.sameValues = res.sameValues && p.values == someYield.values;
+		res.sameSetOps = res.sameSetOps && p.setOps == someYield.setOps;
+		res.sameSelect = res.sameSelect && p.select == someYield.select;
+		res.sameOnDuplicateSetOps = res.sameOnDuplicateSetOps &&
+			p.onDuplicateSetOps == someYield.onDuplicateSetOps;
+	}
+	
+	return sameType(res);
+}
+		//| deleteClauses(bool sameFrom, bool sameUsing, bool sameWhere, bool sameOrderBy, 
+		//	bool sameLimit);
+private YieldInfo compareYields("deleteQuery", set[SQLQuery] parsed){
+	res = deleteClauses(true, true, true, true, true);
+	
+	someYield = getOneFrom(parsed);
+	for(p <- parsed){
+		res.sameFrom = res.sameFrom && p.from == someYield.from;
+		res.sameUsing = res.sameUsing && p.using == someYield.using;
+		res.sameWhere = res.sameWhere && p.where == someYield.where;
+		res.sameOrderBy = res.sameOrderBy && p.order == someYield.order;
+		res.sameLimit = res.sameLimit && p.limit == someYield.limit;
+	}
+	
+	return sameType(res);
 }
 
 @doc{return whether at least one piece in a SQLYield is dynamic}
@@ -189,12 +281,14 @@ public map[str, list[loc]] groupSQLModelLocs(str p, str v)
 public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
 		pattern <- modelMap, models := modelMap[pattern]);
 	
+@doc{empirical information about a specific query type in a system}
 data QueryInfo = selectInfo(int numSelectQueries, int numWhere, int numGroupBy, int numHaving, int numOrderBy, int numLimit, int numJoin)
 					 | updateInfo(int numUpdateQueries, int numWhere, int numOrderBy, int numLimit)
 					 | insertInfo(int numInsertQueries, int numValues, int numSetOp, int numSelect, int numOnDuplicate)
 					 | deleteInfo(int numDeleteQueries, int numUsing, int numWhere, int numOrderBy, int numLimit)
 					 | otherInfo(int numOtherQueryTypes);
 					 
+@doc{empirical information about all query types in a system}					 
 data SystemQueryInfo = systemQueryInfo(QueryInfo selectInfo, QueryInfo updateInfo, QueryInfo insertInfo, QueryInfo deleteInfo, int numOtherQueryTypes);
 								
 @doc{analyzes the queries in a system and returns counts for query types, clauses, etc.}
@@ -264,29 +358,6 @@ private SystemQueryInfo extractQueryInfo(SQLQuery parsed, SystemQueryInfo info){
 	}
 	return info;
 }
-
-//@doc{for queries with multiple yields, extracts query type and clause counts}
-//private SystemQueryInfo extractQueryInfo(set[SQLQuery] parsed, SystemQueryInfo info){
-//	// first, check if all yields are the same query type
-//	someType = getName(getOneFrom(parsed));
-//	sameType = (true | it && getName(p) == someType | p <- parsed);
-//	
-//	// uncommenting this stops the program when a query with multiple possible parsed queries is 
-//	// found and prints the parsed yields (for inspection)
-//	// iprintln(parsed);
-//	// throw "stop";
-//	
-//	if(sameType){
-//		info.otherInfo.numAllYieldsSameType += 1;
-//	}
-//	else{
-//		info.otherInfo.numQueriesWithVaryingTypes += 1;
-//	}
-//	
-//	//TODO: look into this more, see where the yields actually differ
-//	
-//	return info;
-//} 
 			 
 @doc{extracts info about a dynamic query's holes}
 public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, having, order, limit, joins)){
