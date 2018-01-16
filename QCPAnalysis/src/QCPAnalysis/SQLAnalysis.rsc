@@ -158,14 +158,15 @@ data YieldInfo = sameType(ClauseInfo clauseInfo)
 			   | differentTypes(set[str] types);
 			   
 @doc{for yields of the same type, represents information about how the parsed yields differ}  
-data ClauseInfo = selectClauses(bool sameSelect, bool sameFrom, bool sameWhere, bool sameGroupBy, 
-					bool sameHaving, bool sameOrderBy, bool sameLimit, bool sameJoin)
-				| updateClauses(bool sameTables, bool sameSetOps, bool sameWhere, bool sameOrderBy, 
-					bool sameLimit)
-				| insertClauses(bool sameInto, bool sameValues, bool sameSetOps, bool sameSelect,
-					bool sameOnDuplicateSetOps)
-				| deleteClauses(bool sameFrom, bool sameUsing, bool sameWhere, bool sameOrderBy, 
-					bool sameLimit);
+data ClauseInfo = selectClauses(set[list[Exp]] sameSelectExp, set[list[Exp]] sameFrom, set[Where] sameWhere, 
+					set[GroupBy] sameGroupBy, set[Having] sameHaving, set[OrderBy] sameOrderBy, 
+					set[Limit] sameLimit, set[list[Join]] sameJoin)
+				| updateClauses(set[list[Exp]] sameTables, set[list[SetOp]] sameSetOps, 
+					set[Where] sameWhere, set[OrderBy] sameOrderBy, set[Limit] sameLimit)
+				| insertClauses(set[Into] sameInto, set[list[list[str]]] sameValues, set[list[SetOp]] sameSetOps, 
+					set[SQLQuery] sameSelect, set[list[SetOp]] sameOnDuplicateSetOps)
+				| deleteClauses(set[list[Exp]] sameFrom, set[list[str]] sameUsing, set[Where] sameWhere, 
+					set[OrderBy] sameOrderBy, set[Limit] sameLimit);
 
 @doc{determine how a set of parsed queries are different}
 public YieldInfo compareYields(set[SQLQuery] parsed){
@@ -181,63 +182,57 @@ public YieldInfo compareYields(set[SQLQuery] parsed){
 	}
 }
 private YieldInfo compareYields("selectQuery", set[SQLQuery] parsed){
-	res = selectClauses(true, true, true, true, true, true, true, true);
+	res = selectClauses({}, {}, {}, {}, {}, {}, {}, {});
 	
-	someYield = getOneFrom(parsed);
 	for(p <- parsed){
-		res.sameSelect = res.sameSelect && p.selectExpressions == someYield.selectExpressions;
-		res.sameFrom = res.sameFrom && p.from == someYield.from;
-		res.sameWhere = res.sameWhere && p.where == someYield.where;
-		res.sameGroupBy = res.sameGroupBy && p.group == someYield.group;
-		res.sameHaving = res.sameHaving && p.having == someYield.having;
-		res.sameOrderBy = res.sameOrderBy && p.order == someYield.order;
-		res.sameLimit = res.sameLimit && p.limit == someYield.limit;
-		res.sameJoin = res.sameJoin && p.joins == someYield.joins;
+		res.sameSelectExp = res.sameSelectExp + p.selectExpressions;
+		res.sameFrom 	  = res.sameFrom + p.from;
+		res.sameWhere 	  = res.sameWhere + p.where;
+		res.sameGroupBy   = res.sameGroupBy + p.group;
+		res.sameHaving    = res.sameHaving + p.having;
+		res.sameOrderBy   = res.sameOrderBy + p.order;
+		res.sameLimit     = res.sameLimit + p.limit;
+		res.sameJoin      = res.sameJoin + p.joins;
 	}
 	
 	return sameType(res);
 }
 private YieldInfo compareYields("updateQuery", set[SQLQuery] parsed){
-	res = updateClauses(true, true, true, true, true);
+	res = updateClauses({}, {}, {}, {}, {});
 	
 	someYield = getOneFrom(parsed);
 	for(p <- parsed){
-		res.sameTables = res.sameTables && p.tables == someYield.tables;
-		res.sameSetOps = res.sameSetOps && p.setOps == someYield.setOps;
-		res.sameWhere = res.sameWhere && p.where == someYield.where;
-		res.sameOrderBy = res.sameOrderBy && p.order == someYield.order;
-		res.sameLimit = res.sameLimit && p.limit == someYield.limit;
+		res.sameTables  = res.sameTables + p.tables;
+		res.sameSetOps  = res.sameSetOps + p.setOps;
+		res.sameWhere   = res.sameWhere + p.where;
+		res.sameOrderBy = res.sameOrderBy + p.order;
+		res.sameLimit   = res.sameLimit + p.limit;
 	}
 	
 	return sameType(res);
 }
 private YieldInfo compareYields("insertQuery", set[SQLQuery] parsed){
-	res = insertClauses(true, true, true, true, true);
+	res = insertClauses({}, {}, {}, {}, {});
 	
-	someYield = getOneFrom(parsed);
 	for(p <- parsed){
-		res.sameInto = res.sameInto && p.into == someYield.into;
-		res.sameValues = res.sameValues && p.values == someYield.values;
-		res.sameSetOps = res.sameSetOps && p.setOps == someYield.setOps;
-		res.sameSelect = res.sameSelect && p.select == someYield.select;
-		res.sameOnDuplicateSetOps = res.sameOnDuplicateSetOps &&
-			p.onDuplicateSetOps == someYield.onDuplicateSetOps;
+		res.sameInto 			  = res.sameInto + p.into;
+		res.sameValues 			  = res.sameValues + p.values;
+		res.sameSetOps 			  = res.sameSetOps + p.setOps;
+		res.sameSelect 			  = res.sameSelect + p.select;
+		res.sameOnDuplicateSetOps = res.sameOnDuplicateSetOps + p.onDuplicateSetOps;
 	}
 	
 	return sameType(res);
 }
-		//| deleteClauses(bool sameFrom, bool sameUsing, bool sameWhere, bool sameOrderBy, 
-		//	bool sameLimit);
 private YieldInfo compareYields("deleteQuery", set[SQLQuery] parsed){
-	res = deleteClauses(true, true, true, true, true);
+	res = deleteClauses({}, {}, {}, {}, {});
 	
-	someYield = getOneFrom(parsed);
 	for(p <- parsed){
-		res.sameFrom = res.sameFrom && p.from == someYield.from;
-		res.sameUsing = res.sameUsing && p.using == someYield.using;
-		res.sameWhere = res.sameWhere && p.where == someYield.where;
-		res.sameOrderBy = res.sameOrderBy && p.order == someYield.order;
-		res.sameLimit = res.sameLimit && p.limit == someYield.limit;
+		res.sameFrom    = res.sameFrom + p.from;
+		res.sameUsing   = res.sameUsing + p.using;
+		res.sameWhere   = res.sameWhere + p.where;
+		res.sameOrderBy = res.sameOrderBy + p.order;
+		res.sameLimit   = res.sameLimit + p.limit;
 	}
 	
 	return sameType(res);
