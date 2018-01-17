@@ -352,7 +352,7 @@ private SystemQueryInfo extractQueryInfo(SQLQuery parsed, SystemQueryInfo info){
 		if(!parsed.limit is noLimit) info.deleteInfo.numLimit += 1;
 	}
 	else{
-		info.otherInfo.numOtherQueryTypes += 1;
+		info.numOtherQueryTypes += 1;
 	}
 	return info;
 }
