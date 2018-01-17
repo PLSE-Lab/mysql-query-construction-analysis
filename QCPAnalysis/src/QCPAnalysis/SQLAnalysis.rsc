@@ -166,7 +166,9 @@ data ClauseInfo = selectClauses(set[list[Exp]] sameSelectExp, set[list[Exp]] sam
 				| insertClauses(set[Into] sameInto, set[list[list[str]]] sameValues, set[list[SetOp]] sameSetOps, 
 					set[SQLQuery] sameSelect, set[list[SetOp]] sameOnDuplicateSetOps)
 				| deleteClauses(set[list[Exp]] sameFrom, set[list[str]] sameUsing, set[Where] sameWhere, 
-					set[OrderBy] sameOrderBy, set[Limit] sameLimit);
+					set[OrderBy] sameOrderBy, set[Limit] sameLimit)
+				| otherQueryType(str queryType);
+				
 
 @doc{determine how a set of parsed queries are different}
 public YieldInfo compareYields(set[SQLQuery] parsed){
@@ -236,6 +238,9 @@ private YieldInfo compareYields("deleteQuery", set[SQLQuery] parsed){
 	}
 	
 	return sameType(res);
+}
+private YieldInfo compareYields(str queryType, set[SQLQuery] parsed){
+	return sameType(otherQueryType(queryType));
 }
 
 @doc{return whether at least one piece in a SQLYield is dynamic}
@@ -620,7 +625,6 @@ public SQLModelRel getModels(str p, str v){
  				yieldsAndParsed = yieldsAndParsed + <y, runParser(yield2String(y))>;
  			}
  			yieldInfo = compareYields(yieldsAndParsed<1>);
- 			
  			modelsRel = modelsRel + <l, m, yieldsAndParsed, yieldInfo>;
  		}
  		writeBinaryValueFile(analysisLoc + "<p>-<v>.bin", modelsRel, compression=false);	
