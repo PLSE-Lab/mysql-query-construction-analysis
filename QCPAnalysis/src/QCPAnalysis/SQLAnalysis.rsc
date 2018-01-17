@@ -22,7 +22,7 @@ import String;
 import List;
 import Node;
 
-alias SQLModelRel = rel[loc location, SQLModel model, rel[SQLYield, SQLQuery] yields, YieldInfo info];
+alias SQLModelRel = rel[loc location, SQLModel model, rel[SQLYield, SQLQuery] yieldsRel, YieldInfo info];
 alias HoleInfo = map[str, int];
 
 public loc analysisLoc = baseLoc + "serialized/qcp/sqlanalysis/";
@@ -81,11 +81,11 @@ public int getRanking(SQLModel model){
 
 @doc{gets the average score of all models in a system}
 public real rankSystem(str p, str v){
-	models = getModels(p, v);
+	modelsRel = getModels(p, v);
 	int count = 0;
 	real total = 0.0;
  	
-	for(<location, model> <- models){
+	for(model <- modelsRel){
 		pattern = classifySQLModel(model);
 		int score = getRanking(model);
 		total += score;
@@ -96,31 +96,28 @@ public real rankSystem(str p, str v){
 }
 
 @doc{determine which pattern matches a SQLModel}
-public str classifySQLModel(SQLModel model){
-	modelYields = yields(model);
+public str classifySQLModel(tuple[loc location, SQLModel model, rel[SQLYield, SQLQuery] yieldsRel, 
+	YieldInfo info] modelInfo){
 	
-	if(size(modelYields) == 1){
-		return classifyYield(getOneFrom(modelYields));
+	if(size(modelInfo.yieldsRel) == 1){
+		parsedYieldPair = getOneFrom(modelInfo.yieldsRel);
+		return classifyYield(parsedYieldPair[0], parsedYieldPair[1]);
 	}
 	else{
-		return classifyQCP3Query(modelYields);
+		return classifyQCP3Query(modelInfo.yieldsRel, modelInfo.info);
 	}
 }
 
 @doc{determines which sub pattern a QCP3 query belongs to}
-public str classifyQCP3Query(set[SQLYield] modelYields){
-	parsed = { runParser(yield2String(y)) | y <- modelYields};
-	// check if these different yields actually lead to different parsed queries
-	// in many cases, the yields only differ in hole source and not query type, clauses, etc.
-	if(size(parsed) == 1){
+public str classifyQCP3Query(rel[SQLYield, SQLQuery] parsedYieldPairs, YieldInfo info){
+	// check for the case where all yields lead to the same parsed query (qcp3a)
+	if(size(parsedYieldPairs<1>) == 1){
 		return qcp3a;
 	}
 	
-	// in these cases, the yields actually lead to different parsed queries, so we compare them
-	// to see how they differ
-	yieldInfo = compareYields(parsed);
-	
-	if(yieldInfo is sameType){
+	// in these cases, the yields actually lead to different parsed queries, so we consult the
+	// yield info to see how they differ
+	if(info is sameType){
 		return qcp3b;
 	}
 	else{
@@ -129,13 +126,14 @@ public str classifyQCP3Query(set[SQLYield] modelYields){
 }
 
 @doc{classify a single yield}
-private str classifyYield(SQLYield yield){
+private str classifyYield(SQLYield yield, SQLQuery parsed){
+	
 	if(size(yield) == 1 && staticPiece(_) := head(yield)){
 		return qcp0;
 	}
 	
 	if(hasDynamicPiece(yield)){
-		holeInfo = extractHoleInfo(runParser(yield2String(yield)));
+		holeInfo = extractHoleInfo(parsed);
 		if(holeInfo["name"] > 0){
 			return qcp2;
 		}
@@ -259,13 +257,13 @@ public map[str, list[SQLModel]] groupSQLModels(str p, str v){
 	res = ( );
 	models = getModels(p, v);
 	
-	for(<location, model> <- models){
+	for(model <- models){
 		pattern = classifySQLModel(model);
 		if(pattern in res){
-			res[pattern] += model;
+			res[pattern] += model.model;
 		}
 		else{
-			res += (pattern : [model]);
+			res += (pattern : [model.model]);
 		}
 	}
 	
@@ -301,10 +299,10 @@ public SystemQueryInfo collectSystemQueryInfo(str p, str v){
 						  
 	models = getModels(p, v);
 	
-	for(<l,m> <- models){
-		pattern = classifySQLModel(m);
+	for(model <- models){
+		pattern = classifySQLModel(model);
 		if(pattern == qcp0 || pattern == qcp1 || pattern == qcp2 || pattern == qcp3a){
-			parsed = runParser(yield2String(getOneFrom(yields(m))));
+			parsed = getOneFrom(model.yieldsRel)[1];
 			res = extractQueryInfo(parsed, res);
 		}
 		else{
@@ -614,7 +612,7 @@ public int holesInString(str subject){
 public SQLModelRel getModels(str p, str v){
 	modelsRel = {};
 	if(exists(analysisLoc + "<p>-<v>.bin")){
- 		modelsRel = readBinaryValueFile(#SQLModelsRel, analysisLoc + "<p>-<v>.bin");
+ 		modelsRel = readBinaryValueFile(#SQLModelRel, analysisLoc + "<p>-<v>.bin");
  	}
  	else{
  		models = buildModelsForSystem(p, v);
