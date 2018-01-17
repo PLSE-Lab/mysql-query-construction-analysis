@@ -22,10 +22,10 @@ import String;
 import List;
 import Node;
 
-alias SQLModelMap = map[SQLModel model, rel[SQLYield yield, str queryWithHoles, SQLQuery parsed] yieldsRel];
+alias SQLModelRel = rel[loc location, SQLModel model, rel[SQLYield, SQLQuery] yields, YieldInfo info];
 alias HoleInfo = map[str, int];
 
-public loc modelLoc = baseLoc + "serialized/qcp/sqlmodels/";
+public loc analysisLoc = baseLoc + "serialized/qcp/sqlanalysis/";
 
 @doc{single yield, single static piece}
 public str qcp0 = "static";
@@ -606,14 +606,24 @@ public int holesInString(str subject){
 	return res;
 }
 
-public rel[loc, SQLModel] getModels(str p, str v){
-	models = {};
-	if(modelsFileExists(p, v)){
- 		models = readModels(p, v);
+public SQLModelRel getModels(str p, str v){
+	modelsRel = {};
+	if(exists(analysisLoc + "<p>-<v>.bin")){
+ 		modelsRel = readBinaryValueFile(#SQLModelsRel, analysisLoc + "<p>-<v>.bin");
  	}
  	else{
  		models = buildModelsForSystem(p, v);
- 		writeModels(p, v, models);
+ 		for(<l,m> <- models){
+ 			yieldsAndParsed = {};
+ 			modelYields = yields(m);
+ 			for(y <- modelYields){
+ 				yieldsAndParsed = yieldsAndParsed + <y, runParser(yield2String(y))>;
+ 			}
+ 			yieldInfo = compareYields(yieldsAndParsed<1>);
+ 			
+ 			modelsRel = modelsRel + <l, m, yieldsAndParsed, yieldInfo>;
+ 		}
+ 		writeBinaryValueFile(analysisLoc + "<p>-<v>.bin", modelsRel, compression=false);	
  	}
- 	return models;
+ 	return modelsRel;
 }
