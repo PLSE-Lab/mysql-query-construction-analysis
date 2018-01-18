@@ -70,6 +70,14 @@ public str getSystemForNumber(int n) {
 	return "There is no system with id <n>"; 
 }
 
+public System loadSystemForNumber(int n) {
+	systemByNumber = invertUnique(systemNumbers);
+	if (n in systemByNumber) {
+		return loadBinary(systemByNumber[n], (originalCorpus+newCorpus)[systemByNumber[n]]);
+	}
+	throw "No system with number <n> exists";
+}
+
 public str getSensibleName("faqforge") = "FAQ Forge";
 public str getSensibleName("firesoftboard") = "Fire-Soft-Board";
 public default str getSensibleName(str p) = p;
