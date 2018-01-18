@@ -190,10 +190,11 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 	
 	if(hasDynamicPiece(yield)){
 		holeInfo = extractHoleInfo(parsed);
-		if(holeInfo["name"] > 0){
+		if("name" in holeInfo && holeInfo["name"] > 0){
 			return qcp2;
 		}
-		if(holeInfo["param"] > 0 || holeInfo["condition"] > 0){
+		if("param" in holeInfo && holeInfo["param"] > 0 || "condition" in holeInfo &&
+			holeInfo["condition"] > 0){
 			return qcp1;
 		}
 	}
