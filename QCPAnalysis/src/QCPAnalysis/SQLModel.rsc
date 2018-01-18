@@ -72,8 +72,10 @@ public str printEdgeInfo(Name n, set[EdgeInfo] eis) {
 	}	
 }
 
+alias ContainmentRel = rel[Lab containedNode, set[Expr] preds, Lab containingNode];
+
 alias FragmentRel = rel[Lab sourceLabel, QueryFragment sourceFragment, Name name, Lab targetLabel, QueryFragment targetFragment, EdgeInfo edgeInfo];
-data SQLModel = sqlModel(FragmentRel fragmentRel, QueryFragment startFragment, Lab startLabel, loc callLoc);
+data SQLModel = sqlModel(FragmentRel fragmentRel, ContainmentRel containmentRel, QueryFragment startFragment, Lab startLabel, loc callLoc);
 
 @doc{Turn a specific expression into a possibly-nested query fragment.}
 public QueryFragment expr2qf(Expr ex, QCPSystemInfo qcpi, bool simplify=true) {
@@ -204,13 +206,95 @@ public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions =
 	}
 	
 	res = addEdgeInfo(res, slicedCFG);
-	return sqlModel(res, startingFragment, inputNode.l, callLoc);
+	crel = computeContainmentRel(res, slicedCFG);
+	return sqlModel(res, crel, startingFragment, inputNode.l, callLoc);
+}
+
+ContainmentRel computeContainmentRel(FragmentRel frel, CFG slicedCFG) {
+	// Map the labels to their labeled nodes, to make it easier to find them later
+	nodesForLabels = ( n.l : n | n <- slicedCFG.nodes );
+	
+	// Get the entry node for the current CFG
+	entryNode = getEntryNode(slicedCFG);
+	
+	// The resulting containment relation, which relates contained nodes x predicates x containers
+	ContainmentRel res = { };
+	
+	// Get the labels of the target nodes in frel, we want to know if those
+	// nodes are only reachable under certain conditions
+	targetLabels = frel<3>;	
+
+	// Get the nodes for each of these labels
+	targetNodes = { n | n <- slicedCFG.nodes, n.l in targetLabels };
+	
+	// Get the information on which headers dominate the target nodes
+	containsRel = containers(slicedCFG);
+	
+	// We are only interested in conditional containers (ifs and ternary
+	// expressions) since the loop headers don't add useful information.
+	// So, remove them for now -- we can always put them back later if
+	// they would be helpful.
+	containsRel = { < n, cn > | < n, cn > <- containsRel,
+								(headerNode(Stmt s,_,_) := cn && s is \if) ||
+								(headerNode(Expr e,_,_) := cn && e is ternary) };
+	
+	// Get a graph of the CFG to make it easier to find the proper
+	// nodes. Also get the inverse so we can isolate the path. We
+	// also remove the backedges so we don't get relationships that are
+	// reachable in the graph but not mirrored in the tree (e.g., an if
+	// inside a loop would attach both conditions to everything)
+	slicedCFG = removeBackEdges(slicedCFG);
+	g = cfgAsGraph(slicedCFG);
+	ig = invert(g);
+	
+	// The slicedCFG may be smaller, so remove the nodes that are now gone from the map
+	nodesForLabels = ( n.l : n | n <- slicedCFG.nodes );
+
+	// For each target node, get the containers and the predicates	
+	for (tn <- targetNodes) {
+		// Get the nodes that reach this node in the CFG
+		reachedFrom = (ig*)[tn];
+		set[Expr] preds = { };
+		for (h <- containsRel[tn]) {
+			// Get the nodes the header nodes (h) reaches in the CFG
+			reachableFrom = (g*)[h];
+			
+			// The path is nodes that are reached from the header (going forwards) and
+			// are reached from the target node (going backwards)
+			nodesOnPath = reachedFrom & reachableFrom;
+			
+			// Since we work with the labels, this makes it easy to see which we have on the path
+			labelsOnPath = { n.l | n <- nodesOnPath };
+			
+			// Get edges on the path, which have a source and target that are both on the
+			// path. Note that we used ig* and g* above, so the header and target nodes
+			// are possible sources and targets. 
+			edgesOnPath = { e | e <- slicedCFG.edges, e.from in labelsOnPath, e.to in labelsOnPath };
+			
+			// Winnow this down to just those edges that are tied back to the header.
+			// NOTE: The condition is commented out since edges with predicates don't always directly come
+			// from the header or have a head field
+			conditionEdgesOnPath = edgesOnPath; // { e | e <- edgesOnPath, e has header, e.header == h.l };
+			
+			// Extract the conditions from each edge and add that to the preds for this
+			// target node.
+			for (e <- conditionEdgesOnPath) {
+				if (e has why) preds = preds + e.why;
+				if (e has whyNot) preds = preds + unaryOperation(e.whyNot,booleanNot());
+				if (e has whys) preds = preds + toSet(e.whys);
+				if (e has whyNots) preds = preds + { unaryOperation(wn,booleanNot()) | wn <- e.whyNots };
+			}
+			
+			res = res + < tn.l, preds, h.l >;
+		}		
+	}
+	
+	return res;
 }
 
 FragmentRel addEdgeInfo(FragmentRel frel, CFG slicedCFG) {
 	nodesForLabels = ( n.l : n | n <- slicedCFG.nodes );
 	entryNode = getEntryNode(slicedCFG);
-	rel[CFGNode,CFGNode] containedIn = { };
 	
 	// Get the labels of the target nodes in frel, we want to know if those
 	// nodes are only reachable under certain conditions
@@ -309,7 +393,7 @@ FragmentRel addEdgeInfo(FragmentRel frel, CFG slicedCFG) {
 	return frel;		 
 }
 
-public rel[CFGNode,CFGNode] containers(CFG inputCFG) {
+public rel[CFGNode containedNode, CFGNode containerNode] containers(CFG inputCFG) {
 	map[Lab, set[Lab]] resMap = ( );
 	nodesForLabels = ( n.l : n | n <- inputCFG.nodes );
 
@@ -326,19 +410,28 @@ public rel[CFGNode,CFGNode] containers(CFG inputCFG) {
 		workset = workset - n;
 		resStart = resMap[n.l] ? {};
 		
+		// The containing nodes that reach n through incoming labels
 		set[Lab] inbound = { *(resMap[ni.l]? {}) | ni <- gInverted[n]};
+		
+		// The containing nodes that pass through n
 		set[Lab] outbound = inbound;
 		
+		// If n is a footer node, this "closes" the containment, so we remove the
+		// associated header node. If n is a header node, this is a new container,
+		// so we add it
 		if (n is footerNode) {
 			outbound = outbound - { l | l <- inbound, l == n.header };
 		} else if (n is headerNode) {
 			outbound = outbound + n.l;
 		}
 		
+		// The container nodes that contain n
 		resMap[n.l] = outbound;
 		
 		resEnd = resMap[n.l] ? {};
 		
+		// If we added new containers, downstream nodes need to be recalculated, so
+		// add those into the worklist
 		if (resStart != resEnd) {
 			newElements = [ gi | gi <- g[n], gi notin workset ];
 			worklist = newElements + worklist;
@@ -570,4 +663,12 @@ public map[int,SQLModel] renderSQLModelsAsDot(set[SQLModel] ms) {
 		id += 1;
 	}
 	return res;
+}
+
+public CFG getCFGForModel(QCPSystemInfo qcpi, SQLModel sqlm) {
+	inputSystem = qcpi.sys;
+	callLoc = sqlm.callLoc;
+	inputCFGLoc = findContainingCFGLoc(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
+	inputCFG = findContainingCFG(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
+	return inputCFG;
 }
