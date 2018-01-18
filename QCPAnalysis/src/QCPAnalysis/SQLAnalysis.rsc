@@ -313,8 +313,10 @@ public SystemQueryInfo collectSystemQueryInfo(str p, str v){
 				continue;
 			}
 			if(pattern == qcp3c){
-				// TODO: for yields that are different query types, count the clauses of each yield
-				continue;
+				//for yields that are different query types, count the clauses of each yield
+				for(p <- model.yieldsRel[1]){
+					res = extractQueryInfo(p, res);
+				}
 			}
 		}
 	}
