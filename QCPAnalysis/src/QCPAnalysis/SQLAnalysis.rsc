@@ -52,6 +52,32 @@ public str unknown = "unknown";
 // note: qcp3 is not included as its score requires some computation
 public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 2, unknown : 3);
 
+@doc{scores all systems in the corpus}
+public map[str, real] rankCorpus(){
+	res = ();
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		res = res + ("<p>_<v>" : rankSystem(p, v));
+	}
+	return res;
+}
+
+@doc{gets the average score of all models in a system}
+public real rankSystem(str p, str v){
+	modelsRel = getModels(p, v);
+	int count = 0;
+	real total = 0.0;
+ 	
+	for(model <- modelsRel){
+		pattern = classifySQLModel(model);
+		int score = getRanking(model);
+		total += score;
+		count = count + 1;
+	}
+	
+	return total / count;
+}
+
 @doc{gets the "ranking" for this model, indicating how easy it will be to transform}
 public int getRanking(SQLModel model){
 	pattern = classifySQLModel(model);
@@ -79,21 +105,51 @@ public int getRanking(SQLModel model){
 	return rankings[pattern];
 }
 
-@doc{gets the average score of all models in a system}
-public real rankSystem(str p, str v){
-	modelsRel = getModels(p, v);
-	int count = 0;
-	real total = 0.0;
- 	
-	for(model <- modelsRel){
-		pattern = classifySQLModel(model);
-		int score = getRanking(model);
-		total += score;
-		count = count + 1;
+@doc{returns the corpus wide counts of each pattern}
+public map[str, int] countPatternsInCorpus(){
+	res = ();
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		sysCounts = countPatternsInSystem(p, v);
+		for(pattern <- sysCounts, count := sysCounts[pattern]){
+			if(pattern in res){
+				res[pattern] += count;
+			}
+			else{
+				res = res + (pattern : count);
+			}
+		}
 	}
 	
-	return total / count;
+	return res;
 }
+
+@doc{return just the counts of each pattern in a system}
+public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
+		pattern <- modelMap, models := modelMap[pattern]);
+
+@doc{group models in a whole system based on pattern}
+public map[str, list[SQLModel]] groupSQLModels(str p, str v){
+	res = ( );
+	models = getModels(p, v);
+	
+	for(model <- models){
+		pattern = classifySQLModel(model);
+		if(pattern in res){
+			res[pattern] += model.model;
+		}
+		else{
+			res += (pattern : [model.model]);
+		}
+	}
+	
+	return res;
+}
+
+@doc{group the locations of models in a whole system based on pattern}
+public map[str, list[loc]] groupSQLModelLocs(str p, str v)
+	= (pattern : [m.callLoc | m <- models] | modelMap := groupSQLModels(p, v), 
+		pattern <- modelMap, models := modelMap[pattern]);
 
 @doc{determine which pattern matches a SQLModel}
 public str classifySQLModel(tuple[loc location, SQLModel model, rel[SQLYield, SQLQuery] yieldsRel, 
@@ -251,33 +307,6 @@ private bool hasDynamicPiece(SQLYield yield){
 	
 	return false;
 }
-
-@doc{group models in a whole system based on pattern}
-public map[str, list[SQLModel]] groupSQLModels(str p, str v){
-	res = ( );
-	models = getModels(p, v);
-	
-	for(model <- models){
-		pattern = classifySQLModel(model);
-		if(pattern in res){
-			res[pattern] += model.model;
-		}
-		else{
-			res += (pattern : [model.model]);
-		}
-	}
-	
-	return res;
-}
-
-@doc{group the locations of models in a whole system based on pattern}
-public map[str, list[loc]] groupSQLModelLocs(str p, str v)
-	= (pattern : [m.callLoc | m <- models] | modelMap := groupSQLModels(p, v), 
-		pattern <- modelMap, models := modelMap[pattern]);
-		
-@doc{return just the counts of each pattern in a system}
-public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
-		pattern <- modelMap, models := modelMap[pattern]);
 	
 @doc{empirical information about a specific query type in a system}
 data QueryInfo = selectInfo(int numSelectQueries, int numWhere, int numGroupBy, int numHaving, int numOrderBy, int numLimit, int numJoin)
