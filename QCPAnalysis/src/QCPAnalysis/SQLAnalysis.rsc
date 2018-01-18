@@ -307,7 +307,9 @@ public SystemQueryInfo collectSystemQueryInfo(str p, str v){
 		}
 		else{
 			if(pattern == qcp3b){
-				// TODO: compare yields, only count once for clauses that are the same
+				// check the yield info for clauses contained in this model, it is possible
+				// one yield contains a clause that another doesnt
+				res = extractQueryInfo(model.info, res);
 				continue;
 			}
 			if(pattern == qcp3c){
@@ -320,7 +322,53 @@ public SystemQueryInfo collectSystemQueryInfo(str p, str v){
 	return res;
 }
 
-@doc{extracts clause and query type counts from a single query}
+@doc{extracts clause counts from a QCP3b query. The yield info is consulted as it is possible
+	that one yield contains a clause that another yield does not}
+private SystemQueryInfo extractQueryInfo(YieldInfo yieldInfo, SystemQueryInfo info){
+	if(yieldInfo is sameType){
+		clauses = yieldInfo.clauseInfo;
+		if(clauses is selectClauses){
+			info.selectInfo.numSelectQueries += 1;
+			if(hasClause(clauses.sameWhere)) info.selectInfo.numWhere += 1;
+			if(hasClause(clauses.sameGroupBy)) info.selectInfo.numGroupBy += 1;
+			if(hasClause(clauses.sameHaving)) info.selectInfo.numHaving += 1;
+			if(hasClause(clauses.sameOrderBy)) info.selectInfo.numOrderBy += 1;
+			if(hasClause(clauses.sameLimit)) info.selectInfo.numLimit += 1;
+			if(hasClause(clauses.sameJoin)) info.selectInfo.numJoin += 1;
+		}
+		else if(clauses is updateClauses){
+			info.updateInfo.numUpdateQueries += 1;
+			if(hasClause(clauses.sameWhere)) info.updateInfo.numWhere += 1;
+			if(hasClause(clauses.sameOrderBy)) info.updateInfo.numOrderBy += 1;
+			if(hasClause(clauses.sameLimit)) info.updateInfo.numLimit += 1;
+		}
+		else if(clauses is insertClauses){
+			info.insertInfo.numInsertQueries += 1;
+			if(hasClause(clauses.sameValues)) info.insertInfo.numValues += 1;
+			if(hasClause(clauses.sameSetOps)) info.insertInfo.numSetOp += 1;
+			if(hasClause(clauses.sameSelect)) info.insertInfo.numSelect += 1;
+			if(hasClause(clauses.sameOnDuplicateSetOps)) info.insertInfo.numOnDuplicate += 1;
+		}
+		else if(clauses is deleteClauses){
+			info.deleteInfo.numDeleteQueries += 1;
+			if(hasClause(clauses.sameUsing)) info.deleteInfo.numUsing += 1;
+			if(hasClause(clauses.sameWhere)) info.deleteInfo.numWhere += 1;
+			if(hasClause(clauses.sameOrderBy)) info.deleteInfo.numOrderBy += 1;
+			if(hasClause(clauses.sameLimit)) info.deleteInfo.numLimit += 1;
+		}
+		else{
+			info.numOtherQueryTypes += 1;
+		}
+		return info;
+	}
+	else{
+		// TODO: this should handle QCP3c, but this will only be done if this pattern is actually encountered
+		return info;
+	}
+}
+
+
+@doc{extracts clause counts from a single query (QCP0, QCP1, QCP2, QCP3a)}
 private SystemQueryInfo extractQueryInfo(SQLQuery parsed, SystemQueryInfo info){
 	if(parsed is selectQuery){
 		info.selectInfo.numSelectQueries += 1;
@@ -355,6 +403,40 @@ private SystemQueryInfo extractQueryInfo(SQLQuery parsed, SystemQueryInfo info){
 		info.numOtherQueryTypes += 1;
 	}
 	return info;
+}
+
+@doc{given a clause set from a YieldInfo, determines if any clauses exist in the set}
+private bool hasClause(set[list[&T]] clauses){
+	if(size(clauses) == 0){
+		return false;
+	}
+	if(size(clauses) > 1){
+		return true;
+	}
+	
+	clause = getOneFrom(clauses);
+	
+	// if this clause is the empty list, it does not exist in any yields
+	if([] := clause){
+		return false;
+	}
+	
+	return true;
+}
+
+@doc{given a clause set from a YieldInfo, determines if any clauses exist in the set}
+private bool hasClause(set[&T] clauses){
+	if(size(clauses) == 0){
+		return false;
+	}
+	if(size(clauses) > 1){
+		return true;
+	}
+
+	clause = getOneFrom(clauses);
+	//check if the clauses matches non existent clause placeholders
+	return !(clause is noWhere || clause is noGroupBy || clause is noHaving || clause is noOrderBy
+			|| clause is noLimit || clause is noQuery);	
 }
 			 
 @doc{extracts info about a dynamic query's holes}
