@@ -20,63 +20,6 @@ import Set;
 
 loc tables = |project://QCPAnalysis/results/tables/|;
 
-public void writeTables(){
-	writeFile(tables + "qcpCounts.tex", qcpCountsAsLatexTable());
-	writeFile(tables + "qcpCountsBySystem.tex", qcpCountsBySystemAsLatexTable());
-}
-
-public str qcpCountsAsLatexTable(){
-	str getLine(str pattern, int count) = "<pattern> & <count>";
-	str res =
-	"\\npaddmissingzero
-	'\\npfourdigitsep
-	'\\begin{table}
-	'\\centering
-	'\\caption{Counts of Each Query Construction Pattern\\label{tbl:qcp-counts}}
-	'\\ra{1.2}
-	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
-	'Query Construction Pattern & Number of Occurrences\\\\ \\midrule
-	'<for(<p,c> <- getQCPCounts(true)){><getLine(p,c)> \\\\
-	'<}>
-	'\\bottomrule
-	'\\end{tabularx}
-	'\\end{table}
-	'\\npfourdigitnosep
-	'\\npnoaddmissingzero
-	";
-	return res;
-}
-
-public str qcpCountsBySystemAsLatexTable(){
-	Corpus corpus = getCorpus();
-	patterns = ["QCP1", "QCP2", "QCP3", "QCP4", "QCP5", "unclassified"];
-	str getLine(str p, str v){
-		line = "<p>_<v>";
-		for(pattern <- patterns){
-			line = line + " & <size(getQCPSystem(p,v,pattern))> ";
-		}
-		return line;
-	}
-	str res =
-	"\\npaddmissingzero
-	'\\npfourdigitsep
-	'\\begin{table}
-	'\\centering
-	'\\caption{Counts of Each Query Construction Pattern\\label{tbl:qcp-counts}}
-	'\\ra{1.2}
-	'\\begin{tabularx}{\\columnwidth}{Xrrr} \\toprule
-	'System & QCP1 & QCP2 & QCP3 & QCP4 & QCP5 & unclassified\\\\ \\midrule
-	'<for(p <- corpus, v := corpus[p]){><getLine(p,v)> \\\\
-	'<}>
-	'\\bottomrule
-	'\\end{tabularx}
-	'\\end{table}
-	'\\npfourdigitnosep
-	'\\npnoaddmissingzero
-	";
-	return res;
-}
-
 public str corpusAsLatexTable() {
 	Corpus corpus = getCorpus();
 	corpusCounts = getSortedCountsCaseInsensitive();
