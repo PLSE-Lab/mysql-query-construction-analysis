@@ -3,16 +3,34 @@ module QCPAnalysis::ModelAnalysis
 import lang::php::ast::AbstractSyntax;
 import lang::php::ast::System;
 import lang::php::util::Utils;
+import lang::php::util::Config;
 import lang::php::util::Corpus;
 import lang::php::analysis::cfg::CFG;
 
 import QCPAnalysis::Utils;
 import QCPAnalysis::QCPSystemInfo;
 import QCPAnalysis::SQLModel;
+import QCPAnalysis::QCPCorpus;
 
 import Relation;
+import IO;
+import ValueIO;
 
-data FragmentCategories = fcat(int literals, int localNames, int globalNames, int parameterNames, int computed);
+data FragmentCategories = fcat(
+	int literals, // string literals
+	int localVars, // local variables
+	int localProps, // properties of locally-defined variables
+	int localComputed, // computed local names
+	int globalVars, // global variables
+	int globalProps, // properties of globally-defined variables
+	int globalComputed,// computed global names
+	int parameterNames, // parameters
+	int parameterProps, // properties of parameters
+	int parameterComputed, // properties of parameters
+	int computed // dynamic fragments that are not names
+	);
+
+FragmentCategories initFC() = fcat(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
 public set[QueryFragment] flattenFragment(QueryFragment qf) {
 	if (qf is compositeFragment) {
@@ -30,19 +48,9 @@ public set[QueryFragment] flattenFragment(set[QueryFragment] qfs) {
 	return { *flattenFragment(qf) | qf <- qfs };
 }
 
-public FragmentCategories computeFragmentCategories(SQLModel sqm, CFG cflow) {
-	FragmentCategories fc = fcat(0, 0, 0, 0, 0);
-
+public FragmentCategories computeFragmentCategories(SQLModel sqm) {
+	FragmentCategories fc = initFC();
 	fragments = flattenFragment(sqm.fragmentRel<1> + sqm.fragmentRel<4>);
-	
-	// Get names for input parameters for the function or method
-	parameterNames = { n.paramName | n <- cflow.nodes, n is actualProvided || n is actualNotProvided };
-	
-	// Get the global names
-	globalNames = { gn | /global(list[Expr] exprs) := cflow.nodes, var(name(name(gn))) <- exprs };
-	
-	// Remove the global names from the parameter names, the global declaration would change the scope
-	parameterNames -= globalNames;
 	
 	for (fragment <- fragments) {
 		switch(fragment) {
@@ -50,15 +58,27 @@ public FragmentCategories computeFragmentCategories(SQLModel sqm, CFG cflow) {
 				fc.literals += 1;
 			}
 			
-			// TODO: Modify, we have names for params and global from the use/def info!
-			case nameFragment(varName(n)): {
-				if (n in parameterNames) {
-					fc.parameterNames += 1;
-				} else if (n in globalNames) {
-					fc.globalNames += 1;
-				} else {
-					fc.localNames += 1;
-				}
+			case nameFragment(Name n): {
+				switch(n) {
+					case varName(_) :
+						fc.localVars += 1;
+					case computedName(_) :
+						fc.localComputed += 1;
+					case propertyName(Expr targetObject, str propertyName) :
+						fc.localProps += 1;
+					case computedPropertyName(Expr targetObject, Expr computedPropertyName) :
+						fc.localComputed += 1;
+					case staticPropertyName(str className, str propertyName) :
+						fc.localProps += 1;
+					case computedStaticPropertyName(Expr computedClassName, str propertyName) :
+						fc.localComputed += 1;
+					case computedStaticPropertyName(str className, Expr computedPropertyName) :
+						fc.localComputed += 1;
+					case computedStaticPropertyName(Expr computedClassName, Expr computedPropertyName) :
+						fc.localComputed += 1;
+					default:
+						throw "Unrecognized name fragment case: <n>";
+				}				
 			}
 			
 			case dynamicFragment(_): {
@@ -77,12 +97,50 @@ public FragmentCategories computeFragmentCategories(SQLModel sqm, CFG cflow) {
 				fc.computed += 1;
 			}
 			
-			case inputParamFragment(_): {
-				fc.parameterNames += 1;
+			case inputParamFragment(Name n): {
+				switch(n) {
+					case varName(_) :
+						fc.parameterNames += 1;
+					case computedName(_) :
+						fc.parameterComputed += 1;
+					case propertyName(Expr targetObject, str propertyName) :
+						fc.parameterProps += 1;
+					case computedPropertyName(Expr targetObject, Expr computedPropertyName) :
+						fc.parameterComputed += 1;
+					case staticPropertyName(str className, str propertyName) :
+						fc.parameterProps += 1;
+					case computedStaticPropertyName(Expr computedClassName, str propertyName) :
+						fc.parameterComputed += 1;
+					case computedStaticPropertyName(str className, Expr computedPropertyName) :
+						fc.parameterComputed += 1;
+					case computedStaticPropertyName(Expr computedClassName, Expr computedPropertyName) :
+						fc.parameterComputed += 1;
+					default:
+						throw "Unrecognized input param fragment case: <n>";
+				}				
 			}
 			
-			case globalFragment(_): {
-				fc.parameterNames += 1;
+			case globalFragment(Name n): {
+				switch(n) {
+					case varName(_) :
+						fc.globalVars += 1;
+					case computedName(_) :
+						fc.globalComputed += 1;
+					case propertyName(Expr targetObject, str propertyName) :
+						fc.globalProps += 1;
+					case computedPropertyName(Expr targetObject, Expr computedPropertyName) :
+						fc.globalComputed += 1;
+					case staticPropertyName(str className, str propertyName) :
+						fc.globalProps += 1;
+					case computedStaticPropertyName(Expr computedClassName, str propertyName) :
+						fc.globalComputed += 1;
+					case computedStaticPropertyName(str className, Expr computedPropertyName) :
+						fc.globalComputed += 1;
+					case computedStaticPropertyName(Expr computedClassName, Expr computedPropertyName) :
+						fc.globalComputed += 1;
+					default:
+						throw "Unrecognized global fragment case: <n>";
+				}				
 			}
 			
 			case unknownFragment(): {
@@ -92,5 +150,55 @@ public FragmentCategories computeFragmentCategories(SQLModel sqm, CFG cflow) {
 		}
 	}
 
+	return fc;
+}
+
+private loc modelAnalysisLoc = baseLoc + "serialized/qcp/modelanalysis/";
+
+public void writeFC(str systemName, str systemVersion, rel[loc callLoc, SQLModel sqm, FragmentCategories fc] fc) {
+	writeBinaryValueFile(analysisLoc + "<systemName>-<systemVersion>.bin", fc);
+}
+
+public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] computeForSystem(str systemName, str systemVersion) {
+	rel[loc callLoc, SQLModel sqm, FragmentCategories fc] res = { };
+	
+	System pt = loadBinary(systemName, systemVersion);
+	QCPSystemInfo qcpi = readQCPSystemInfo(systemName, systemVersion);
+	allCalls = { < c, c@at > | /c:call(name(name("mysql_query")),_) := pt.files };
+
+	for (< c, l > <- allCalls) {		
+		callModel = buildModel(qcpi, l);
+		fc = computeFragmentCategories(callModel);
+		res = res + < l, callModel, fc >;
+	}
+	
+	writeFC(systemName, systemVersion, res);
+	return res;	
+}
+
+public map[str system, rel[loc callLoc, SQLModel sqm, FragmentCategories fc] fcrel] computeForCorpus() {
+	map[str system, rel[loc callLoc, SQLModel sqm, FragmentCategories fc] fcrel] res = ( );
+	corpus = getCorpus();
+	for (systemName <- corpus, systemVersion := corpus[systemName]) {
+		res[systemName] = computeForSystem(systemName, systemVersion);
+	}
+	return res;
+}
+
+public FragmentCategories sumFC(rel[loc,SQLModel,FragmentCategories] fcrel) {
+	FragmentCategories fc = initFC();
+	for (< l, sqm, fci > <- fcrel ) {
+		fc.literals += fci.literals;
+		fc.localVars += fci.localVars;
+		fc.localProps += fci.localProps;
+		fc.localComputed += fci.localComputed;
+		fc.globalVars += fci.globalVars;
+		fc.globalProps += fci.globalProps;
+		fc.globalComputed += fci.globalComputed;
+		fc.parameterNames += fci.parameterNames;
+		fc.parameterProps += fci.parameterProps;
+		fc.parameterComputed += fci.parameterComputed;
+		fc.computed += fci.computed;
+	}
 	return fc;
 }
