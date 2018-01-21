@@ -52,6 +52,32 @@ public str unknown = "unknown";
 // note: qcp3 is not included as its score requires some computation
 public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 2, unknown : 3);
 
+@doc{scores all systems in the corpus}
+public map[str, real] rankCorpus(){
+	res = ();
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		res = res + ("<p>_<v>" : rankSystem(p, v));
+	}
+	return res;
+}
+
+@doc{gets the average score of all models in a system}
+public real rankSystem(str p, str v){
+	modelsRel = getModels(p, v);
+	int count = 0;
+	real total = 0.0;
+ 	
+	for(model <- modelsRel){
+		pattern = classifySQLModel(model);
+		int score = getRanking(model);
+		total += score;
+		count = count + 1;
+	}
+	
+	return total / count;
+}
+
 @doc{gets the "ranking" for this model, indicating how easy it will be to transform}
 public int getRanking(SQLModel model){
 	pattern = classifySQLModel(model);
@@ -79,21 +105,51 @@ public int getRanking(SQLModel model){
 	return rankings[pattern];
 }
 
-@doc{gets the average score of all models in a system}
-public real rankSystem(str p, str v){
-	modelsRel = getModels(p, v);
-	int count = 0;
-	real total = 0.0;
- 	
-	for(model <- modelsRel){
-		pattern = classifySQLModel(model);
-		int score = getRanking(model);
-		total += score;
-		count = count + 1;
+@doc{returns the corpus wide counts of each pattern}
+public map[str, int] countPatternsInCorpus(){
+	res = ();
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		sysCounts = countPatternsInSystem(p, v);
+		for(pattern <- sysCounts, count := sysCounts[pattern]){
+			if(pattern in res){
+				res[pattern] += count;
+			}
+			else{
+				res = res + (pattern : count);
+			}
+		}
 	}
 	
-	return total / count;
+	return res;
 }
+
+@doc{return just the counts of each pattern in a system}
+public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
+		pattern <- modelMap, models := modelMap[pattern]);
+
+@doc{group models in a whole system based on pattern}
+public map[str, list[SQLModel]] groupSQLModels(str p, str v){
+	res = ( );
+	models = getModels(p, v);
+	
+	for(model <- models){
+		pattern = classifySQLModel(model);
+		if(pattern in res){
+			res[pattern] += model.model;
+		}
+		else{
+			res += (pattern : [model.model]);
+		}
+	}
+	
+	return res;
+}
+
+@doc{group the locations of models in a whole system based on pattern}
+public map[str, list[loc]] groupSQLModelLocs(str p, str v)
+	= (pattern : [m.callLoc | m <- models] | modelMap := groupSQLModels(p, v), 
+		pattern <- modelMap, models := modelMap[pattern]);
 
 @doc{determine which pattern matches a SQLModel}
 public str classifySQLModel(tuple[loc location, SQLModel model, rel[SQLYield, SQLQuery] yieldsRel, 
@@ -134,10 +190,11 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 	
 	if(hasDynamicPiece(yield)){
 		holeInfo = extractHoleInfo(parsed);
-		if(holeInfo["name"] > 0){
+		if("name" in holeInfo && holeInfo["name"] > 0){
 			return qcp2;
 		}
-		if(holeInfo["param"] > 0 || holeInfo["condition"] > 0){
+		if("param" in holeInfo && holeInfo["param"] > 0 || "condition" in holeInfo &&
+			holeInfo["condition"] > 0){
 			return qcp1;
 		}
 	}
@@ -251,33 +308,6 @@ private bool hasDynamicPiece(SQLYield yield){
 	
 	return false;
 }
-
-@doc{group models in a whole system based on pattern}
-public map[str, list[SQLModel]] groupSQLModels(str p, str v){
-	res = ( );
-	models = getModels(p, v);
-	
-	for(model <- models){
-		pattern = classifySQLModel(model);
-		if(pattern in res){
-			res[pattern] += model.model;
-		}
-		else{
-			res += (pattern : [model.model]);
-		}
-	}
-	
-	return res;
-}
-
-@doc{group the locations of models in a whole system based on pattern}
-public map[str, list[loc]] groupSQLModelLocs(str p, str v)
-	= (pattern : [m.callLoc | m <- models] | modelMap := groupSQLModels(p, v), 
-		pattern <- modelMap, models := modelMap[pattern]);
-		
-@doc{return just the counts of each pattern in a system}
-public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
-		pattern <- modelMap, models := modelMap[pattern]);
 	
 @doc{empirical information about a specific query type in a system}
 data QueryInfo = selectInfo(int numSelectQueries, int numWhere, int numGroupBy, int numHaving, int numOrderBy, int numLimit, int numJoin)
@@ -307,12 +337,16 @@ public SystemQueryInfo collectSystemQueryInfo(str p, str v){
 		}
 		else{
 			if(pattern == qcp3b){
-				// TODO: compare yields, only count once for clauses that are the same
+				// check the yield info for clauses contained in this model, it is possible
+				// one yield contains a clause that another doesnt
+				res = extractQueryInfo(model.info, res);
 				continue;
 			}
 			if(pattern == qcp3c){
-				// TODO: for yields that are different query types, count the clauses of each yield
-				continue;
+				//for yields that are different query types, count the clauses of each yield
+				for(p <- model.yieldsRel[1]){
+					res = extractQueryInfo(p, res);
+				}
 			}
 		}
 	}
@@ -320,7 +354,53 @@ public SystemQueryInfo collectSystemQueryInfo(str p, str v){
 	return res;
 }
 
-@doc{extracts clause and query type counts from a single query}
+@doc{extracts clause counts from a QCP3b query. The yield info is consulted as it is possible
+	that one yield contains a clause that another yield does not}
+private SystemQueryInfo extractQueryInfo(YieldInfo yieldInfo, SystemQueryInfo info){
+	if(yieldInfo is sameType){
+		clauses = yieldInfo.clauseInfo;
+		if(clauses is selectClauses){
+			info.selectInfo.numSelectQueries += 1;
+			if(hasClause(clauses.sameWhere)) info.selectInfo.numWhere += 1;
+			if(hasClause(clauses.sameGroupBy)) info.selectInfo.numGroupBy += 1;
+			if(hasClause(clauses.sameHaving)) info.selectInfo.numHaving += 1;
+			if(hasClause(clauses.sameOrderBy)) info.selectInfo.numOrderBy += 1;
+			if(hasClause(clauses.sameLimit)) info.selectInfo.numLimit += 1;
+			if(hasClause(clauses.sameJoin)) info.selectInfo.numJoin += 1;
+		}
+		else if(clauses is updateClauses){
+			info.updateInfo.numUpdateQueries += 1;
+			if(hasClause(clauses.sameWhere)) info.updateInfo.numWhere += 1;
+			if(hasClause(clauses.sameOrderBy)) info.updateInfo.numOrderBy += 1;
+			if(hasClause(clauses.sameLimit)) info.updateInfo.numLimit += 1;
+		}
+		else if(clauses is insertClauses){
+			info.insertInfo.numInsertQueries += 1;
+			if(hasClause(clauses.sameValues)) info.insertInfo.numValues += 1;
+			if(hasClause(clauses.sameSetOps)) info.insertInfo.numSetOp += 1;
+			if(hasClause(clauses.sameSelect)) info.insertInfo.numSelect += 1;
+			if(hasClause(clauses.sameOnDuplicateSetOps)) info.insertInfo.numOnDuplicate += 1;
+		}
+		else if(clauses is deleteClauses){
+			info.deleteInfo.numDeleteQueries += 1;
+			if(hasClause(clauses.sameUsing)) info.deleteInfo.numUsing += 1;
+			if(hasClause(clauses.sameWhere)) info.deleteInfo.numWhere += 1;
+			if(hasClause(clauses.sameOrderBy)) info.deleteInfo.numOrderBy += 1;
+			if(hasClause(clauses.sameLimit)) info.deleteInfo.numLimit += 1;
+		}
+		else{
+			info.numOtherQueryTypes += 1;
+		}
+		return info;
+	}
+	else{
+		// TODO: this should handle QCP3c, but this will only be done if this pattern is actually encountered
+		return info;
+	}
+}
+
+
+@doc{extracts clause counts from a single query (QCP0, QCP1, QCP2, QCP3a)}
 private SystemQueryInfo extractQueryInfo(SQLQuery parsed, SystemQueryInfo info){
 	if(parsed is selectQuery){
 		info.selectInfo.numSelectQueries += 1;
@@ -355,6 +435,40 @@ private SystemQueryInfo extractQueryInfo(SQLQuery parsed, SystemQueryInfo info){
 		info.numOtherQueryTypes += 1;
 	}
 	return info;
+}
+
+@doc{given a clause set from a YieldInfo, determines if any clauses exist in the set}
+private bool hasClause(set[list[&T]] clauses){
+	if(size(clauses) == 0){
+		return false;
+	}
+	if(size(clauses) > 1){
+		return true;
+	}
+	
+	clause = getOneFrom(clauses);
+	
+	// if this clause is the empty list, it does not exist in any yields
+	if([] := clause){
+		return false;
+	}
+	
+	return true;
+}
+
+@doc{given a clause set from a YieldInfo, determines if any clauses exist in the set}
+private bool hasClause(set[&T] clauses){
+	if(size(clauses) == 0){
+		return false;
+	}
+	if(size(clauses) > 1){
+		return true;
+	}
+
+	clause = getOneFrom(clauses);
+	//check if the clauses matches non existent clause placeholders
+	return !(clause is noWhere || clause is noGroupBy || clause is noHaving || clause is noOrderBy
+			|| clause is noLimit || clause is noQuery);	
 }
 			 
 @doc{extracts info about a dynamic query's holes}
