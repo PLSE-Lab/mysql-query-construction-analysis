@@ -584,8 +584,11 @@ public rel[loc, SQLModel] buildModelsForSystem(str systemName, str systemVersion
 public rel[loc, SQLModel] buildModelsForSystem(System s, QCPSystemInfo qcpi) {
 	allCalls = { < c@at, c > | /c:call(name(name("mysql_query")), _) := s };
 	rel[loc, SQLModel] res = { };
+	int buildCount = 0;
+	int totalToBuild = size(allCalls<0>);	
 	for (l <- allCalls<0>) {
-		println("Building model for call at location <l>");
+		buildCount += 1;
+		println("Building model <buildCount> of <totalToBuild> for call at location <l>");
 		res = res + < l, buildModel(qcpi, l) >;
 	}
 	return res;
