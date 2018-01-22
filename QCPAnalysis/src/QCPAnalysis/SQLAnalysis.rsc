@@ -128,6 +128,34 @@ public map[str, int] countPatternsInCorpus(){
 @doc{return just the counts of each pattern in a system}
 public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
 		pattern <- modelMap, models := modelMap[pattern]);
+		
+@doc{group models based on pattern from the whole corpus}
+public map[str, list[SQLModel]] groupSQLModelsCorpus(){
+
+	res = ();
+	Corpus corpus = getCorpus();
+	
+	void addModelsWithPattern(str pattern, map[str, list[SQLModel]] models){
+		if(pattern in models){
+			if(pattern in res){
+				res[pattern] = res[pattern] + models[pattern];
+			}
+			else{
+				res = res + (pattern : models[pattern]);
+			}
+		}
+		
+	}
+		
+	for(p <- corpus, v := corpus[p]){
+		models = groupSQLModels(p, v);
+		patterns = [qcp0, qcp1, qcp2, qcp3a, qcp3b, qcp3c, unknown];
+		for(pattern <- pattern){
+			addModelsWithPattern(pattern, models);
+		}
+	}
+	return res;	
+}
 
 @doc{group models in a whole system based on pattern}
 public map[str, list[SQLModel]] groupSQLModels(str p, str v){
