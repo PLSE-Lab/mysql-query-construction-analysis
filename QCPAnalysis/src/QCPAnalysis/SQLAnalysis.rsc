@@ -67,14 +67,12 @@ public real rankSystem(str p, str v){
 	modelsRel = getModels(p, v);
 	int count = 0;
 	real total = 0.0;
- 	
 	for(model <- modelsRel){
 		//pattern = classifySQLModel(model);
 		int score = getRanking(model);
 		total += score;
 		count = count + 1;
 	}
-	
 	return total / count;
 }
 
@@ -86,8 +84,8 @@ public int getRanking(tuple[loc location, SQLModel model, rel[SQLYield, SQLQuery
 	
 	// for qcp3a, check whether this is dynamic parameters or completely dynamic
 	if(pattern == qcp3a){
-		yield = getOneFrom(yieldsRel);
-		return rankings[classifyYield(yield[0], yield[1])];
+		theYield = getOneFrom(modelInfo.yieldsRel);
+		return rankings[classifyYield(theYield[0], theYield[1])];
 	}
 	
 	// for qcp3b and qcp3c, the ranking is the ranking of the "worst" yield
@@ -758,12 +756,12 @@ public SQLModelRel getModels(str p, str v){
 	if(exists(analysisLoc + "<p>-<v>.bin")){
  		modelsRel = readBinaryValueFile(#SQLModelRel, analysisLoc + "<p>-<v>.bin");
  	}
- 	else if(modelFileExists(p, v)){
- 		models = readModels(p, v);
- 	}
  	else{
- 		models = buildModelsForSystem(p, v);
+	 	models = modelsFileExists(p, v) ? readModels(p, v) : buildModelsForSystem(p, v);
  		for(<l,m> <- models){
+ 			for(y <- yields(m)){
+ 				println(y);
+ 			}
  			yieldsAndParsed = {};
  			modelYields = yields(m);
  			for(y <- modelYields){
