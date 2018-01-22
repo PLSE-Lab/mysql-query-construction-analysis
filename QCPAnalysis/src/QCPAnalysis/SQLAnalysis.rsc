@@ -726,8 +726,12 @@ public int holesInString(str subject){
 
 public SQLModelRel getModels(str p, str v){
 	modelsRel = {};
+	rel[loc, SQLModel] models;
 	if(exists(analysisLoc + "<p>-<v>.bin")){
  		modelsRel = readBinaryValueFile(#SQLModelRel, analysisLoc + "<p>-<v>.bin");
+ 	}
+ 	else if(modelFileExists(p, v)){
+ 		models = readModels(p, v);
  	}
  	else{
  		models = buildModelsForSystem(p, v);
