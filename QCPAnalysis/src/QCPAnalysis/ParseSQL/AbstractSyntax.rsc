@@ -26,7 +26,8 @@ public data Exp = name(SQLName name)
 				| star()
 				| hole(int holeID)
 				| unknownExp(str expression)
-				| aliased(Exp exp, str theAlias);
+				| aliased(Exp exp, str theAlias)
+				| noExp();
 				
 public data SQLName = column(str column)
 					| table(str table)
