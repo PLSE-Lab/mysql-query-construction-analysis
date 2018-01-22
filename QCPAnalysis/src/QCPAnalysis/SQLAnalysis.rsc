@@ -69,7 +69,7 @@ public real rankSystem(str p, str v){
 	real total = 0.0;
  	
 	for(model <- modelsRel){
-		pattern = classifySQLModel(model);
+		//pattern = classifySQLModel(model);
 		int score = getRanking(model);
 		total += score;
 		count = count + 1;
@@ -79,22 +79,23 @@ public real rankSystem(str p, str v){
 }
 
 @doc{gets the "ranking" for this model, indicating how easy it will be to transform}
-public int getRanking(SQLModel model){
-	pattern = classifySQLModel(model);
+public int getRanking(tuple[loc location, SQLModel model, rel[SQLYield, SQLQuery] yieldsRel, 
+	YieldInfo info] modelInfo){
+	
+	pattern = classifySQLModel(modelInfo);
 	
 	// for qcp3a, check whether this is dynamic parameters or completely dynamic
 	if(pattern == qcp3a){
-		yield = getOneFrom(yields(model));
-		return rankings[classifyYield(yield)];
+		yield = getOneFrom(yieldsRel);
+		return rankings[classifyYield(yield[0], yield[1])];
 	}
 	
 	// for qcp3b and qcp3c, the ranking is the ranking of the "worst" yield
 	if(pattern == qcp3b || pattern == qcp3c){
 		int max = 0;
-		modelYields = yields(model);
 		
-		for(yield <- modelYields){
-			int rank = rankings[classifyYield(yield)];
+		for(<yield, parsed> <- modelInfo.yieldsRel){
+			int rank = rankings[classifyYield(yield, parsed)];
 			if(rank > max) max = rank;
 		}
 		
