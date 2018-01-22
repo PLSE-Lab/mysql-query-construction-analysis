@@ -726,7 +726,7 @@ public int holesInString(str subject){
 
 public SQLModelRel getModels(str p, str v){
 	modelsRel = {};
-	rel[loc, SQLModel] models;
+	rel[loc, SQLModel] models; 
 	if(exists(analysisLoc + "<p>-<v>.bin")){
  		modelsRel = readBinaryValueFile(#SQLModelRel, analysisLoc + "<p>-<v>.bin");
  	}
@@ -747,4 +747,23 @@ public SQLModelRel getModels(str p, str v){
  		writeBinaryValueFile(analysisLoc + "<p>-<v>.bin", modelsRel, compression=false);	
  	}
  	return modelsRel;
+}
+
+@doc{rebuilds yields, parsed queries, and yield info for the entire corpus}
+public void rebuildYieldInfo(){
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		modelsRel = getModels(p, v);
+		for(modelInfo <- modelsRel){
+			yieldsAndParsed = {};
+ 			modelYields = yields(modelInfo.model);
+ 			for(y <- modelYields){
+ 				yieldsAndParsed = yieldsAndParsed + <y, runParser(yield2String(y))>;
+ 			}
+ 			yieldInfo = compareYields(yieldsAndParsed<1>);
+ 			modelInfo.yieldsRel = yieldsAndParsed;
+ 			modelInfo.info = yieldInfo;
+		}
+		writeBinaryValueFile(analysisLoc + "<p>-<v>.bin", modelsRel, compression=false);
+	}
 }
