@@ -683,8 +683,9 @@ private int extractConditionHoleInfo(condition(inValues(_, exp, values))){
 private int extractConditionHoleInfo(condition(like(_, exp, pattern)))
 	= holesInString(exp) + holesInString(pattern);
 
-private default tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition){ 
-  throw "unhandled condition type encountered"; 
+private default int extractConditionHoleInfo(condition){ 
+ 	println( "unhandled condition type encountered");
+ 	return 0;
 } 
 
 private int extractOrderByHoleInfo(OrderBy order){
