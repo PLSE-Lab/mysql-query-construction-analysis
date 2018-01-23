@@ -759,9 +759,6 @@ public SQLModelRel getModels(str p, str v){
  	else{
 	 	models = modelsFileExists(p, v) ? readModels(p, v) : buildModelsForSystem(p, v);
  		for(<l,m> <- models){
- 			for(y <- yields(m)){
- 				println(y);
- 			}
  			yieldsAndParsed = {};
  			modelYields = yields(m);
  			for(y <- modelYields){

@@ -7,6 +7,7 @@ public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, 
 					 | insertQuery(Into into, list[list[str]] values, list[SetOp] setOps, SQLQuery select, list[SetOp] onDuplicateSetOps)
 					 | deleteQuery(list[Exp] from, list[str] using, Where where, OrderBy order, Limit limit)
 					 | setQuery(list[SetOp] setOps)
+					 | setOptionsQuery(str option, str val)
 					 | dropQuery(list[Exp] fields, Exp table)
 					 | alterQuery(Exp table) //TODO: altered fields and options
 					 | replaceQuery(Into into, list[list[str]] values, list[SetOp] setOps, SQLQuery select)
