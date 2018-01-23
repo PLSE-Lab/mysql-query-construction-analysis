@@ -496,6 +496,20 @@ public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
 								 | < ll, lf > <- expansions[fragment.name], 
 								   ll != l && ll notin alreadyVisited } +
 							     { addLabels([ dynamicPiece() ], edgeInfo) | < ll, lf > <- expansions[fragment.name], ll == l || ll in alreadyVisited };
+							     
+				// This is a heuristic: if we have an edge condition stating that a name is non-null,
+				// then we discard empty replacements for the name since we specifically were filtering
+				// those out in the code. TODO: This should ensure the assignment comes from outside, but
+				// there is no reason to check to ensure something isn't empty and then set it to empty
+				// to insert it into q query. This is really protecting against defaults set higher up
+				// in the code that are reachable in the CFG.
+				if (varName(vn) := fragment.name) {
+					nameCheckConds = { vn | edgeCondsInfo(set[Expr] conds, _) <- edgeInfo, var(name(name(vn))) <- conds };
+					emptyExpansions = { lp | lp:[labeledPiece(staticPiece(""),_)] <- nameExpansions };
+					if (size(emptyExpansions) > 0) {
+						nameExpansions = nameExpansions - emptyExpansions;
+					} 
+				}
 				return { ne | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] !:= ne } + 
 				       { addLabels(yieldForFragment(fragment), edgeInfo) | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] := ne };
 			} else if (fragment is compositeFragment) {
