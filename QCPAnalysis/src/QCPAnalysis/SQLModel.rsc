@@ -505,9 +505,11 @@ public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
 				// in the code that are reachable in the CFG.
 				if (varName(vn) := fragment.name) {
 					nameCheckConds = { vn | edgeCondsInfo(set[Expr] conds, _) <- edgeInfo, var(name(name(vn))) <- conds };
-					emptyExpansions = { lp | lp:[labeledPiece(staticPiece(""),_)] <- nameExpansions };
-					if (size(emptyExpansions) > 0) {
-						nameExpansions = nameExpansions - emptyExpansions;
+					if (size(nameCheckConds) > 0) {
+						emptyExpansions = { lp | lp:[labeledPiece(staticPiece(""),_)] <- nameExpansions };
+						if (size(emptyExpansions) > 0) {
+							nameExpansions = nameExpansions - emptyExpansions;
+						}
 					} 
 				}
 				return { ne | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] !:= ne } + 
@@ -677,7 +679,7 @@ public void printYields(rel[loc, SQLModel] models) {
 //public default str getEdgeLabel(QueryFragment qf) = "";
 
 // TODO: Add code to visualize model as dot graph...
-public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "") {
+public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "", bool showConditions = true) {
 	nodes = m.fragmentRel<1> + m.fragmentRel<4>;
 	if (isEmpty(nodes)) {
 		nodes = { m.startFragment };
@@ -690,7 +692,7 @@ public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "") {
 	} 
 	
 	nodes = [ "\"<nodeMap[n]>\" [ label = \"<escapeForDot(printQueryFragment(n))>\", labeljust=\"l\" ];" | n <- nodes ];
-	edges = [ "\"<nodeMap[n1]>\" -\> \"<nodeMap[n2]>\" [ label = \"<printEdgeInfo(nm,m.fragmentRel[l1,n1,nm,l2,n2])>\"];" | < l1, n1, nm, l2, n2 > <- m.fragmentRel<0,1,2,3,4> ];
+	edges = [ "\"<nodeMap[n1]>\" -\> \"<nodeMap[n2]>\" [ label = \"< showConditions ? printEdgeInfo(nm,m.fragmentRel[l1,n1,nm,l2,n2]) : "">\"];" | < l1, n1, nm, l2, n2 > <- m.fragmentRel<0,1,2,3,4> ];
 	str dotGraph = "digraph \"SQLModel\" {
 				   '	graph [ label = \"SQL Model<size(title)>0?" for <title>":"">\" ];
 				   '	node [ shape = box ];
