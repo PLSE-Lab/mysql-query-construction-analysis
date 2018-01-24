@@ -148,7 +148,7 @@ public map[str, list[SQLModel]] groupSQLModelsCorpus(){
 	for(p <- corpus, v := corpus[p]){
 		models = groupSQLModels(p, v);
 		patterns = [qcp0, qcp1, qcp2, qcp3a, qcp3b, qcp3c, unknown];
-		for(pattern <- pattern){
+		for(pattern <- patterns){
 			addModelsWithPattern(pattern, models);
 		}
 	}
@@ -172,6 +172,11 @@ public map[str, list[SQLModel]] groupSQLModels(str p, str v){
 	
 	return res;
 }
+
+@doc{group the location of models corpus wide based on pattern}
+public map[str, list[loc]] groupSQLModelLocsCorpus()
+	= (pattern : [m.callLoc | m <- models] | modelMap := groupSQLModelsCorpus(), 
+		pattern <- modelMap, models := modelMap[pattern]);
 
 @doc{group the locations of models in a whole system based on pattern}
 public map[str, list[loc]] groupSQLModelLocs(str p, str v)
@@ -683,8 +688,9 @@ private int extractConditionHoleInfo(condition(inValues(_, exp, values))){
 private int extractConditionHoleInfo(condition(like(_, exp, pattern)))
 	= holesInString(exp) + holesInString(pattern);
 
-private default tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition){ 
-  throw "unhandled condition type encountered"; 
+private default int extractConditionHoleInfo(condition){ 
+ 	println( "unhandled condition type encountered");
+ 	return 0;
 } 
 
 private int extractOrderByHoleInfo(OrderBy order){
@@ -759,9 +765,6 @@ public SQLModelRel getModels(str p, str v){
  	else{
 	 	models = modelsFileExists(p, v) ? readModels(p, v) : buildModelsForSystem(p, v);
  		for(<l,m> <- models){
- 			for(y <- yields(m)){
- 				println(y);
- 			}
  			yieldsAndParsed = {};
  			modelYields = yields(m);
  			for(y <- modelYields){
