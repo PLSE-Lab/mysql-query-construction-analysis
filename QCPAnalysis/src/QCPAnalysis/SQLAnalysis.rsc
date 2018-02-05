@@ -22,7 +22,7 @@ import String;
 import List;
 import Node;
 
-alias SQLModelRel = rel[loc location, SQLModel model, rel[SQLYield, SQLQuery] yieldsRel, YieldInfo info];
+alias SQLModelRel = rel[loc location, SQLModel model, rel[SQLYield, str, SQLQuery] yieldsRel, YieldInfo info];
 alias HoleInfo = map[str, int];
 
 public loc analysisLoc = baseLoc + "serialized/qcp/sqlanalysis/";
@@ -80,7 +80,7 @@ public real rankSystem(str p, str v){
 }
 
 @doc{gets the "ranking" for this model, indicating how easy it will be to transform}
-public int getRanking(tuple[loc location, SQLModel model, rel[SQLYield, SQLQuery] yieldsRel, 
+public int getRanking(tuple[loc location, SQLModel model, rel[SQLYield, str, SQLQuery] yieldsRel, 
 	YieldInfo info] modelInfo){
 	
 	pattern = classifySQLModel(modelInfo);
@@ -188,12 +188,12 @@ public map[str, list[loc]] groupSQLModelLocs(str p, str v)
 		pattern <- modelMap, models := modelMap[pattern]);
 
 @doc{determine which pattern matches a SQLModel}
-public str classifySQLModel(tuple[loc location, SQLModel model, rel[SQLYield, SQLQuery] yieldsRel, 
+public str classifySQLModel(tuple[loc location, SQLModel model, rel[SQLYield, str, SQLQuery] yieldsRel, 
 	YieldInfo info] modelInfo){
 	
 	if(size(modelInfo.yieldsRel) == 1){
 		parsedYieldPair = getOneFrom(modelInfo.yieldsRel);
-		return classifyYield(parsedYieldPair[0], parsedYieldPair[1]);
+		return classifyYield(parsedYieldPair[0], parsedYieldPair[2]);
 	}
 	else{
 		return classifyQCP3Query(modelInfo.yieldsRel, modelInfo.info);
@@ -201,9 +201,9 @@ public str classifySQLModel(tuple[loc location, SQLModel model, rel[SQLYield, SQ
 }
 
 @doc{determines which sub pattern a QCP3 query belongs to}
-public str classifyQCP3Query(rel[SQLYield, SQLQuery] parsedYieldPairs, YieldInfo info){
+public str classifyQCP3Query(rel[SQLYield, str, SQLQuery] parsedYields, YieldInfo info){
 	// check for the case where all yields lead to the same parsed query (qcp3a)
-	if(size(parsedYieldPairs<1>) == 1){
+	if(size(parsedYields<2>) == 1){
 		return qcp3a;
 	}
 	
@@ -775,14 +775,16 @@ public SQLModelRel getModels(str p, str v){
  			for(y <- modelYields){
  				 if(i < maxYields){
  				 	 println("yield <i> for call at <l>");
- 					 yieldsAndParsed = yieldsAndParsed + <y, runParser(yield2String(y))>;
+ 				 	 sql = yield2String(y);
+ 				 	 parsed = runParser(sql);
+ 					 yieldsAndParsed = yieldsAndParsed + <y, sql, parsed>;
  					 i = i + 1;
  				}
  				else{
  					break;
  				}
  			}
- 			yieldInfo = compareYields(yieldsAndParsed<1>);
+ 			yieldInfo = compareYields(yieldsAndParsed<2>);
  			modelsRel = modelsRel + <l, m, yieldsAndParsed, yieldInfo>;
  		}
  		writeBinaryValueFile(analysisLoc + "<p>-<v>.bin", modelsRel, compression=false);	
@@ -801,15 +803,17 @@ public void rebuildYieldInfo(){
  			int i = 0;
  			for(y <- modelYields){
  				if(i < maxYields){
- 				 	 println("Now parsing yield <i> for call at <l>");
- 					 yieldsAndParsed = yieldsAndParsed + <y, runParser(yield2String(y))>;
+				 	 println("yield <i> for call at <l>");
+ 				 	 sql = yield2String(y);
+ 				 	 parsed = runParser(sql);
+ 					 yieldsAndParsed = yieldsAndParsed + <y, sql, parsed>;
  					 i = i + 1;
  				}
  				else{
  					break;
  				}
  			}
- 			yieldInfo = compareYields(yieldsAndParsed<1>);
+ 			yieldInfo = compareYields(yieldsAndParsed<2>);
  			modelInfo.yieldsRel = yieldsAndParsed;
  			modelInfo.info = yieldInfo;
 		}
