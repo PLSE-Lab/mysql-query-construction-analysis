@@ -48,6 +48,9 @@ public str qcp3c = "multiple yields, different query types";
 @doc{model matches no patterns}
 public str unknown = "unknown";
 
+@doc{maximum number of times to invoke the parser}
+public int maxYields = 1000;
+
 @doc{"ranking" for each pattern indicating ease of transformation}
 // note: qcp3 is not included as its score requires some computation
 public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 2, unknown : 3);
@@ -110,6 +113,7 @@ public map[str, int] countPatternsInCorpus(){
 	Corpus corpus = getCorpus();
 	for(p <- corpus, v := corpus[p]){
 		sysCounts = countPatternsInSystem(p, v);
+		println("<p>, <v>, <sysCounts>");
 		for(pattern <- sysCounts, count := sysCounts[pattern]){
 			if(pattern in res){
 				res[pattern] += count;
@@ -767,8 +771,16 @@ public SQLModelRel getModels(str p, str v){
  		for(<l,m> <- models){
  			yieldsAndParsed = {};
  			modelYields = yields(m);
+ 			int i = 0;
  			for(y <- modelYields){
- 				yieldsAndParsed = yieldsAndParsed + <y, runParser(yield2String(y))>;
+ 				 if(i < maxYields){
+ 				 	 println("yield <i> for call at <l>");
+ 					 yieldsAndParsed = yieldsAndParsed + <y, runParser(yield2String(y))>;
+ 					 i = i + 1;
+ 				}
+ 				else{
+ 					break;
+ 				}
  			}
  			yieldInfo = compareYields(yieldsAndParsed<1>);
  			modelsRel = modelsRel + <l, m, yieldsAndParsed, yieldInfo>;
@@ -786,8 +798,16 @@ public void rebuildYieldInfo(){
 		for(modelInfo <- modelsRel){
 			yieldsAndParsed = {};
  			modelYields = yields(modelInfo.model);
+ 			int i = 0;
  			for(y <- modelYields){
- 				yieldsAndParsed = yieldsAndParsed + <y, runParser(yield2String(y))>;
+ 				if(i < maxYields){
+ 				 	 println("Now parsing yield <i> for call at <l>");
+ 					 yieldsAndParsed = yieldsAndParsed + <y, runParser(yield2String(y))>;
+ 					 i = i + 1;
+ 				}
+ 				else{
+ 					break;
+ 				}
  			}
  			yieldInfo = compareYields(yieldsAndParsed<1>);
  			modelInfo.yieldsRel = yieldsAndParsed;
