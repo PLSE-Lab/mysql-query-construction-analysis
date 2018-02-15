@@ -132,12 +132,12 @@ public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | 
 		pattern <- modelMap, models := modelMap[pattern]);
 		
 @doc{group models based on pattern from the whole corpus}
-public map[str, list[SQLModel]] groupSQLModelsCorpus(){
+public map[str, SQLModelRel] groupSQLModelsCorpus(){
 
 	res = ();
 	Corpus corpus = getCorpus();
 	
-	void addModelsWithPattern(str pattern, map[str, list[SQLModel]] models){
+	void addModelsWithPattern(str pattern, map[str, SQLModelRel] models){
 		if(pattern in models){
 			if(pattern in res){
 				res[pattern] = res[pattern] + models[pattern];
@@ -160,17 +160,17 @@ public map[str, list[SQLModel]] groupSQLModelsCorpus(){
 }
 
 @doc{group models in a whole system based on pattern}
-public map[str, list[SQLModel]] groupSQLModels(str p, str v){
-	res = ( );
+public map[str, SQLModelRel] groupSQLModels(str p, str v){
+	map[str, SQLModelRel] res = ( );
 	models = getModels(p, v);
 	
 	for(model <- models){
 		pattern = classifySQLModel(model);
 		if(pattern in res){
-			res[pattern] += model.model;
+			res[pattern] += {model};
 		}
 		else{
-			res += (pattern : [model.model]);
+			res += (pattern : {model});
 		}
 	}
 	
