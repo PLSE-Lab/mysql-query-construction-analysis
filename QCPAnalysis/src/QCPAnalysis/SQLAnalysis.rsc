@@ -523,7 +523,7 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 	
 	
 	if(!(where is noWhere)){
-		res["condition"] = extractConditionHoleInfo(where.condition);
+		res["condition"] += extractConditionHoleInfo(where.condition);
 	}
 	
 	if(!(group is noGroupBy)){
@@ -535,7 +535,7 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 	}
 	
 	if(!(having is noHaving)){
-		res["condition"] = extractConditionHoleInfo(having.condition);
+		res["condition"] += extractConditionHoleInfo(having.condition);
 	}
 	
 	res["name"] += extractOrderByHoleInfo(order);
@@ -546,7 +546,7 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 		res["name"] += holesInString(j.joinType);
 		if(hole(_) := j.joinExp) res["name"] += 1;
 		if(j is joinOn){
-			res["condition"] = extractConditionHoleInfo(j.on);
+			res["condition"] += extractConditionHoleInfo(j.on);
 			continue;
 		}
 		if(j is joinUsing){
@@ -572,7 +572,7 @@ public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)
 	res["param"] += setOpInfo[1];
 	
 	if(!(where is noWhere)){
-		res["condition"] = extractConditionHoleInfo(where.condition);
+		res["condition"] += extractConditionHoleInfo(where.condition);
 	}
 	
 	res["name"] += extractOrderByHoleInfo(order);
@@ -623,7 +623,7 @@ public HoleInfo extractHoleInfo(deleteQuery(from, using, where, order, limit)){
 	}
 	
 	if(!(where is noWhere)){
-		res["condition"] = extractConditionHoleInfo(where.condition);
+		res["condition"] += extractConditionHoleInfo(where.condition);
 	}
 	
 	res["name"] += extractOrderByHoleInfo(order);
@@ -655,10 +655,9 @@ private int extractConditionHoleInfo(not(negated)){
 	return extractConditionHoleInfo(negated);
 }
 
-// do we need a case where the comparison operator is a hole? I hope developers dont do this...	
-private int extractConditionHoleInfo(condition(simpleComparison(left, op, right)))
-	= holesInString(left) + holesInString(right);
-	
+private int extractConditionHoleInfo(condition(simpleComparison(left, op, right))){
+	return holesInString(left) + holesInString(right);
+}	
 private int extractConditionHoleInfo(condition(compoundComparison(left, op, right))){
 	rightHoles = extractConditionHoleInfo(right);
 	return holesInString(left) + rightHoles;
