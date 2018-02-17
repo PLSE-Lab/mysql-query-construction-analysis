@@ -524,11 +524,11 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 	// TODO: refactor some of this into methods, other query types have the same clauses
 	
 	for(s <- selectExpr){
-		if(hole(_) := s) res["name"] += 1;
+		res["name"] += holesInExpr(s);
 	}
 	
 	for(f <- from){
-		if(hole(_) := f)  res["name"] += 1;
+		res["name"] += holesInExpr(f);
 	}
 	
 	
@@ -538,9 +538,7 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 	
 	if(!(group is noGroupBy)){
 		for(<exp, mode> <- group.groupings){
-			if(hole(_) := exp){
-				res["name"] += 1;
-			}
+			res["name"] += holesInExpr(exp);
 		}
 	}
 	
@@ -554,7 +552,7 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 	
 	for(j <- joins){
 		res["name"] += holesInString(j.joinType);
-		if(hole(_) := j.joinExp) res["name"] += 1;
+		res["name"] += holesInExpr(j.joinExp);
 		if(j is joinOn){
 			res["condition"] += extractConditionHoleInfo(j.on);
 			continue;
@@ -572,9 +570,7 @@ public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)
 	res = ("name" : 0, "param" : 0, "condition" : 0);
 	
 	for(t <- tables){
-		if(hole(_) := t){
-			res["name"] += 1;
-		}
+		res["name"] += holesInExpr(t);
 	}
 	
 	setOpInfo = extractSetOpHoleInfo(setOps);
@@ -595,7 +591,7 @@ public HoleInfo extractHoleInfo(insertQuery(into, values, setOps, select, onDupl
 	res = ("name" : 0, "param" : 0, "condition" : 0);
 	
 	if(!(into is noInto)){
-		if(hole(_) := into.dest) res["name"] += 1;
+		res["name"] += holesInExpr(into.dest);
 		for(c <- into.columns){
 			res["name"] += holesInString(c);
 		}
@@ -625,7 +621,7 @@ public HoleInfo extractHoleInfo(deleteQuery(from, using, where, order, limit)){
 	res = ("name" : 0, "param" : 0, "condition" : 0);
 	
 	for(f <- from){
-		if(hole(_) := f)  res["name"] += 1;
+		res["name"] += holesInExpr(f);
 	}
 	
 	for(u <- using){
@@ -710,9 +706,7 @@ private int extractOrderByHoleInfo(OrderBy order){
 	res = 0;
 	if(!(order is noOrderBy)){
 		for(<exp, mode> <- order.orderings){
-			if(hole(_) := exp){
-				res += 1;
-			}
+			res += holesInExpr(exp);
 		}
 	}
 	return res;
@@ -767,6 +761,23 @@ public int holesInString(str subject){
 	}
 	
 	return res;
+}
+
+@doc{returns the number of holes in an expression}
+public int holesInExpr(Exp expr){
+	switch(expr){
+		case literal(s) : return holesInString(s);
+		case call(s) : return holesInString(s);
+		case unknownExp(s) : return holesInString(s);
+		case aliased(e, s) : return holesInExpr(e) + holesInString(s);
+		case name(column(c)) : return holesInString(c);
+		case name(table(t)) : return holesInString(t);
+		case name(database(d)) : return holesInString(d);
+		case name(tableColumn(t, c)) : return holesInString(t) + holesInString(c);
+		case name(databaseTable(d, t)) : return holesInString(d) + holesInString(t);
+		case name(databaseTableColumn(d, t, c)) : return holesInString(d) + holesInString(t) + holesInString(c);
+		default: return 0;
+	}
 }
 
 public SQLModelRel getModels(str p, str v){

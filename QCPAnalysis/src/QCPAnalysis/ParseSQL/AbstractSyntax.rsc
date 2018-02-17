@@ -25,7 +25,6 @@ public data Exp = name(SQLName name)
 			    | literal(str literalVal)
 			    | call(str functionName)//TODO: function params
 				| star()
-				| hole(int holeID)
 				| unknownExp(str expression)
 				| aliased(Exp exp, str theAlias)
 				| noExp();
