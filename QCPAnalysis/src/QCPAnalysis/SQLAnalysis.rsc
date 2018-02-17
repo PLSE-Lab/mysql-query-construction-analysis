@@ -45,6 +45,9 @@ public str qcp3b = "multiple yields, same query type";
 @doc{query has multiple yields, yields are of differing query types}
 public str qcp3c = "multiple yields, different query types";
 
+@doc{query comes from function/method parameter}
+public str qcp4 = "function query";
+
 @doc{model matches no patterns}
 public str unknown = "unknown";
 
@@ -53,7 +56,7 @@ public int maxYields = 1000;
 
 @doc{"ranking" for each pattern indicating ease of transformation}
 // note: qcp3 is not included as its score requires some computation
-public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 2, unknown : 3);
+public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 2, qcp4: 3, unknown : 4);
 
 @doc{scores all systems in the corpus}
 public map[str, real] rankCorpus(){
@@ -192,8 +195,8 @@ public str classifySQLModel(tuple[loc location, SQLModel model, rel[SQLYield, st
 	YieldInfo info] modelInfo){
 	
 	if(size(modelInfo.yieldsRel) == 1){
-		parsedYieldPair = getOneFrom(modelInfo.yieldsRel);
-		return classifyYield(parsedYieldPair[0], parsedYieldPair[2]);
+		parsedYieldTuple = getOneFrom(modelInfo.yieldsRel);
+		return classifyYield(parsedYieldTuple[0], parsedYieldTuple[2]);
 	}
 	else{
 		return classifyQCP3Query(modelInfo.yieldsRel, modelInfo.info);
@@ -220,8 +223,15 @@ public str classifyQCP3Query(rel[SQLYield, str, SQLQuery] parsedYields, YieldInf
 @doc{classify a single yield}
 private str classifyYield(SQLYield yield, SQLQuery parsed){
 	
-	if(size(yield) == 1 && staticPiece(_) := head(yield)){
-		return qcp0;
+	if(size(yield) == 1){
+		if(head(yield) is staticPiece){
+			return qcp0;
+		}
+		// TODO: this only hanles the basic case where a single function parameter provides the value
+		// of the whole query
+		if(head(yield) is namePiece || head(yield) is dynamicPiece){
+			return qcp4;
+		}
 	}
 	
 	if(hasDynamicPiece(yield)){
