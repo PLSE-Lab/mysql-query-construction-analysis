@@ -91,7 +91,7 @@ public int getRanking(tuple[loc location, SQLModel model, rel[SQLYield, str, SQL
 	// for qcp3a, check whether this is dynamic parameters or completely dynamic
 	if(pattern == qcp3a){
 		theYield = getOneFrom(modelInfo.yieldsRel);
-		return rankings[classifyYield(theYield[0], theYield[1])];
+		return rankings[classifyYield(theYield[0], theYield[2])];
 	}
 	
 	// for qcp3b and qcp3c, the ranking is the ranking of the "worst" yield
@@ -378,7 +378,7 @@ public SystemQueryInfo collectSystemQueryInfo(str p, str v){
 	for(model <- models){
 		pattern = classifySQLModel(model);
 		if(pattern == qcp0 || pattern == qcp1 || pattern == qcp2 || pattern == qcp3a){
-			parsed = getOneFrom(model.yieldsRel)[1];
+			parsed = getOneFrom(model.yieldsRel)[2];
 			res = extractQueryInfo(parsed, res);
 		}
 		else{
@@ -390,7 +390,7 @@ public SystemQueryInfo collectSystemQueryInfo(str p, str v){
 			}
 			if(pattern == qcp3c){
 				//for yields that are different query types, count the clauses of each yield
-				for(p <- model.yieldsRel[1]){
+				for(p <- model.yieldsRel[2]){
 					res = extractQueryInfo(p, res);
 				}
 			}
