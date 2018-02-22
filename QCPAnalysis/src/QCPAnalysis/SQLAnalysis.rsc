@@ -48,7 +48,13 @@ public str qcp3c = "multiple yields, different query types";
 @doc{query comes from function/method parameter}
 public str qcp4 = "function query";
 
-@doc{model matches no patterns}
+@doc{model represents a query type other than select, insert, update, delete}
+public str otherType = "other query type";
+
+@doc{pattern cannot be determined due to a parse error (ideally, this shouldnt occur)}
+public str parseError = "parse error";
+
+@doc{model matches no patterns (yet, ideally this shouldnt occur)}
 public str unknown = "unknown";
 
 @doc{maximum number of times to invoke the parser}
@@ -56,7 +62,8 @@ public int maxYields = 1000;
 
 @doc{"ranking" for each pattern indicating ease of transformation}
 // note: qcp3 is not included as its score requires some computation
-public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 2, qcp4: 3, unknown : 4);
+public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 2, qcp4: 3, unknown : 0, parseError : 0,
+	otherType : 0);
 
 @doc{scores all systems in the corpus}
 public map[str, real] rankCorpus(){
@@ -232,6 +239,14 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 		if(head(yield) is namePiece || head(yield) is dynamicPiece){
 			return qcp4;
 		}
+	}
+	
+	if(parsed is parseError){
+		return parseError;
+	}
+	
+	if(!(parsed is selectQuery || parsed is insertQuery || parsed is updateQuery || parsed is deleteQuery)){
+		return otherType;
 	}
 	
 	if(hasDynamicPiece(yield)){
