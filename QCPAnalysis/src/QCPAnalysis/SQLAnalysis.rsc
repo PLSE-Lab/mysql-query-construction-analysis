@@ -717,7 +717,7 @@ private int extractConditionHoleInfo(condition(like(_, exp, pattern)))
 	= holesInString(exp) + holesInString(pattern);
 
 private default int extractConditionHoleInfo(condition){ 
- 	println( "unhandled condition type encountered");
+ 	println( "unhandled condition type encountered : <condition>");
  	return 0;
 } 
 
