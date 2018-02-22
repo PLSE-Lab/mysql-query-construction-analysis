@@ -212,6 +212,10 @@ public str classifySQLModel(tuple[loc location, SQLModel model, rel[SQLYield, st
 
 @doc{determines which sub pattern a QCP3 query belongs to}
 public str classifyQCP3Query(rel[SQLYield, str, SQLQuery] parsedYields, YieldInfo info){
+	if(otherQueryType(t) := info){
+		return t == "parseError" ? parseError : otherType;
+	}
+	
 	// check for the case where all yields lead to the same parsed query (qcp3a)
 	if(size(parsedYields<2>) == 1){
 		return qcp3a;
