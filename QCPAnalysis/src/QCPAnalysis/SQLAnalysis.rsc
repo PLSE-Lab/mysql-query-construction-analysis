@@ -161,7 +161,7 @@ public map[str, SQLModelRel] groupSQLModelsCorpus(){
 		
 	for(p <- corpus, v := corpus[p]){
 		models = groupSQLModels(p, v);
-		patterns = [qcp0, qcp1, qcp2, qcp3a, qcp3b, qcp3c, unknown];
+		patterns = [qcp0, qcp1, qcp2, qcp3a, qcp3b, qcp3c, unknown, parseError, otherType];
 		for(pattern <- patterns){
 			addModelsWithPattern(pattern, models);
 		}
