@@ -5,6 +5,8 @@
 module QCPAnalysis::WriteResults
 
 import QCPAnalysis::QCPCorpus;
+import QCPAnalysis::SQLAnalysis;
+import QCPAnalysis::SQLModel;
 
 import lang::php::ast::AbstractSyntax;
 import lang::php::util::Corpus;
@@ -19,6 +21,33 @@ import Set;
 import Map;
 
 loc tables = |project://QCPAnalysis/results/tables/|;
+loc examples = |project://QCPAnalysis/results/examples/|;
+
+public loc getExample(str qcp, int exampleNum = 0){
+	models = groupSQLModelsCorups();
+	return getExample(qcp, models, exampleNum);
+}
+
+public loc getExample(str qcp, str p, str v, int exampleNum = 0){
+	models = groupSQLModels(p, v);
+	return getExample(qcp, models, exampleNum);
+}
+
+private loc getExample(str qcp, map[str, SQLModelRel] models, int exampleNum){
+	try 
+		matches = models[qcp];
+	catch : 
+		throw "there are no models matching pattern: <qcp>";
+	
+	exampleLoc = examples + "/<qcp>/<exampleNum>/";
+	model = getOneFrom(matches);
+	
+	iprintToFile(exampleLoc + "model.txt", model.model);
+	iprintToFile(exampleLoc + "yieldsRel.txt", model.yieldsRel);
+	renderSQLModelAsDot(model.model, exampleLoc + "dot.dot");
+	
+	return model.location;
+}
 
 public str corpusAsLatexTable(bool captionOnTop=false, bool tablestar = false) {
 	Corpus corpus = getCorpus();
