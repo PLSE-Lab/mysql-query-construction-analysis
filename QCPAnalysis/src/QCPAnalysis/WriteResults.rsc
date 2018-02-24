@@ -23,6 +23,13 @@ import Map;
 loc tables = |project://QCPAnalysis/results/tables/|;
 loc examples = |project://QCPAnalysis/results/examples/|;
 
+/**
+	getExample finds a random example (from either a specific system, or the whole corpus) for a 
+	specified pattern and if one exists,
+	1) generates a dot graph for the model of this example
+	2) generates a latex figure for the yields, query strings, and SQL ASTs for the example
+	3) returns the location of the example
+*/
 public loc getExample(str qcp, int exampleNum = 0){
 	models = groupSQLModelsCorups();
 	return getExample(qcp, models, exampleNum);
