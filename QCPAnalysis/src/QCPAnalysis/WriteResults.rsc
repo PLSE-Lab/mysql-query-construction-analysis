@@ -49,6 +49,9 @@ private loc getExample(str qcp, map[str, SQLModelRel] models, int exampleNum){
 	exampleLoc = examples + "/<qcp>/<exampleNum>/";
 	model = getOneFrom(matches);
 	pattern = getOneFrom(invert(QCPs)[qcp]);
+	pluralYield = size(model.yieldsRel<0>) > 1 ? "s" : "";
+	pluralString = size(model.yieldsRel<1>) > 1 ? "s" : "";
+	pluralAST = size(model.yieldsRel<2>) > 1 ? "s" : "";
 	
 	str latex = 
 		"\\begin{figure*}
@@ -66,7 +69,7 @@ private loc getExample(str qcp, map[str, SQLModelRel] models, int exampleNum){
 		'\\end{lstlisting}
 		'
 		'\\end{enumerate}
-		'\\caption{<toUpperCase(pattern)>: Yield, Query String, and AST}
+		'\\caption{<toUpperCase(pattern)>: Yield<pluralYield>, Query String<pluralString>, and AST<pluralAST>}
 		'\\label{fig:<pattern>_<exampleNum>_yields}
 		'\\end{figure*}
 		";
