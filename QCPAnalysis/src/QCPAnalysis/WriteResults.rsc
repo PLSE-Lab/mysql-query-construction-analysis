@@ -48,6 +48,7 @@ private loc getExample(str qcp, map[str, SQLModelRel] models, int exampleNum){
 	
 	exampleLoc = examples + "/<qcp>/<exampleNum>/";
 	model = getOneFrom(matches);
+	pattern = getOneFrom(invert(QCPs)[qcp]);
 	
 	str latex = 
 		"\\begin{figure*}
@@ -65,14 +66,14 @@ private loc getExample(str qcp, map[str, SQLModelRel] models, int exampleNum){
 		'\\end{lstlisting}
 		'
 		'\\end{enumerate}
-		'\\caption{<qcp>: Yield, Query String, and AST}
-		'\\label{fig:<exampleNum>_yields}
+		'\\caption{<toUpperCase(pattern)>: Yield, Query String, and AST}
+		'\\label{fig:<pattern>_<exampleNum>_yields}
 		'\\end{figure*}
 		";
 	
 	iprintToFile(exampleLoc + "model.txt", model.model);
-	writeFile(exampleLoc + "yieldsRel.tex", latex);
-	renderSQLModelAsDot(model.model, exampleLoc + "dot.dot");
+	writeFile(exampleLoc + "<pattern>_<exampleNum>.tex", latex);
+	renderSQLModelAsDot(model.model, exampleLoc + "<pattern>_<exampleNum>.dot");
 	
 	return model.location;
 }

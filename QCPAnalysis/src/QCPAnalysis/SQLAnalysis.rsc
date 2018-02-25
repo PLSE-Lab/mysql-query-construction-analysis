@@ -57,6 +57,20 @@ public str parseError = "parse error";
 @doc{model matches no patterns (yet, ideally this shouldnt occur)}
 public str unknown = "unknown";
 
+@doc{map containing all QCPs, for easy access to QCP names}
+public map[str, str] QCPs = (
+	"qcp0" 	: "static",
+	"qcp1" 	: "dynamic parameters",
+	"qcp2" 	: "dynamic",
+	"qcp3a" : "multiple yields, same parsed query",
+	"qcp3b" : "multiple yields, same query type",
+	"qcp3c" : "multiple yields, different query types",
+	"qcp4" : "function query",
+	"otherType" : "other query type",
+	"parseError" : "parse error",
+	"unknown" : "unknown"
+	);
+
 @doc{maximum number of times to invoke the parser}
 public int maxYields = 1000;
 
