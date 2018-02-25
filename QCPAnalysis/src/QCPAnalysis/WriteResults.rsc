@@ -57,15 +57,15 @@ private loc getExample(str qcp, map[str, SQLModelRel] models, int exampleNum){
 		"\\begin{figure*}
 		'\\begin{enumerate}
 		'\\item\\begin{lstlisting}
-		'<model.yieldsRel<0>>
+		'<for(y <- model.yieldsRel<0>){><y>\n<}>
 		'\\end{lstlisting}
 		'
 		'\\item\\begin{lstlisting}
-		'<model.yieldsRel<1>>
+		'<for(y <- model.yieldsRel<1>){><y>\n<}>
 		'\\end{lstlisting}
 		'
 		'\\item\\begin{lstlisting}
-		'<model.yieldsRel<2>>
+		'<for(y <- model.yieldsRel<2>){><y>\n<}>
 		'\\end{lstlisting}
 		'
 		'\\end{enumerate}
