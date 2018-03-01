@@ -46,6 +46,49 @@ private loc getExample(str qcp, map[str, SQLModelRel] models, int exampleNum){
 	catch : 
 		throw "there are no models matching pattern: <qcp>";
 	
+	return writeExample(qcp, matches, exampleNum);
+}
+
+/**
+	getExamples finds numExamples random examples (from either a specific system, or the whole corpus) for a 
+	specified pattern. and for each example:
+		1) generates a dot graph for the model of this example
+		2) generates a latex figure for the yields, query strings, and SQL ASTs for the example
+		3) returns the location of the example
+	if the number of existing examples < than numExamples, it returns the number of existing examples
+*/
+
+public set[loc] getExamples(int numExamples, str qcp, int exampleNum = 0){
+	models = groupSQLModelsCorpus();
+	return getExamples(qcp, models, exampleNum);
+}
+
+public set[loc] getExamples(int numExamples, str qcp, str p, str v, int exampleNum = 0){
+	models = groupSQLModels(p, v);
+	return getExamples(numExamples, qcp, models, exampleNum);
+}
+
+public set[loc] getExamples(int numExamples, str qcp, map[str, SQLModelRel] models, int exampleNum){
+	try 
+		matches = models[qcp];
+	catch : 
+		throw "there are no models matching pattern: <qcp>";
+		
+	res = {};
+	for(i <- [0..numExamples]){
+		if(size(matches) == 0){
+			println("Only <i> models matching \"<qcp>\" could be found");
+			break;
+		}
+		else{
+			model = takeOneFrom(matches);
+			res += writeExample(qcp, matches, exampleNum + i);
+		}
+	}
+	return res;
+}
+
+private loc writeExample(str qcp, SQLModelRel matches, int exampleNum){
 	exampleLoc = examples + "/<qcp>/<exampleNum>/";
 	model = getOneFrom(matches);
 	pattern = getOneFrom(invert(QCPs)[qcp]);
