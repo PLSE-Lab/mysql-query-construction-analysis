@@ -59,7 +59,7 @@ public str unknown = "unknown";
 
 @doc{map containing all QCPs, for easy access to QCP names}
 public map[str, str] QCPs = (
-	"qcp0" 	: "static",
+	"qcp0" 	: "static", 
 	"qcp1" 	: "dynamic parameters",
 	"qcp2" 	: "dynamic",
 	"qcp3a" : "multiple yields, same parsed query",
@@ -154,6 +154,18 @@ public map[str, int] countPatternsInCorpus(){
 @doc{return just the counts of each pattern in a system}
 public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
 		pattern <- modelMap, models := modelMap[pattern]);
+		
+@doc{groups the counts of each QCP by system}
+public map[tuple[str,str], map[str, int]] groupPatternCountsBySystem(){
+	res = ( );
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		res += (<p, v> : countPatternsInSystem(p, v));
+	}
+	res += (<"total" , "0.0"> : countPatternsInCorpus());
+	
+	return res;
+}
 		
 @doc{group models based on pattern from the whole corpus}
 public map[str, SQLModelRel] groupSQLModelsCorpus(){
