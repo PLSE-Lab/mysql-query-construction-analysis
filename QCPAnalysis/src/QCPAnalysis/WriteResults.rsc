@@ -118,7 +118,7 @@ public str qcpCountsAsLatexTable(bool captionOnTop=false, bool tablestar = false
 		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrrrrrr} \\toprule
 		'System & Version & 0 & 1 & 2 & 3a & 3b & 3c & 4 & O & P & U \\\\ \\midrule
 		'<for(<_,p> <- pForSort, v := corpus[p]){><getLine(p,v)> \\\\
-		'<}>
+		'<}>\\midrule
 		'<getTotalLine()> \\\\
 		'\\bottomrule
 		'\\end{tabularx}
