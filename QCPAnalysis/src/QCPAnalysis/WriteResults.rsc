@@ -81,6 +81,63 @@ private loc getExample(str qcp, map[str, SQLModelRel] models, int exampleNum){
 	return model.location;
 }
 
+public str qcpCountsAsLatexTable(bool captionOnTop=false, bool tablestar = false){
+	Corpus corpus = getCorpus();
+	counts = groupPatternCountsBySystem();
+	totals = counts[<"total", "0.0">];
+	delete(counts, "total");//total should be printed last
+	
+	pForSort = [ < toUpperCase(p), p > | p <- corpus ];
+	pForSort = sort(pForSort, bool(tuple[str,str] t1, tuple[str,str] t2) { return t1[0] < t2[0]; });
+	sortedQ = [qcp0, qcp1, qcp2, qcp3a, qcp3b, qcp3c, qcp4, otherType, parseError, unknown];
+	
+	str getLine(str p, str v){
+		sysCounts = counts[<p, v>];
+		res = "<getSensibleName(p)> & <v>";
+		for(qcp <- sortedQ){
+			res +=  "& \\numprint{<(qcp in sysCounts) ? sysCounts[qcp] : 0>}";
+		}
+		return res;
+	}
+	
+	str getTotalLine(){
+		res = "\\textbf{totals} & -";
+		for(qcp <- sortedQ){
+			res +=  "& \\numprint{<(qcp in totals) ? totals[qcp] : 0>}";
+		}
+		return res;
+	}
+	
+	str res =
+		"\\npaddmissingzero
+		'\\npfourdigitsep
+		'\\begin{table<if(tablestar){>*<}>}
+		'\\centering
+		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
+		'\\ra{1.2}
+		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrrrrrr} \\toprule
+		'System & Version & 0 & 1 & 2 & 3a & 3b & 3c & 4 & O & P & U \\\\ \\midrule
+		'<for(<_,p> <- pForSort, v := corpus[p]){><getLine(p,v)> \\\\
+		'<}>
+		'<getTotalLine()> \\\\
+		'\\bottomrule
+		'\\end{tabularx}
+		'\\\\
+		'\\vspace{2ex}
+		'\\footnotesize
+		' Counts for each QCP in each System. QCP names are abbreviated. Numbered patterns
+		' are replaced by their number. O stands for other query type. P stands for parse error.
+		' U stands for models that match no patterns.
+		'<if(!captionOnTop){>\\caption{QCP Counts by System.\\label{tbl:qcp-counts}}<}>
+		'\\end{table<if(tablestar){>*<}>}
+		'\\npfourdigitnosep
+		'\\npnoaddmissingzero
+		";
+		
+	writeFile(tables + "qcpCounts.tex", res);
+	return res;
+}
+
 public str corpusAsLatexTable(bool captionOnTop=false, bool tablestar = false) {
 	Corpus corpus = getCorpus();
 	corpusCounts = getSortedCountsCaseInsensitive();
