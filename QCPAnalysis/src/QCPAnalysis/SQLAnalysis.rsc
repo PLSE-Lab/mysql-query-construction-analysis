@@ -22,7 +22,7 @@ import String;
 import List;
 import Node;
 
-alias SQLModelRel = rel[loc location, SQLModel model, rel[SQLYield, SQLQuery] yieldsRel, YieldInfo info];
+alias SQLModelRel = rel[loc location, SQLModel model, rel[SQLYield, str, SQLQuery] yieldsRel, YieldInfo info];
 alias HoleInfo = map[str, int];
 
 public loc analysisLoc = baseLoc + "serialized/qcp/sqlanalysis/";
@@ -45,12 +45,39 @@ public str qcp3b = "multiple yields, same query type";
 @doc{query has multiple yields, yields are of differing query types}
 public str qcp3c = "multiple yields, different query types";
 
-@doc{model matches no patterns}
+@doc{query comes from function/method parameter}
+public str qcp4 = "function query";
+
+@doc{model represents a query type other than select, insert, update, delete}
+public str otherType = "other query type";
+
+@doc{pattern cannot be determined due to a parse error (ideally, this shouldnt occur)}
+public str parseError = "parse error";
+
+@doc{model matches no patterns (yet, ideally this shouldnt occur)}
 public str unknown = "unknown";
+
+@doc{map containing all QCPs, for easy access to QCP names}
+public map[str, str] QCPs = (
+	"qcp0" 	: "static", 
+	"qcp1" 	: "dynamic parameters",
+	"qcp2" 	: "dynamic",
+	"qcp3a" : "multiple yields, same parsed query",
+	"qcp3b" : "multiple yields, same query type",
+	"qcp3c" : "multiple yields, different query types",
+	"qcp4" : "function query",
+	"otherType" : "other query type",
+	"parseError" : "parse error",
+	"unknown" : "unknown"
+	);
+
+@doc{maximum number of times to invoke the parser}
+public int maxYields = 1000;
 
 @doc{"ranking" for each pattern indicating ease of transformation}
 // note: qcp3 is not included as its score requires some computation
-public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 2, unknown : 3);
+public map[str, int] rankings = (qcp0 : 0, qcp1 : 1, qcp2 : 2, qcp4: 3, unknown : 0, parseError : 0,
+	otherType : 0);
 
 @doc{scores all systems in the corpus}
 public map[str, real] rankCorpus(){
@@ -77,7 +104,7 @@ public real rankSystem(str p, str v){
 }
 
 @doc{gets the "ranking" for this model, indicating how easy it will be to transform}
-public int getRanking(tuple[loc location, SQLModel model, rel[SQLYield, SQLQuery] yieldsRel, 
+public int getRanking(tuple[loc location, SQLModel model, rel[SQLYield, str, SQLQuery] yieldsRel, 
 	YieldInfo info] modelInfo){
 	
 	pattern = classifySQLModel(modelInfo);
@@ -85,7 +112,7 @@ public int getRanking(tuple[loc location, SQLModel model, rel[SQLYield, SQLQuery
 	// for qcp3a, check whether this is dynamic parameters or completely dynamic
 	if(pattern == qcp3a){
 		theYield = getOneFrom(modelInfo.yieldsRel);
-		return rankings[classifyYield(theYield[0], theYield[1])];
+		return rankings[classifyYield(theYield[0], theYield[2])];
 	}
 	
 	// for qcp3b and qcp3c, the ranking is the ranking of the "worst" yield
@@ -110,6 +137,7 @@ public map[str, int] countPatternsInCorpus(){
 	Corpus corpus = getCorpus();
 	for(p <- corpus, v := corpus[p]){
 		sysCounts = countPatternsInSystem(p, v);
+		println("<p>, <v>, <sysCounts>");
 		for(pattern <- sysCounts, count := sysCounts[pattern]){
 			if(pattern in res){
 				res[pattern] += count;
@@ -127,13 +155,25 @@ public map[str, int] countPatternsInCorpus(){
 public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
 		pattern <- modelMap, models := modelMap[pattern]);
 		
+@doc{groups the counts of each QCP by system}
+public map[tuple[str,str], map[str, int]] groupPatternCountsBySystem(){
+	res = ( );
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		res += (<p, v> : countPatternsInSystem(p, v));
+	}
+	res += (<"total" , "0.0"> : countPatternsInCorpus());
+	
+	return res;
+}
+		
 @doc{group models based on pattern from the whole corpus}
-public map[str, list[SQLModel]] groupSQLModelsCorpus(){
+public map[str, SQLModelRel] groupSQLModelsCorpus(){
 
 	res = ();
 	Corpus corpus = getCorpus();
 	
-	void addModelsWithPattern(str pattern, map[str, list[SQLModel]] models){
+	void addModelsWithPattern(str pattern, map[str, SQLModelRel] models){
 		if(pattern in models){
 			if(pattern in res){
 				res[pattern] = res[pattern] + models[pattern];
@@ -147,7 +187,7 @@ public map[str, list[SQLModel]] groupSQLModelsCorpus(){
 		
 	for(p <- corpus, v := corpus[p]){
 		models = groupSQLModels(p, v);
-		patterns = [qcp0, qcp1, qcp2, qcp3a, qcp3b, qcp3c, unknown];
+		patterns = [qcp0, qcp1, qcp2, qcp3a, qcp3b, qcp3c, unknown, parseError, otherType];
 		for(pattern <- patterns){
 			addModelsWithPattern(pattern, models);
 		}
@@ -156,17 +196,17 @@ public map[str, list[SQLModel]] groupSQLModelsCorpus(){
 }
 
 @doc{group models in a whole system based on pattern}
-public map[str, list[SQLModel]] groupSQLModels(str p, str v){
-	res = ( );
+public map[str, SQLModelRel] groupSQLModels(str p, str v){
+	map[str, SQLModelRel] res = ( );
 	models = getModels(p, v);
 	
 	for(model <- models){
 		pattern = classifySQLModel(model);
 		if(pattern in res){
-			res[pattern] += model.model;
+			res[pattern] += {model};
 		}
 		else{
-			res += (pattern : [model.model]);
+			res += (pattern : {model});
 		}
 	}
 	
@@ -184,12 +224,12 @@ public map[str, list[loc]] groupSQLModelLocs(str p, str v)
 		pattern <- modelMap, models := modelMap[pattern]);
 
 @doc{determine which pattern matches a SQLModel}
-public str classifySQLModel(tuple[loc location, SQLModel model, rel[SQLYield, SQLQuery] yieldsRel, 
+public str classifySQLModel(tuple[loc location, SQLModel model, rel[SQLYield, str, SQLQuery] yieldsRel, 
 	YieldInfo info] modelInfo){
 	
 	if(size(modelInfo.yieldsRel) == 1){
-		parsedYieldPair = getOneFrom(modelInfo.yieldsRel);
-		return classifyYield(parsedYieldPair[0], parsedYieldPair[1]);
+		parsedYieldTuple = getOneFrom(modelInfo.yieldsRel);
+		return classifyYield(parsedYieldTuple[0], parsedYieldTuple[2]);
 	}
 	else{
 		return classifyQCP3Query(modelInfo.yieldsRel, modelInfo.info);
@@ -197,9 +237,13 @@ public str classifySQLModel(tuple[loc location, SQLModel model, rel[SQLYield, SQ
 }
 
 @doc{determines which sub pattern a QCP3 query belongs to}
-public str classifyQCP3Query(rel[SQLYield, SQLQuery] parsedYieldPairs, YieldInfo info){
+public str classifyQCP3Query(rel[SQLYield, str, SQLQuery] parsedYields, YieldInfo info){
+	if(otherQueryType(t) := info){
+		return t == "parseError" ? parseError : otherType;
+	}
+	
 	// check for the case where all yields lead to the same parsed query (qcp3a)
-	if(size(parsedYieldPairs<1>) == 1){
+	if(size(parsedYields<2>) == 1){
 		return qcp3a;
 	}
 	
@@ -216,8 +260,23 @@ public str classifyQCP3Query(rel[SQLYield, SQLQuery] parsedYieldPairs, YieldInfo
 @doc{classify a single yield}
 private str classifyYield(SQLYield yield, SQLQuery parsed){
 	
-	if(size(yield) == 1 && staticPiece(_) := head(yield)){
-		return qcp0;
+	if(size(yield) == 1){
+		if(head(yield) is staticPiece){
+			return qcp0;
+		}
+		// TODO: this only hanles the basic case where a single function parameter provides the value
+		// of the whole query
+		if(head(yield) is namePiece || head(yield) is dynamicPiece){
+			return qcp4;
+		}
+	}
+	
+	if(parsed is parseError){
+		return parseError;
+	}
+	
+	if(!(parsed is selectQuery || parsed is insertQuery || parsed is updateQuery || parsed is deleteQuery)){
+		return otherType;
 	}
 	
 	if(hasDynamicPiece(yield)){
@@ -364,7 +423,7 @@ public SystemQueryInfo collectSystemQueryInfo(str p, str v){
 	for(model <- models){
 		pattern = classifySQLModel(model);
 		if(pattern == qcp0 || pattern == qcp1 || pattern == qcp2 || pattern == qcp3a){
-			parsed = getOneFrom(model.yieldsRel)[1];
+			parsed = getOneFrom(model.yieldsRel)[2];
 			res = extractQueryInfo(parsed, res);
 		}
 		else{
@@ -376,7 +435,7 @@ public SystemQueryInfo collectSystemQueryInfo(str p, str v){
 			}
 			if(pattern == qcp3c){
 				//for yields that are different query types, count the clauses of each yield
-				for(p <- model.yieldsRel[1]){
+				for(p <- model.yieldsRel[2]){
 					res = extractQueryInfo(p, res);
 				}
 			}
@@ -510,28 +569,26 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 	// TODO: refactor some of this into methods, other query types have the same clauses
 	
 	for(s <- selectExpr){
-		if(hole(_) := s) res["name"] += 1;
+		res["name"] += holesInExpr(s);
 	}
 	
 	for(f <- from){
-		if(hole(_) := f)  res["name"] += 1;
+		res["name"] += holesInExpr(f);
 	}
 	
 	
 	if(!(where is noWhere)){
-		res["condition"] = extractConditionHoleInfo(where.condition);
+		res["condition"] += extractConditionHoleInfo(where.condition);
 	}
 	
 	if(!(group is noGroupBy)){
 		for(<exp, mode> <- group.groupings){
-			if(hole(_) := exp){
-				res["name"] += 1;
-			}
+			res["name"] += holesInExpr(exp);
 		}
 	}
 	
 	if(!(having is noHaving)){
-		res["condition"] = extractConditionHoleInfo(having.condition);
+		res["condition"] += extractConditionHoleInfo(having.condition);
 	}
 	
 	res["name"] += extractOrderByHoleInfo(order);
@@ -540,9 +597,9 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 	
 	for(j <- joins){
 		res["name"] += holesInString(j.joinType);
-		if(hole(_) := j.joinExp) res["name"] += 1;
+		res["name"] += holesInExpr(j.joinExp);
 		if(j is joinOn){
-			res["condition"] = extractConditionHoleInfo(j.on);
+			res["condition"] += extractConditionHoleInfo(j.on);
 			continue;
 		}
 		if(j is joinUsing){
@@ -558,9 +615,7 @@ public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)
 	res = ("name" : 0, "param" : 0, "condition" : 0);
 	
 	for(t <- tables){
-		if(hole(_) := t){
-			res["name"] += 1;
-		}
+		res["name"] += holesInExpr(t);
 	}
 	
 	setOpInfo = extractSetOpHoleInfo(setOps);
@@ -568,7 +623,7 @@ public HoleInfo extractHoleInfo(updateQuery(tables, setOps, where, order, limit)
 	res["param"] += setOpInfo[1];
 	
 	if(!(where is noWhere)){
-		res["condition"] = extractConditionHoleInfo(where.condition);
+		res["condition"] += extractConditionHoleInfo(where.condition);
 	}
 	
 	res["name"] += extractOrderByHoleInfo(order);
@@ -581,7 +636,7 @@ public HoleInfo extractHoleInfo(insertQuery(into, values, setOps, select, onDupl
 	res = ("name" : 0, "param" : 0, "condition" : 0);
 	
 	if(!(into is noInto)){
-		if(hole(_) := into.dest) res["name"] += 1;
+		res["name"] += holesInExpr(into.dest);
 		for(c <- into.columns){
 			res["name"] += holesInString(c);
 		}
@@ -611,7 +666,7 @@ public HoleInfo extractHoleInfo(deleteQuery(from, using, where, order, limit)){
 	res = ("name" : 0, "param" : 0, "condition" : 0);
 	
 	for(f <- from){
-		if(hole(_) := f)  res["name"] += 1;
+		res["name"] += holesInExpr(f);
 	}
 	
 	for(u <- using){
@@ -619,7 +674,7 @@ public HoleInfo extractHoleInfo(deleteQuery(from, using, where, order, limit)){
 	}
 	
 	if(!(where is noWhere)){
-		res["condition"] = extractConditionHoleInfo(where.condition);
+		res["condition"] += extractConditionHoleInfo(where.condition);
 	}
 	
 	res["name"] += extractOrderByHoleInfo(order);
@@ -651,10 +706,9 @@ private int extractConditionHoleInfo(not(negated)){
 	return extractConditionHoleInfo(negated);
 }
 
-// do we need a case where the comparison operator is a hole? I hope developers dont do this...	
-private int extractConditionHoleInfo(condition(simpleComparison(left, op, right)))
-	= holesInString(left) + holesInString(right);
-	
+private int extractConditionHoleInfo(condition(simpleComparison(left, op, right))){
+	return holesInString(left) + holesInString(right);
+}	
 private int extractConditionHoleInfo(condition(compoundComparison(left, op, right))){
 	rightHoles = extractConditionHoleInfo(right);
 	return holesInString(left) + rightHoles;
@@ -689,7 +743,7 @@ private int extractConditionHoleInfo(condition(like(_, exp, pattern)))
 	= holesInString(exp) + holesInString(pattern);
 
 private default int extractConditionHoleInfo(condition){ 
- 	println( "unhandled condition type encountered");
+ 	println( "unhandled condition type encountered : <condition>");
  	return 0;
 } 
 
@@ -697,9 +751,7 @@ private int extractOrderByHoleInfo(OrderBy order){
 	res = 0;
 	if(!(order is noOrderBy)){
 		for(<exp, mode> <- order.orderings){
-			if(hole(_) := exp){
-				res += 1;
-			}
+			res += holesInExpr(exp);
 		}
 	}
 	return res;
@@ -756,6 +808,23 @@ public int holesInString(str subject){
 	return res;
 }
 
+@doc{returns the number of holes in an expression}
+public int holesInExpr(Exp expr){
+	switch(expr){
+		case literal(s) : return holesInString(s);
+		case call(s) : return holesInString(s);
+		case unknownExp(s) : return holesInString(s);
+		case aliased(e, s) : return holesInExpr(e) + holesInString(s);
+		case name(column(c)) : return holesInString(c);
+		case name(table(t)) : return holesInString(t);
+		case name(database(d)) : return holesInString(d);
+		case name(tableColumn(t, c)) : return holesInString(t) + holesInString(c);
+		case name(databaseTable(d, t)) : return holesInString(d) + holesInString(t);
+		case name(databaseTableColumn(d, t, c)) : return holesInString(d) + holesInString(t) + holesInString(c);
+		default: return 0;
+	}
+}
+
 public SQLModelRel getModels(str p, str v){
 	modelsRel = {};
 	rel[loc, SQLModel] models; 
@@ -767,10 +836,20 @@ public SQLModelRel getModels(str p, str v){
  		for(<l,m> <- models){
  			yieldsAndParsed = {};
  			modelYields = yields(m);
+ 			int i = 0;
  			for(y <- modelYields){
- 				yieldsAndParsed = yieldsAndParsed + <y, runParser(yield2String(y))>;
+ 				 if(i < maxYields){
+ 				 	 println("yield <i> for call at <l>");
+ 				 	 sql = yield2String(y);
+ 				 	 parsed = runParser(sql);
+ 					 yieldsAndParsed = yieldsAndParsed + <y, sql, parsed>;
+ 					 i = i + 1;
+ 				}
+ 				else{
+ 					break;
+ 				}
  			}
- 			yieldInfo = compareYields(yieldsAndParsed<1>);
+ 			yieldInfo = compareYields(yieldsAndParsed<2>);
  			modelsRel = modelsRel + <l, m, yieldsAndParsed, yieldInfo>;
  		}
  		writeBinaryValueFile(analysisLoc + "<p>-<v>.bin", modelsRel, compression=false);	
@@ -786,10 +865,20 @@ public void rebuildYieldInfo(){
 		for(modelInfo <- modelsRel){
 			yieldsAndParsed = {};
  			modelYields = yields(modelInfo.model);
+ 			int i = 0;
  			for(y <- modelYields){
- 				yieldsAndParsed = yieldsAndParsed + <y, runParser(yield2String(y))>;
+ 				if(i < maxYields){
+				 	 println("yield <i> for call at <l>");
+ 				 	 sql = yield2String(y);
+ 				 	 parsed = runParser(sql);
+ 					 yieldsAndParsed = yieldsAndParsed + <y, sql, parsed>;
+ 					 i = i + 1;
+ 				}
+ 				else{
+ 					break;
+ 				}
  			}
- 			yieldInfo = compareYields(yieldsAndParsed<1>);
+ 			yieldInfo = compareYields(yieldsAndParsed<2>);
  			modelInfo.yieldsRel = yieldsAndParsed;
  			modelInfo.info = yieldInfo;
 		}

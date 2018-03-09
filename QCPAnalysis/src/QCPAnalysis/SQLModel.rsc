@@ -694,7 +694,7 @@ public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "", bool sh
 	nodes = [ "\"<nodeMap[n]>\" [ label = \"<escapeForDot(printQueryFragment(n))>\", labeljust=\"l\" ];" | n <- nodes ];
 	edges = [ "\"<nodeMap[n1]>\" -\> \"<nodeMap[n2]>\" [ label = \"< showConditions ? printEdgeInfo(nm,m.fragmentRel[l1,n1,nm,l2,n2]) : "">\"];" | < l1, n1, nm, l2, n2 > <- m.fragmentRel<0,1,2,3,4> ];
 	str dotGraph = "digraph \"SQLModel\" {
-				   '	graph [ label = \"SQL Model<size(title)>0?" for <title>":"">\" ];
+				   '	graph [ label = \"SQL Model<size(title)>0?" for <title>":"">\" , ranksep=1, dpi=400];
 				   '	node [ shape = box ];
 				   '	<intercalate("\n", nodes)>
 				   '	<intercalate("\n",edges)>
