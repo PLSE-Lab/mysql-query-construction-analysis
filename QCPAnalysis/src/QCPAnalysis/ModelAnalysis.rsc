@@ -12,6 +12,7 @@ import QCPAnalysis::QCPSystemInfo;
 import QCPAnalysis::SQLModel;
 import QCPAnalysis::QCPCorpus;
 
+import Set;
 import Relation;
 import IO;
 import ValueIO;
@@ -159,15 +160,19 @@ public void writeFC(str systemName, str systemVersion, rel[loc callLoc, SQLModel
 	writeBinaryValueFile(analysisLoc + "<systemName>-<systemVersion>.bin", fc);
 }
 
-public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] computeForSystem(str systemName, str systemVersion) {
+public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] computeForSystem(str systemName, str systemVersion, bool useCache=true) {
 	rel[loc callLoc, SQLModel sqm, FragmentCategories fc] res = { };
 	
 	System pt = loadBinary(systemName, systemVersion);
 	QCPSystemInfo qcpi = readQCPSystemInfo(systemName, systemVersion);
+	rel[loc,SQLModel] models = { };
+	if (useCache) {
+		models = readModels(systemName, systemVersion);
+	}
 	allCalls = { < c, c@at > | /c:call(name(name("mysql_query")),_) := pt.files };
 
 	for (< c, l > <- allCalls) {		
-		callModel = buildModel(qcpi, l);
+		callModel = (l in models<0>) ? getOneFrom(models[l]) : buildModel(qcpi, l);
 		fc = computeFragmentCategories(callModel);
 		res = res + < l, callModel, fc >;
 	}
@@ -201,4 +206,12 @@ public FragmentCategories sumFC(rel[loc,SQLModel,FragmentCategories] fcrel) {
 		fc.computed += fci.computed;
 	}
 	return fc;
+}
+
+public map[str, FragmentCategories] sumFCMap(map[str system, rel[loc callLoc, SQLModel sqm, FragmentCategories fc] fcrel] fcmap) {
+	map[str,FragmentCategories] res = ( );
+	for (s <- fcmap<0>) {
+		res[s] = sumFC(fcmap[s]);
+	}
+	return res;
 }

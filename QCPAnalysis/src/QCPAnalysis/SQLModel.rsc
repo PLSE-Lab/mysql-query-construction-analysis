@@ -554,43 +554,43 @@ public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
 	
 	labeledYields = buildPieces(m.startFragment, m.startLabel, {}, {});
 
-	feasibleYields = labeledYields;
+	feasibleYields = filterYields ? removeInfeasibleYields(labeledYields) : labeledYields;
 
-	if (filterYields) {
-		infeasibleYields = { } ;
-	
-		yieldsLoop: for (ly <- labeledYields) {
-			pieces = [ lp | lp:labeledPiece(_,_) <- ly ];
-			condsHeaders = { h | lp <- pieces, edgeCondsInfo(_, h) <- lp.edgeInfo };
-			condsMap = ( h : [ ] | h <- condsHeaders );
-			for (lp <- pieces, edgeCondsInfo(conds, h) <- lp.edgeInfo) {
-				condsMap[h] = condsMap[h] + conds;
-			}
-			for (h <- condsMap) {
-				worklist = condsMap[h];
-				while (size(worklist) > 1) {
-					item1 = worklist[0]; worklist = worklist[1..];
-					for (item2 <- worklist) {
-						itemInter = item1 & item2;
-						if ( itemInter != item1 && itemInter != item2 ) {
-							infeasibleYields = infeasibleYields + ly;
-							continue yieldsLoop;
-						}
+	regularYields = stripLabels(feasibleYields);
+	return simplifyYields(regularYields);
+}
+
+public set[SQLYield] removeInfeasibleYields(set[SQLYield] labeledYields) {
+	infeasibleYields = { } ;
+
+	yieldsLoop: for (ly <- labeledYields) {
+		pieces = [ lp | lp:labeledPiece(_,_) <- ly ];
+		condsHeaders = { h | lp <- pieces, edgeCondsInfo(_, h) <- lp.edgeInfo };
+		condsMap = ( h : [ ] | h <- condsHeaders );
+		for (lp <- pieces, edgeCondsInfo(conds, h) <- lp.edgeInfo) {
+			condsMap[h] = condsMap[h] + conds;
+		}
+		for (h <- condsMap) {
+			worklist = condsMap[h];
+			while (size(worklist) > 1) {
+				item1 = worklist[0]; worklist = worklist[1..];
+				for (item2 <- worklist) {
+					itemInter = item1 & item2;
+					if ( itemInter != item1 && itemInter != item2 ) {
+						infeasibleYields = infeasibleYields + ly;
+						continue yieldsLoop;
 					}
 				}
 			}
-			//if ([_*,labeledPiece(_,ei1),_*,labeledPiece(_,ei2),_*] := ly,
-			//	{_*, edgeCondsInfo(conds1, h1), _*} := ei1, {_*, edgeCondsInfo(conds2,h1), _*} := ei2,
-			//	(conds1 & conds2) != conds1 && (conds1 & conds2) != conds2) {
-			//	infeasibleYields = infeasibleYields + ly;
-			//}
 		}
-	
-		feasibleYields = labeledYields - infeasibleYields;
+		//if ([_*,labeledPiece(_,ei1),_*,labeledPiece(_,ei2),_*] := ly,
+		//	{_*, edgeCondsInfo(conds1, h1), _*} := ei1, {_*, edgeCondsInfo(conds2,h1), _*} := ei2,
+		//	(conds1 & conds2) != conds1 && (conds1 & conds2) != conds2) {
+		//	infeasibleYields = infeasibleYields + ly;
+		//}
 	}
-			
-	regularYields = stripLabels(feasibleYields);
-	return simplifyYields(regularYields);
+
+	return labeledYields - infeasibleYields;
 }
 
 @doc{converts a yield to a string parsable by the sql parser}
