@@ -454,6 +454,8 @@ alias LabeledYield = list[LabeledPiece];
 data SQLPiece = staticPiece(str literal) | namePiece(str name) | dynamicPiece();
 alias SQLYield = list[SQLPiece];
 
+public set[LabeledYield] wow = { };
+
 public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
 	SQLYield yieldForFragment(literalFragment(str s)) = [ staticPiece(s) ];
 	SQLYield yieldForFragment(nameFragment(Name n)) = [ yieldForName(n) ];
@@ -481,15 +483,34 @@ public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
 	SQLYield stripLabels(LabeledYield ly) = [ stripLabels(lp) | lp <- ly ];
 	set[SQLYield] stripLabels(set[LabeledYield] ls) = { stripLabels(li) | li <- ls };
 
+	map[tuple[Lab sourceLabel, QueryFragment sourceFragment],rel[Name name, Lab targetLabel, QueryFragment targetFragment, EdgeInfo edgeInfo]] fragmentRelMap =
+		( < sourceLabel, sourceFragment > : { } | < sourceLabel, sourceFragment > <- m.fragmentRel<0,1> );
+	
+	for (< sourceLabel, sourceFragment, n, targetLabel, targetFragment, edgeInfo > <- m.fragmentRel ) {
+		fragmentRelMap[ < sourceLabel, sourceFragment > ] += < n, targetLabel, targetFragment, edgeInfo >;
+	}
+		
+	map[tuple[QueryFragment,Lab], set[LabeledYield]] buildCache = ( );
+				   
 	set[LabeledYield] buildPieces(QueryFragment inputFragment, Lab l, set[EdgeInfo] edgeInfo, set[Lab] alreadyVisited) {
+		if (<inputFragment, l> in buildCache) {
+			return buildCache[<inputFragment,l>];
+		}
+		
 		// Get the possible expansions for each at this location
-		expansionsWithConditions = m.fragmentRel[l, inputFragment];
+		expansionsWithConditions = (<l, inputFragment> in fragmentRelMap) ? fragmentRelMap[<l, inputFragment>] : { };
 		expansions = expansionsWithConditions<0,1,2>;
 		
+		map[QueryFragment, set[LabeledYield]] expansionCache = ( );
 		set[LabeledYield] performExpansion(QueryFragment fragment) {
+			if (fragment in expansionCache) {
+				return expansionCache[fragment];
+			}
+			
 			if (fragment is nameFragment) {
 				if (isEmpty(expansions[fragment.name])) {
-					return { labeledPiece(yieldForFragment(fragment), edgeInfo); }
+					expansionCache[fragment] = { labeledPiece(yieldForFragment(fragment), edgeInfo) };
+					return expansionCache[fragment];
 				}
 				
 				nameExpansions = { *buildPieces(lf,ll,edgeInfo + expansionsWithConditions[fragment.name,ll,lf], alreadyVisited+l) 
@@ -510,28 +531,40 @@ public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
 						if (size(emptyExpansions) > 0) {
 							nameExpansions = nameExpansions - emptyExpansions;
 						}
-					} 
+					}
+					println("Found <size(nameExpansions)> expansions");
+					if (size(nameExpansions) > 1000000) {
+						println("WOW!");
+						wow = nameExpansions;
+					}
 				}
-				return { ne | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] !:= ne } + 
+				expansionCache[fragment] = 
+				       { ne | ne <- nameExpansions, size(ne) != 1 || [labeledPiece(dynamicPiece(),_)] !:= ne } + 
 				       { addLabels(yieldForFragment(fragment), edgeInfo) | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] := ne };
+				return expansionCache[fragment];
 			} else if (fragment is compositeFragment) {
 				compositeYield = performExpansion(fragment.fragments[0]);
 				for (f <- fragment.fragments[1..]) {
 					nextYield = performExpansion(f);
 					compositeYield = { cyi + nyi | cyi <- compositeYield, nyi <- nextYield };
 				}
-				return compositeYield;
+				expansionCache[fragment] = compositeYield;
+				return expansionCache[fragment];
 			} else if (fragment is concatFragment) {
 				leftYield = performExpansion(fragment.left);
 				rightYield = performExpansion(fragment.right);
 				concatYield = { lyi + ryi | lyi <- leftYield, ryi <- rightYield };
-				return concatYield;
+				expansionCache[fragment] = concatYield;
+				return expansionCache[fragment];
 			} else {
-				return { addLabels(yieldForFragment(fragment), edgeInfo) };
+				expansionCache[fragment] = { addLabels(yieldForFragment(fragment), edgeInfo) };
+				return expansionCache[fragment];
 			} 
 		}
 		
-		return performExpansion(inputFragment);
+		res = performExpansion(inputFragment);
+		buildCache[<inputFragment,l>] = res;
+		return res;
 	}
 		
 	SQLYield mergeStatics(SQLYield y) {

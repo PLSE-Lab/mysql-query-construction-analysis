@@ -1,6 +1,5 @@
 module QCPAnalysis::SQLAnalysis
 
-
 import lang::php::util::Utils;
 import lang::php::util::Config;
 import lang::php::ast::System;
