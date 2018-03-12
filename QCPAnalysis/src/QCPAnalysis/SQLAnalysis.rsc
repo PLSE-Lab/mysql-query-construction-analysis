@@ -470,32 +470,32 @@ private SystemQueryInfo extractQueryInfo(YieldInfo yieldInfo, SystemQueryInfo in
 		clauses = yieldInfo.clauseInfo;
 		if(clauses is selectClauses){
 			info.selectInfo.numSelectQueries += 1;
-			if(hasClause(clauses.sameWhere)) info.selectInfo.numWhere += 1;
-			if(hasClause(clauses.sameGroupBy)) info.selectInfo.numGroupBy += 1;
-			if(hasClause(clauses.sameHaving)) info.selectInfo.numHaving += 1;
-			if(hasClause(clauses.sameOrderBy)) info.selectInfo.numOrderBy += 1;
-			if(hasClause(clauses.sameLimit)) info.selectInfo.numLimit += 1;
-			if(hasClause(clauses.sameJoin)) info.selectInfo.numJoin += 1;
+			if(!(clauses.where is none)) info.selectInfo.numWhere += 1;
+			if(!(clauses.groupBy is none)) info.selectInfo.numGroupBy += 1;
+			if(!(clauses.having is none)) info.selectInfo.numHaving += 1;
+			if(!(clauses.orderBy is none)) info.selectInfo.numOrderBy += 1;
+			if(!(clauses.limit is none)) info.selectInfo.numLimit += 1;
+			if(!(clauses.joins is none)) info.selectInfo.numJoin += 1;
 		}
 		else if(clauses is updateClauses){
 			info.updateInfo.numUpdateQueries += 1;
-			if(hasClause(clauses.sameWhere)) info.updateInfo.numWhere += 1;
-			if(hasClause(clauses.sameOrderBy)) info.updateInfo.numOrderBy += 1;
-			if(hasClause(clauses.sameLimit)) info.updateInfo.numLimit += 1;
+			if(!(clauses.where is none)) info.updateInfo.numWhere += 1;
+			if(!(clauses.orderBy is none)) info.updateInfo.numOrderBy += 1;
+			if(!(clauses.limit is none)) info.updateInfo.numLimit += 1;
 		}
 		else if(clauses is insertClauses){
 			info.insertInfo.numInsertQueries += 1;
-			if(hasClause(clauses.sameValues)) info.insertInfo.numValues += 1;
-			if(hasClause(clauses.sameSetOps)) info.insertInfo.numSetOp += 1;
-			if(hasClause(clauses.sameSelect)) info.insertInfo.numSelect += 1;
-			if(hasClause(clauses.sameOnDuplicateSetOps)) info.insertInfo.numOnDuplicate += 1;
+			if(!(clauses.values is none)) info.insertInfo.numValues += 1;
+			if(!(clauses.setOps is none)) info.insertInfo.numSetOp += 1;
+			if(!(clauses.select is none)) info.insertInfo.numSelect += 1;
+			if(!(clauses.onDuplicateSetOps is none)) info.insertInfo.numOnDuplicate += 1;
 		}
 		else if(clauses is deleteClauses){
 			info.deleteInfo.numDeleteQueries += 1;
-			if(hasClause(clauses.sameUsing)) info.deleteInfo.numUsing += 1;
-			if(hasClause(clauses.sameWhere)) info.deleteInfo.numWhere += 1;
-			if(hasClause(clauses.sameOrderBy)) info.deleteInfo.numOrderBy += 1;
-			if(hasClause(clauses.sameLimit)) info.deleteInfo.numLimit += 1;
+			if(!(clauses.using is none)) info.deleteInfo.numUsing += 1;
+			if(!(clauses.where is none)) info.deleteInfo.numWhere += 1;
+			if(!(clauses.orderBy is none)) info.deleteInfo.numOrderBy += 1;
+			if(!(clauses.limit is none)) info.deleteInfo.numLimit += 1;
 		}
 		else{
 			info.numOtherQueryTypes += 1;
