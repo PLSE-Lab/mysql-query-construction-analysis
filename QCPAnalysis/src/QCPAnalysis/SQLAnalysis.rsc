@@ -297,9 +297,10 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 	return unknown;
 }
 
-data ClauseComp = different(set[&T] clauses)
-				| same(&T clause)
-				| none();
+data ClauseComp = different(set[&T] clauses) // this clause differs across yields
+				| some(set[&T] clauses)		 // some yields include this clause while others do not
+				| same(&T clause)			 // this clause is constant throughout all yields
+				| none();					 // no yields contain this clause
 				   
 @doc{for yields of the same type, represents information about how the parsed yields differ}  
 data ClauseInfo = selectClauses(ClauseComp select, ClauseComp from, ClauseComp where, 
@@ -333,15 +334,17 @@ public YieldInfo compareYields(set[SQLQuery] parsed){
 private YieldInfo compareYields("selectQuery", set[SQLQuery] parsed){
 	res = selectClauses(none(), none(), none(), none(), none(), none(), none(), none());
 	
+	bool firstYield = true;
 	for(p <- parsed){
-		if(hasClause(p.selectExpressions)) res.select = compareClauses(p.selectExpressions, res.select);
-		if(hasClause(p.from))	res.from = compareClauses(p.from, res.from);
-		if(hasClause(p.where))	res.where = compareClauses(p.where, res.where);
-		if(hasClause(p.group))	res.groupBy = compareClauses(p.group, res.groupBy);
-		if(hasClause(p.having)) res.having = compareClauses(p.having, res.having);
-		if(hasClause(p.order))	res.orderBy = compareClauses(p.order, res.orderBy);
-		if(hasClause(p.limit))	res.limit = compareClauses(p.limit, res.limit);
-		if(hasClause(p.joins))	res.joins = compareClauses(p.joins, res.joins);
+		res.select = compareClauses(p.selectExpressions, res.select, firstYield);
+		res.from = compareClauses(p.from, res.from, firstYield);
+		res.where = compareClauses(p.where, res.where, firstYield);
+		res.groupBy = compareClauses(p.group, res.groupBy, firstYield);
+		res.having = compareClauses(p.having, res.having, firstYield);
+		res.orderBy = compareClauses(p.order, res.orderBy, firstYield);
+		res.limit = compareClauses(p.limit, res.limit, firstYield);
+		res.joins = compareClauses(p.joins, res.joins, firstYield);
+		firstYield = false;
 	}
 	
 	return sameType(res);
@@ -349,13 +352,14 @@ private YieldInfo compareYields("selectQuery", set[SQLQuery] parsed){
 private YieldInfo compareYields("updateQuery", set[SQLQuery] parsed){
 	res = updateClauses(none(), none(), none(), none(), none());
 	
-	someYield = getOneFrom(parsed);
+	bool firstYield = true;
 	for(p <- parsed){
-		if(hasClause(p.tables))	res.tables = compareClauses(p.tables, res.tables);
-		if(hasClause(p.setOps))	res.setOps = compareClauses(p.setOps, res.setOps);
-		if(hasClause(p.where))	res.where = compareClauses(p.where, res.where);
-		if(hasClause(p.order))	res.orderBy = compareClauses(p.order, res.orderBy);
-		if(hasClause(p.limit))	res.limit = compareClauses(p.limit, res.limit);
+		res.tables = compareClauses(p.tables, res.tables, firstYield);
+		res.setOps = compareClauses(p.setOps, res.setOps, firstYield);
+		res.where = compareClauses(p.where, res.where, firstYield);
+		res.orderBy = compareClauses(p.order, res.orderBy, firstYield);
+		res.limit = compareClauses(p.limit, res.limit, firstYield);
+		firstYield = false;
 	}
 	
 	return sameType(res);
@@ -363,13 +367,14 @@ private YieldInfo compareYields("updateQuery", set[SQLQuery] parsed){
 private YieldInfo compareYields("insertQuery", set[SQLQuery] parsed){
 	res = insertClauses(none(), none(), none(), none(), none());
 	
+	bool firstYield = true;
 	for(p <- parsed){
-		if(hasClause(p.into))	res.into = compareClauses(p.into, res.into);
-		if(hasClause(p.values)) res.values = compareClauses(p.values, res.values);
-		if(hasClause(p.setOps)) res.setOps = compareClauses(p.setOps, res.setOps);
-		if(hasClause(p.select)) res.select = compareClauses(p.select, res.select);
-		if(hasClause(p.onDuplicateSetOps)) 
-			res.onDuplicateSetOps = compareClauses(p.onDuplicateSetOps, res.onDuplicateSetOps);
+		res.into = compareClauses(p.into, res.into, firstYield);
+		res.values = compareClauses(p.values, res.values, firstYield);
+		res.setOps = compareClauses(p.setOps, res.setOps, firstYield);
+		res.select = compareClauses(p.select, res.select, firstYield);
+		res.onDuplicateSetOps = compareClauses(p.onDuplicateSetOps, res.onDuplicateSetOps, firstYield);
+		firstYield = false;
 	}
 	
 	return sameType(res);
@@ -377,12 +382,14 @@ private YieldInfo compareYields("insertQuery", set[SQLQuery] parsed){
 private YieldInfo compareYields("deleteQuery", set[SQLQuery] parsed){
 	res = deleteClauses(none(), none(), none(), none(), none());
 	
+	bool firstYield = true;
 	for(p <- parsed){
-		if(hasClause(p.from)) res.from = compareClauses(p.from, res.from);
-		if(hasClause(p.using)) res.using = compareClauses(p.using, res.using);
-		if(hasClause(p.where)) res.where = compareClauses(p.where, res.where);
-		if(hasClause(p.order)) res.orderBy = compareClauses(p.order, res.orderBy);
-		if(hasClause(p.limit)) res.limit = compareClauses(p.limit, res.limit);
+		res.from = compareClauses(p.from, res.from, firstYield);
+		res.using = compareClauses(p.using, res.using, firstYield);
+		res.where = compareClauses(p.where, res.where, firstYield);
+		res.orderBy = compareClauses(p.order, res.orderBy, firstYield);
+		res.limit = compareClauses(p.limit, res.limit, firstYield);
+		firstYield = false;
 	}
 	
 	return sameType(res);
@@ -392,11 +399,50 @@ private YieldInfo compareYields(str queryType, set[SQLQuery] parsed){
 	return sameType(otherQueryType(queryType));
 }
 
-private ClauseComp compareClauses(&T newClause, ClauseComp clauseComp){
+/**
+ * State machine:
+ *
+ * State						Condition						New State
+ * ----------------------------------------------------------------------
+ * none							firstYield &&					none
+ *								empty(new clause)
+ * ----------------------------------------------------------------------
+ * none							firstYield &&					same
+ * 								!empty(new clause)
+ * ----------------------------------------------------------------------
+ * none							!firstYield &&					none
+ *								empty(new clause)
+ * ----------------------------------------------------------------------	
+ * none			   			 	!firstYield && 					some 
+ * 								!empty(new clause)			
+ * ----------------------------------------------------------------------
+ * same							empty(new clause)				some
+ * ----------------------------------------------------------------------
+ * same							new clause == prev clause		same
+ * ----------------------------------------------------------------------
+ * same							new clause != prev clause		different
+ * ----------------------------------------------------------------------
+ * different					empty(new clause)				some
+ * ----------------------------------------------------------------------
+ * different					!empty(new clause)				different
+ * ----------------------------------------------------------------------
+ * some							-								some
+ * ----------------------------------------------------------------------							
+ */
+private ClauseComp compareClauses(&T newClause, ClauseComp clauseComp, bool firstYield){
+	if(firstYield){
+		if(!clauseComp is none) throw "illegal start state";
+		return hasClause(newClause) ? same(newClause) : none();
+	}
+	
 	switch(clauseComp){
-		case none()  : return same(newClause);
-		case same(c) : return c == newClause ? clauseComp : different({c, newClause});
-		case different(c) : return different(c + {newClause});
+		case none()  : return hasClause(newClause) ? some(newClause) : none();
+		case same(c) : {
+			if(!hasClause(newClause)) return some({c});
+			else return c == newClause ? same(c) : different({c, newClause});
+		} 
+		case different(c) : return hasClause(newClause) ? different(c + {newClause}) : some(c);
+		case some(c) : return hasClause(newClause) ? some(c + {newClause}) : some(c);
 	}
 }
 
