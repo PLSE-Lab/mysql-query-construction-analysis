@@ -297,23 +297,25 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 	return unknown;
 }
 
-@doc{represents the differences in yields for a specific set of model yields}
-// until we actually see QCP3c, differentType will only keep track of what the query types are
-data YieldInfo = sameType(ClauseInfo clauseInfo)
-			   | differentTypes(set[str] types);
-			   
+data ClauseComp = different(set[&T] clauses)
+				| same(&T clause)
+				| none();
+				   
 @doc{for yields of the same type, represents information about how the parsed yields differ}  
-data ClauseInfo = selectClauses(set[list[Exp]] sameSelectExp, set[list[Exp]] sameFrom, set[Where] sameWhere, 
-					set[GroupBy] sameGroupBy, set[Having] sameHaving, set[OrderBy] sameOrderBy, 
-					set[Limit] sameLimit, set[list[Join]] sameJoin)
-				| updateClauses(set[list[Exp]] sameTables, set[list[SetOp]] sameSetOps, 
-					set[Where] sameWhere, set[OrderBy] sameOrderBy, set[Limit] sameLimit)
-				| insertClauses(set[Into] sameInto, set[list[list[str]]] sameValues, set[list[SetOp]] sameSetOps, 
-					set[SQLQuery] sameSelect, set[list[SetOp]] sameOnDuplicateSetOps)
-				| deleteClauses(set[list[Exp]] sameFrom, set[list[str]] sameUsing, set[Where] sameWhere, 
-					set[OrderBy] sameOrderBy, set[Limit] sameLimit)
+data ClauseInfo = selectClauses(ClauseComp select, ClauseComp from, ClauseComp where, 
+					ClauseComp groupBy, ClauseComp having, ClauseComp orderBy, 
+					ClauseComp limit, ClauseComp joins)
+				| updateClauses(ClauseComp tables, ClauseComp setOps, 
+					ClauseComp where, ClauseComp orderBy, ClauseComp limit)
+				| insertClauses(ClauseComp into, ClauseComp values, ClauseComp setOps, 
+					ClauseComp select, ClauseComp onDuplicateSetOps)
+				| deleteClauses(ClauseComp from, ClauseComp using, ClauseComp where, 
+					ClauseComp orderBy, ClauseComp limit)
 				| otherQueryType(str queryType);
-				
+
+@doc{represents the differences in yields for a specific set of model yields}
+data YieldInfo = sameType(ClauseInfo clauseInfo)
+			   | differentTypes(set[str] types);				
 
 @doc{determine how a set of parsed queries are different}
 public YieldInfo compareYields(set[SQLQuery] parsed){
@@ -329,64 +331,81 @@ public YieldInfo compareYields(set[SQLQuery] parsed){
 	}
 }
 private YieldInfo compareYields("selectQuery", set[SQLQuery] parsed){
-	res = selectClauses({}, {}, {}, {}, {}, {}, {}, {});
+	res = selectClauses(none(), none(), none(), none(), none(), none(), none(), none());
 	
 	for(p <- parsed){
-		res.sameSelectExp = res.sameSelectExp + p.selectExpressions;
-		res.sameFrom 	  = res.sameFrom + p.from;
-		res.sameWhere 	  = res.sameWhere + p.where;
-		res.sameGroupBy   = res.sameGroupBy + p.group;
-		res.sameHaving    = res.sameHaving + p.having;
-		res.sameOrderBy   = res.sameOrderBy + p.order;
-		res.sameLimit     = res.sameLimit + p.limit;
-		res.sameJoin      = res.sameJoin + p.joins;
+		if(hasClause(p.selectExpressions)) res.select = compareClauses(p.selectExpressions, res.select);
+		if(hasClause(p.from))	res.from = compareClauses(p.from, res.from);
+		if(hasClause(p.where))	res.where = compareClauses(p.where, res.where);
+		if(hasClause(p.group))	res.groupBy = compareClauses(p.group, res.groupBy);
+		if(hasClause(p.having)) res.having = compareClauses(p.having, res.having);
+		if(hasClause(p.order))	res.orderBy = compareClauses(p.order, res.orderBy);
+		if(hasClause(p.limit))	res.limit = compareClauses(p.limit, res.limit);
+		if(hasClause(p.joins))	res.joins = compareClauses(p.joins, res.joins);
 	}
 	
 	return sameType(res);
 }
 private YieldInfo compareYields("updateQuery", set[SQLQuery] parsed){
-	res = updateClauses({}, {}, {}, {}, {});
+	res = updateClauses(none(), none(), none(), none(), none());
 	
 	someYield = getOneFrom(parsed);
 	for(p <- parsed){
-		res.sameTables  = res.sameTables + p.tables;
-		res.sameSetOps  = res.sameSetOps + p.setOps;
-		res.sameWhere   = res.sameWhere + p.where;
-		res.sameOrderBy = res.sameOrderBy + p.order;
-		res.sameLimit   = res.sameLimit + p.limit;
+		if(hasClause(p.tables))	res.tables = compareClauses(p.tables, res.tables);
+		if(hasClause(p.setOps))	res.setOps = compareClauses(p.setOps, res.setOps);
+		if(hasClause(p.where))	res.where = compareClauses(p.where, res.where);
+		if(hasClause(p.order))	res.orderBy = compareClauses(p.order, res.orderBy);
+		if(hasClause(p.limit))	res.limit = compareClauses(p.limit, res.limit);
 	}
 	
 	return sameType(res);
 }
 private YieldInfo compareYields("insertQuery", set[SQLQuery] parsed){
-	res = insertClauses({}, {}, {}, {}, {});
+	res = insertClauses(none(), none(), none(), none(), none());
 	
 	for(p <- parsed){
-		res.sameInto 			  = res.sameInto + p.into;
-		res.sameValues 			  = res.sameValues + p.values;
-		res.sameSetOps 			  = res.sameSetOps + p.setOps;
-		res.sameSelect 			  = res.sameSelect + p.select;
-		res.sameOnDuplicateSetOps = res.sameOnDuplicateSetOps + p.onDuplicateSetOps;
+		if(hasClause(p.into))	res.into = compareClauses(p.into, res.into);
+		if(hasClause(p.values)) res.values = compareClauses(p.values, res.values);
+		if(hasClause(p.setOps)) res.setOps = compareClauses(p.setOps, res.setOps);
+		if(hasClause(p.select)) res.select = compareClauses(p.select, res.select);
+		if(hasClause(p.onDuplicateSetOps)) 
+			res.onDuplicateSetOps = compareClauses(p.onDuplicateSetOps, res.onDuplicateSetOps);
 	}
 	
 	return sameType(res);
 }
 private YieldInfo compareYields("deleteQuery", set[SQLQuery] parsed){
-	res = deleteClauses({}, {}, {}, {}, {});
+	res = deleteClauses(none(), none(), none(), none(), none());
 	
 	for(p <- parsed){
-		res.sameFrom    = res.sameFrom + p.from;
-		res.sameUsing   = res.sameUsing + p.using;
-		res.sameWhere   = res.sameWhere + p.where;
-		res.sameOrderBy = res.sameOrderBy + p.order;
-		res.sameLimit   = res.sameLimit + p.limit;
+		if(hasClause(p.from)) res.from = compareClauses(p.from, res.from);
+		if(hasClause(p.using)) res.using = compareClauses(p.using, res.using);
+		if(hasClause(p.where)) res.where = compareClauses(p.where, res.where);
+		if(hasClause(p.order)) res.orderBy = compareClauses(p.order, res.orderBy);
+		if(hasClause(p.limit)) res.limit = compareClauses(p.limit, res.limit);
 	}
 	
 	return sameType(res);
 }
+
 private YieldInfo compareYields(str queryType, set[SQLQuery] parsed){
 	return sameType(otherQueryType(queryType));
 }
+
+private ClauseComp compareClauses(&T newClause, ClauseComp clauseComp){
+	switch(clauseComp){
+		case none()  : return same(newClause);
+		case same(c) : return c == newClause ? clauseComp : different({c, newClause});
+		case different(c) : return different(c + {newClause});
+	}
+}
+
+@doc{checks whether a given clause exists (list type clauses)}
+private bool hasClause(list[&T] clause) = [] !:= clause;
+
+@doc{checks whether a given clause exists (non list type clauses)}
+private bool hasClause(&T clause) = !(clause is noWhere || clause is noGroupBy || clause is noHaving 
+				|| clause is noOrderBy || clause is noLimit || clause is noQuery);
 
 @doc{return whether at least one piece in a SQLYield is dynamic}
 private bool hasDynamicPiece(SQLYield yield){
@@ -525,40 +544,6 @@ private SystemQueryInfo extractQueryInfo(SQLQuery parsed, SystemQueryInfo info){
 		info.numOtherQueryTypes += 1;
 	}
 	return info;
-}
-
-@doc{given a clause set from a YieldInfo, determines if any clauses exist in the set}
-private bool hasClause(set[list[&T]] clauses){
-	if(size(clauses) == 0){
-		return false;
-	}
-	if(size(clauses) > 1){
-		return true;
-	}
-	
-	clause = getOneFrom(clauses);
-	
-	// if this clause is the empty list, it does not exist in any yields
-	if([] := clause){
-		return false;
-	}
-	
-	return true;
-}
-
-@doc{given a clause set from a YieldInfo, determines if any clauses exist in the set}
-private bool hasClause(set[&T] clauses){
-	if(size(clauses) == 0){
-		return false;
-	}
-	if(size(clauses) > 1){
-		return true;
-	}
-
-	clause = getOneFrom(clauses);
-	//check if the clauses matches non existent clause placeholders
-	return !(clause is noWhere || clause is noGroupBy || clause is noHaving || clause is noOrderBy
-			|| clause is noLimit || clause is noQuery);	
 }
 			 
 @doc{extracts info about a dynamic query's holes}
@@ -727,16 +712,6 @@ private int extractConditionHoleInfo(condition(inValues(_, exp, values))){
 	}
 	return res;
 }
-
-// revisit this, do we need the distinction between name and param holes that are in subqueries used for filtering?
-//private tuple[int nameHoles, int paramHoles] extractConditionHoleInfo(condition(inSubquery(_, exp, subquery))){
-//	res = <0,0>;
-//	res[0] += holesInString(exp);
-//	selectInfo = extractHoleInfo(subquery);
-//	res[0] += selectInfo["name"];
-//	res[1] += selectInfo["param"];
-//	return res;
-//}
 
 private int extractConditionHoleInfo(condition(like(_, exp, pattern)))
 	= holesInString(exp) + holesInString(pattern);
