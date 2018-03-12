@@ -41,8 +41,8 @@ private Corpus corpus2018 = (
 	"cpg" : "1.5.46",
 	"mantisbt" : "2.10.0",
 	"SugarCE" : "6.5.26",
-	"orangehrm" : "4.0",
-	"SchoolERP" : "1.0"
+	"orangehrm" : "4.0"//,
+	//"SchoolERP" : "1.0"
 );
 
 private map[str,int] systemNumbers = (
