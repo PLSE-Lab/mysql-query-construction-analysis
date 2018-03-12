@@ -402,32 +402,32 @@ private YieldInfo compareYields(str queryType, set[SQLQuery] parsed){
 /**
  * State machine:
  *
- * State						Condition						New State
+ * State                        Condition                        New State
  * ----------------------------------------------------------------------
- * none							firstYield &&					none
- *								empty(new clause)
+ * none                         firstYield &&                    none
+ *                              empty(new clause)
  * ----------------------------------------------------------------------
- * none							firstYield &&					same
- * 								!empty(new clause)
+ * none                         firstYield &&                    same
+ *                              !empty(new clause)
  * ----------------------------------------------------------------------
- * none							!firstYield &&					none
- *								empty(new clause)
- * ----------------------------------------------------------------------	
- * none			   			 	!firstYield && 					some 
- * 								!empty(new clause)			
+ * none                         !firstYield &&                   none
+ *                              empty(new clause)
+ * ----------------------------------------------------------------------    
+ * none                         !firstYield &&                   some 
+ *                              !empty(new clause)            
  * ----------------------------------------------------------------------
- * same							empty(new clause)				some
+ * same                         empty(new clause)                some
  * ----------------------------------------------------------------------
- * same							new clause == prev clause		same
+ * same                         new clause == prev clause        same
  * ----------------------------------------------------------------------
- * same							new clause != prev clause		different
+ * same                         new clause != prev clause        different
  * ----------------------------------------------------------------------
- * different					empty(new clause)				some
+ * different                    empty(new clause)                some
  * ----------------------------------------------------------------------
- * different					!empty(new clause)				different
+ * different                    !empty(new clause)               different
  * ----------------------------------------------------------------------
- * some							-								some
- * ----------------------------------------------------------------------							
+ * some                         -                                some
+ * ----------------------------------------------------------------------                            
  */
 private ClauseComp compareClauses(&T newClause, ClauseComp clauseComp, bool firstYield){
 	if(firstYield){
