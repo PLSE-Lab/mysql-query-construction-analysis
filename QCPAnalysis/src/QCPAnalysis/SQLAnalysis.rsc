@@ -436,7 +436,7 @@ private ClauseComp compareClauses(&T newClause, ClauseComp clauseComp, bool firs
 	}
 	
 	switch(clauseComp){
-		case none()  : return hasClause(newClause) ? some(newClause) : none();
+		case none()  : return hasClause(newClause) ? some({newClause}) : none();
 		case same(c) : {
 			if(!hasClause(newClause)) return some({c});
 			else return c == newClause ? same(c) : different({c, newClause});
