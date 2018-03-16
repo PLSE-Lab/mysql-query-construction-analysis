@@ -463,135 +463,76 @@ private bool hasDynamicPiece(SQLYield yield){
 	
 	return false;
 }
+
+alias ClauseCompMap = map[str queryType, map[str clause, tuple[int same, int some, int different, int none] clauses] clauseMap];
+
+public ClauseCompMap extractClauseComparison(SQLModelRel models){
+	res = buildInitialClauseCompMap();
 	
-@doc{empirical information about a specific query type in a system}
-data QueryInfo = selectInfo(int numSelectQueries, int numWhere, int numGroupBy, int numHaving, int numOrderBy, int numLimit, int numJoin)
-					 | updateInfo(int numUpdateQueries, int numWhere, int numOrderBy, int numLimit)
-					 | insertInfo(int numInsertQueries, int numValues, int numSetOp, int numSelect, int numOnDuplicate)
-					 | deleteInfo(int numDeleteQueries, int numUsing, int numWhere, int numOrderBy, int numLimit)
-					 | otherInfo(int numOtherQueryTypes);
-					 
-@doc{empirical information about all query types in a system}					 
-data SystemQueryInfo = systemQueryInfo(QueryInfo selectInfo, QueryInfo updateInfo, QueryInfo insertInfo, QueryInfo deleteInfo, int numOtherQueryTypes);
-								
-@doc{analyzes the queries in a system and returns counts for query types, clauses, etc.}
-public SystemQueryInfo collectSystemQueryInfo(str p, str v){
-	res = systemQueryInfo(selectInfo(0,0,0,0,0,0,0),
-						  updateInfo(0,0,0,0),
-						  insertInfo(0,0,0,0,0),
-						  deleteInfo(0,0,0,0,0),
-						  0);
-						  
-	models = getModels(p, v);
-	
-	for(model <- models){
-		pattern = classifySQLModel(model);
-		if(pattern == qcp0 || pattern == qcp1 || pattern == qcp2 || pattern == qcp3a){
-			parsed = getOneFrom(model.yieldsRel)[2];
-			res = extractQueryInfo(parsed, res);
+	void incMap(str queryType, str clause, ClauseComp cc){
+		if(queryType == "other"){
+			res[queryType]["count"].same += 1;
 		}
-		else{
-			if(pattern == qcp3b){
-				// check the yield info for clauses contained in this model, it is possible
-				// one yield contains a clause that another doesnt
-				res = extractQueryInfo(model.info, res);
-				continue;
-			}
-			if(pattern == qcp3c){
-				//for yields that are different query types, count the clauses of each yield
-				for(p <- model.yieldsRel[2]){
-					res = extractQueryInfo(p, res);
-				}
-			}
+		switch(cc){
+			case same(_) 	  : res[queryType][clause].same += 1;
+			case some(_) 	  : res[queryType][clause].some += 1;
+			case different(_) : res[queryType][clause].different += 1;
+			case none() 	  : res[queryType][clause].none += 1;
 		}
 	}
 	
+	for(model <- models){
+		yi = model.info;
+		if(!(yi is sameType)){
+			continue;	
+		}
+		
+		ci = model.info.clauseInfo;
+		if(selectClauses(select, from, where, groupBy, having, orderBy, limit, joins) := ci){
+			pairs = {<"select", select>, <"from", from>, <"where", where>, <"groupBy", groupBy>,
+					 <"having", having>, <"orderBy", orderBy>, <"limit", limit>, <"joins", joins>};
+			for(<name, clauseComp> <- pairs){
+				incMap("select", name, clauseComp);
+			}
+		} 
+		else if(insertClauses(into, values, setOps, select, onDuplicateSetOps) := ci){
+			pairs = {<"into", into>, <"values", values>, <"setOps", setOps>, <"select", select>,
+					 <"onDuplicateSetOps", onDuplicateSetOps>};
+			for(<name, clauseComp> <- pairs){
+				incMap("insert", name, clauseComp);
+			}
+		}
+		else if(updateClauses(tables, setOps, where, orderBy, limit) := ci){
+			pairs = {<"tables", tables>, <"setOps", setOps>, <"where", where>, <"orderBy", orderBy>, <"limit", limit>};
+			for(<name, clauseComp> <- pairs){
+				incMap("update", name, clauseComp);
+			}
+		}
+		else if(deleteClauses(from, using, where, orderBy, limit) := ci){
+			pairs = {<"from", from>, <"using", using>, <"where", where>, <"orderBy", orderBy>, <"limit", limit>};
+			for(<name, clauseComp> <- pairs){
+				incMap("delete", name, clauseComp);
+			}
+		}
+		else{
+			incMap("other");
+		}
+	}
 	return res;
 }
 
-@doc{extracts clause counts from a QCP3b query. The yield info is consulted as it is possible
-	that one yield contains a clause that another yield does not}
-private SystemQueryInfo extractQueryInfo(YieldInfo yieldInfo, SystemQueryInfo info){
-	if(yieldInfo is sameType){
-		clauses = yieldInfo.clauseInfo;
-		if(clauses is selectClauses){
-			info.selectInfo.numSelectQueries += 1;
-			if(!(clauses.where is none)) info.selectInfo.numWhere += 1;
-			if(!(clauses.groupBy is none)) info.selectInfo.numGroupBy += 1;
-			if(!(clauses.having is none)) info.selectInfo.numHaving += 1;
-			if(!(clauses.orderBy is none)) info.selectInfo.numOrderBy += 1;
-			if(!(clauses.limit is none)) info.selectInfo.numLimit += 1;
-			if(!(clauses.joins is none)) info.selectInfo.numJoin += 1;
-		}
-		else if(clauses is updateClauses){
-			info.updateInfo.numUpdateQueries += 1;
-			if(!(clauses.where is none)) info.updateInfo.numWhere += 1;
-			if(!(clauses.orderBy is none)) info.updateInfo.numOrderBy += 1;
-			if(!(clauses.limit is none)) info.updateInfo.numLimit += 1;
-		}
-		else if(clauses is insertClauses){
-			info.insertInfo.numInsertQueries += 1;
-			if(!(clauses.values is none)) info.insertInfo.numValues += 1;
-			if(!(clauses.setOps is none)) info.insertInfo.numSetOp += 1;
-			if(!(clauses.select is none)) info.insertInfo.numSelect += 1;
-			if(!(clauses.onDuplicateSetOps is none)) info.insertInfo.numOnDuplicate += 1;
-		}
-		else if(clauses is deleteClauses){
-			info.deleteInfo.numDeleteQueries += 1;
-			if(!(clauses.using is none)) info.deleteInfo.numUsing += 1;
-			if(!(clauses.where is none)) info.deleteInfo.numWhere += 1;
-			if(!(clauses.orderBy is none)) info.deleteInfo.numOrderBy += 1;
-			if(!(clauses.limit is none)) info.deleteInfo.numLimit += 1;
-		}
-		else{
-			info.numOtherQueryTypes += 1;
-		}
-		return info;
-	}
-	else{
-		// TODO: this should handle QCP3c, but this will only be done if this pattern is actually encountered
-		return info;
-	}
-}
-
-
-@doc{extracts clause counts from a single query (QCP0, QCP1, QCP2, QCP3a)}
-private SystemQueryInfo extractQueryInfo(SQLQuery parsed, SystemQueryInfo info){
-	if(parsed is selectQuery){
-		info.selectInfo.numSelectQueries += 1;
-		if(parsed.where is where) info.selectInfo.numWhere += 1;
-		if(parsed.group is groupBy) info.selectInfo.numGroupBy += 1;
-		if(parsed.having is having) info.selectInfo.numHaving += 1;
-		if(parsed.order is orderBy) info.selectInfo.numOrderBy += 1;
-		if(!parsed.limit is noLimit) info.selectInfo.numLimit += 1;
-		if(!isEmpty(parsed.joins)) info.selectInfo.numJoin += 1;
-	}
-	else if(parsed is updateQuery){
-		info.updateInfo.numUpdateQueries += 1;
-		if(parsed.where is where) info.updateInfo.numWhere += 1;
-		if(parsed.order is orderBy) info.updateInfo.numOrderBy += 1;
-		if(!parsed.limit is noLimit) info.updateInfo.numLimit += 1;
-	}
-	else if(parsed is insertQuery){
-		info.insertInfo.numInsertQueries += 1;
-		if(!isEmpty(parsed.values)) info.insertInfo.numValues += 1;
-		if(!isEmpty(parsed.setOps)) info.insertInfo.numSetOp += 1;
-		if(parsed.select is selectQuery) info.insertInfo.numSelect += 1;
-		if(!isEmpty(parsed.onDuplicateSetOps)) info.insertInfo.numOnDuplicate += 1;
-	}
-	else if(parsed is deleteQuery){
-		info.deleteInfo.numDeleteQueries += 1;
-		if(!isEmpty(parsed.using)) info.deleteInfo.numUsing += 1;
-		if(parsed.where is where) info.deleteInfo.numWhere += 1;
-		if(parsed.order is orderBy) info.deleteInfo.numOrderBy += 1;
-		if(!parsed.limit is noLimit) info.deleteInfo.numLimit += 1;
-	}
-	else{
-		info.numOtherQueryTypes += 1;
-	}
-	return info;
-}
-			 
+private ClauseCompMap buildInitialClauseCompMap(){
+	zeros = <0,0,0,0>;
+	res = (
+		"select"  : ("select": zeros, "from": zeros, "where" : zeros, "groupBy" : zeros, "having": zeros, "orderBy": zeros, "limit": zeros, "joins": zeros),
+		"insert"  : ("into": zeros, "values": zeros, "setOps": zeros, "select": zeros, "onDuplicateSetOps": zeros),
+		"update"  : ("tables": zeros, "setOps": zeros, "where": zeros, "orderBy": zeros, "limit": zeros),
+		"delete"  : ("from": zeros, "using": zeros, "where": zeros, "orderBy": zeros, "limit": zeros),
+		"other"   : ("count": zeros)
+	);
+	
+	return res;
+}		 
 @doc{extracts info about a dynamic query's holes}
 public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, having, order, limit, joins)){
 	res = ("name" : 0, "param" : 0, "condition" : 0);
