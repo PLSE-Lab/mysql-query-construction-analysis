@@ -465,6 +465,7 @@ private bool hasDynamicPiece(SQLYield yield){
 }
 
 alias ClauseCompMap = map[str queryType, map[str clause, tuple[int same, int some, int different, int none] clauses] clauseMap];
+alias ClauseCountMap = map[str queryType, map[str, int] clauseCounts];
 
 public ClauseCompMap extractClauseComparison(SQLModelRel models){
 	res = buildInitialClauseCompMap();
@@ -516,6 +517,18 @@ public ClauseCompMap extractClauseComparison(SQLModelRel models){
 		}
 		else{
 			incMap("other");
+		}
+	}
+	return res;
+}
+
+public ClauseCountMap extractClauseCounts(SQLModelRel models){
+	res = ( );
+	clauseComp = extractClauseComparison(models);
+	for(queryType <- clauseComp, clauses := clauseComp[queryType]){
+		res += (queryType : ( ));
+		for(clause <- clauses, counts := clauses[clause]){
+			res[queryType] += (clause : counts.same + counts.some + counts.different);
 		}
 	}
 	return res;
