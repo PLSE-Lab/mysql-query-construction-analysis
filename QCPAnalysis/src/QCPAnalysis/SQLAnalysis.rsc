@@ -530,6 +530,12 @@ public ClauseCountMap extractClauseCounts(SQLModelRel models){
 		for(clause <- clauses, counts := clauses[clause]){
 			res[queryType] += (clause : counts.same + counts.some + counts.different);
 		}
+		
+		// to get the total number of queries of this query type, we can just pick a clause
+		// then add up the same/some/different/none counts
+		aClause = getOneFrom(clauses);
+		counts = clauses[aClause];
+		res[queryType] += ("total queries" : counts.same + counts.some + counts.different + counts.none);
 	}
 	return res;
 }
