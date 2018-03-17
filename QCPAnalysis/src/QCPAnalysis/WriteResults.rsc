@@ -172,7 +172,7 @@ public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar
 		'\\vspace{2ex}
 		'\\footnotesize
 		' Counts for the number of each query type in each system in the corpus.
-		'<if(!captionOnTop){>\\caption{QCP Counts by System.\\label{tbl:query-type-counts}}<}>
+		'<if(!captionOnTop){>\\caption{Query Type Counts by System.\\label{tbl:query-type-counts}}<}>
 		'\\end{table<if(tablestar){>*<}>}
 		'\\npfourdigitnosep
 		'\\npnoaddmissingzero
