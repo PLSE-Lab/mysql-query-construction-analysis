@@ -124,7 +124,73 @@ private loc writeExample(str qcp, SQLModelRel matches, int exampleNum){
 	return model.location;
 }
 
-public str qcpCountsAsLatexTable(bool captionOnTop=false, bool tablestar = false){
+public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar = false){
+	Corpus corpus = getCorpus();
+	pForSort = [ < toUpperCase(p), p > | p <- corpus ];
+	pForSort = sort(pForSort, bool(tuple[str,str] t1, tuple[str,str] t2) { return t1[0] < t2[0]; });
+	sortedTypes = ["select", "insert", "update", "delete", "other"];
+	totals = <0, 0, 0, 0, 0>;
+	
+	str getLine(str p, str v){
+		counts = extractClauseCounts(getModels(p, v));
+		res = "<getSensibleName(p)> & <v>";
+		int i = 0;
+		for(t <- sortedTypes){
+			count = counts[t]["total queries"];
+			res += "& \\numprint{<count>}";
+			totals[i] += count;
+			i += 1;	
+		}
+		return res;
+	}
+	
+	str getTotalLine(){
+		res = "\\textbf{totals} & -";
+		int i = 0;
+		for(t <- sortedTypes){
+			res +=  "& \\numprint{<totals[i]>}";
+			i += 1;
+		}
+		return res;
+	}
+	
+		str res =
+		"\\npaddmissingzero
+		'\\npfourdigitsep
+		'\\begin{table<if(tablestar){>*<}>}
+		'\\centering
+		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
+		'\\ra{1.2}
+		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrrrrrr} \\toprule
+		'System & Version & SELECT & INSERT & UPDATE & DELETE & OTHER\\\\ \\midrule
+		'<for(<_,p> <- pForSort, v := corpus[p]){><getLine(p,v)> \\\\
+		'<}>\\midrule
+		'<getTotalLine()> \\\\
+		'\\bottomrule
+		'\\end{tabularx}
+		'\\\\
+		'\\vspace{2ex}
+		'\\footnotesize
+		' Counts for the number of each query type in each system in the corpus.
+		'<if(!captionOnTop){>\\caption{QCP Counts by System.\\label{tbl:query-type-counts}}<}>
+		'\\end{table<if(tablestar){>*<}>}
+		'\\npfourdigitnosep
+		'\\npnoaddmissingzero
+		";
+		
+	writeFile(tables + "queryTypeCounts.tex", res);
+	return res;
+}
+
+public str clauseCountsAsLatexTable(bool captionOnTop = flase, bool tablestar = false){
+	
+}
+
+public str qcp3YieldComparisonAsLatexTable(bool captionOnTop = false, bool tablestar = false){
+
+}
+
+public str qcpCountsAsLatexTable(bool captionOnTop = false, bool tablestar = false){
 	Corpus corpus = getCorpus();
 	counts = groupPatternCountsBySystem();
 	totals = counts[<"total", "0.0">];
