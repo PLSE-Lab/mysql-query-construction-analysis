@@ -805,6 +805,15 @@ public int holesInExpr(Exp expr){
 	}
 }
 
+public SQLModelRel getModelsCorpus(){
+	res = {};
+	Corpus corpus = getCorpus();
+	for(p <- corpus, v := corpus[p]){
+		res = res + getModels(p, v);
+	}
+	return res;	
+}
+
 public SQLModelRel getModels(str p, str v){
 	modelsRel = {};
 	rel[loc, SQLModel] models; 
@@ -831,7 +840,7 @@ public SQLModelRel getModels(str p, str v){
  			}
  			yieldInfo = compareYields(yieldsAndParsed<2>);
  			modelsRel = modelsRel + <l, m, yieldsAndParsed, yieldInfo>;
- 		}
+ 		} 
  		writeBinaryValueFile(analysisLoc + "<p>-<v>.bin", modelsRel, compression=false);	
  	}
  	return modelsRel;
