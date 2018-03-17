@@ -471,15 +471,15 @@ public ClauseCompMap extractClauseComparison(SQLModelRel models){
 	res = buildInitialClauseCompMap();
 	
 	void incMap(str queryType, str clause, ClauseComp cc){
-		if(queryType == "other"){
-			res[queryType]["count"].same += 1;
-		}
 		switch(cc){
 			case same(_) 	  : res[queryType][clause].same += 1;
 			case some(_) 	  : res[queryType][clause].some += 1;
 			case different(_) : res[queryType][clause].different += 1;
 			case none() 	  : res[queryType][clause].none += 1;
 		}
+	}
+	void incMap("other"){
+		res["other"]["count"].same += 1;
 	}
 	
 	for(model <- models){
