@@ -161,7 +161,7 @@ public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar
 		'\\centering
 		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
 		'\\ra{1.2}
-		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrrrrrr} \\toprule
+		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrr} \\toprule
 		'System & Version & SELECT & INSERT & UPDATE & DELETE & OTHER\\\\ \\midrule
 		'<for(<_,p> <- pForSort, v := corpus[p]){><getLine(p,v)> \\\\
 		'<}>\\midrule
@@ -182,8 +182,74 @@ public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar
 	return res;
 }
 
-public str clauseCountsAsLatexTable(bool captionOnTop = flase, bool tablestar = false){
+public str clauseCountsAsLatexTable(bool captionOnTop = false, bool tablestar = false){
+	counts = extractClauseCounts(getModelsCorpus());
+	sortedTypes = ["select", "insert", "update", "delete"];
+	sortedSelect = ["select", "from", "where", "groupBy", "having", "orderBy", "limit", "joins", "total queries"];
+	sortedInsert = ["into", "values", "setOps", "select", "onDuplicateSetOps", "total queries"];
+	sortedUpdate = ["tables", "setOps", "where", "orderBy", "limit", "total queries"];
+	sortedDelete = ["from", "using", "where", "orderBy", "limit", "total queries"];
 	
+	str getInnerClauseNameTable(list[str] clauses){
+		res = "\\begin{tabular}{l}";
+		for(c <- clauses){
+			res = res + "<c>\\\\";
+		}
+		res = res + "\\end{tabular}";
+		return res;
+	}
+	
+	str getInnerClauseCountsTable(list[str] clauses, str queryType){
+		clauseCounts = counts[queryType];
+		res = "\\begin{tabular}{l}";
+		for(c <- clauses){
+			res = res + "\\numprint{<clauseCounts[c]>}\\\\";
+		}
+		res = res + "\\end{tabular}";
+		return res;
+	}
+	
+	str getLine(str queryType){
+		res = "<queryType>";
+		clauses = [];
+		
+		switch(queryType){
+			case "select" : clauses = sortedSelect;
+			case "insert" : clauses = sortedInsert;
+			case "update" : clauses = sortedUpdate;
+			case "delete" : clauses = sortedDelete;
+		}
+		
+		res = res + "& <getInnerClauseNameTable(clauses)> & <getInnerClauseCountsTable(clauses, queryType)>";
+		
+		return res;
+	}
+	
+	str res =
+		"\\npaddmissingzero
+		'\\npfourdigitsep
+		'\\begin{table<if(tablestar){>*<}>}
+		'\\centering
+		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
+		'\\ra{1.2}
+		'\\begin{tabularx}{\\columnwidth}{Xlll} \\toprule
+		'Query Type & Clauses & Counts \\\\ \\midrule
+		'<for(t <- sortedTypes){><getLine(t)>\\\\ \\midrule
+		'<}>
+		'\\bottomrule
+		'\\end{tabularx}
+		'\\\\
+		'\\vspace{2ex}
+		'\\footnotesize
+		' Counts of each clause for each query type.
+		'<if(!captionOnTop){>\\caption{Clause Counts for each Query Type.\\label{tbl:clause-counts}}<}>
+		'\\end{table<if(tablestar){>*<}>}
+		'\\npfourdigitnosep
+		'\\npnoaddmissingzero
+		";
+		
+	writeFile(tables + "clauseCounts.tex", res);
+	return res;
 }
 
 public str qcp3YieldComparisonAsLatexTable(bool captionOnTop = false, bool tablestar = false){
