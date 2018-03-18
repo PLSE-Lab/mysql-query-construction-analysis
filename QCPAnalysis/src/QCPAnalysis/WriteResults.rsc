@@ -184,7 +184,7 @@ public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar
 
 public str clauseCountsAsLatexTable(bool captionOnTop = false, bool tablestar = false){
 	counts = extractClauseCounts(getModelsCorpus());
-	sortedTypes = ["select", "insert", "update", "delete"];
+	sortedTypes  = ["select", "insert", "update", "delete"];
 	sortedSelect = ["select", "from", "where", "groupBy", "having", "orderBy", "limit", "joins", "total queries"];
 	sortedInsert = ["into", "values", "setOps", "select", "onDuplicateSetOps", "total queries"];
 	sortedUpdate = ["tables", "setOps", "where", "orderBy", "limit", "total queries"];
@@ -252,8 +252,89 @@ public str clauseCountsAsLatexTable(bool captionOnTop = false, bool tablestar = 
 	return res;
 }
 
-public str qcp3YieldComparisonAsLatexTable(bool captionOnTop = false, bool tablestar = false){
-
+public str qcp3bYieldComparisonAsLatexTable(bool captionOnTop = false, bool tablestar = false){
+	models = groupSQLModelsCorpus()[qcp3b];
+	counts = extractClauseComparison(models);
+	sortedTypes  = ["select", "insert", "update", "delete"];
+	sortedSelect = ["select", "from", "where", "groupBy", "having", "orderBy", "limit", "joins"];
+	sortedInsert = ["into", "values", "setOps", "select", "onDuplicateSetOps"];
+	sortedUpdate = ["tables", "setOps", "where", "orderBy", "limit"];
+	sortedDelete = ["from", "using", "where", "orderBy", "limit"];
+	
+	str getInnerClauseNameTable(list[str] clauses){
+		res = "\\begin{tabular}{l}";
+		for(c <- clauses){
+			res = res + "<c>\\\\";
+		}
+		res = res + "\\end{tabular}";
+		return res;
+	}
+	
+	str getInnerClauseComparisonCountTables(list[str] clauses, str queryType){
+		clauseMap = counts[queryType];
+		sameTable = "\\begin{tabular}{l}";
+		someTable = "\\begin{tabular}{l}";
+		differentTable = "\\begin{tabular}{l}";
+		noneTable = "\\begin{tabular}{l}";
+		
+		for(c <- clauses){
+			sameTable = sameTable + "<clauseMap[c].same>\\\\";
+			someTable = someTable + "<clauseMap[c].some>\\\\";
+			differentTable = differentTable + "<clauseMap[c].different>\\\\";
+			noneTable = noneTable + "<clauseMap[c].none>\\\\";
+		}
+		
+		sameTable = sameTable + "\\end{tabular}";
+		someTable = someTable + "\\end{tabular}";;
+		differentTable = differentTable + "\\end{tabular}";
+		noneTable = noneTable + "\\end{tabular}";
+		
+		return "<sameTable> & <differentTable> & <someTable> & <noneTable>";
+	}
+	
+	str getLine(str queryType){
+		res = "<queryType>";
+		clauses = [];
+		
+		switch(queryType){
+			case "select" : clauses = sortedSelect;
+			case "insert" : clauses = sortedInsert;
+			case "update" : clauses = sortedUpdate;
+			case "delete" : clauses = sortedDelete;
+		}
+		
+		res = res + "& <getInnerClauseNameTable(clauses)> & <getInnerClauseComparisonCountTables(clauses, queryType)>";
+		
+		return res;
+	}
+	
+	str res =
+		"\\npaddmissingzero
+		'\\npfourdigitsep
+		'\\begin{table<if(tablestar){>*<}>}
+		'\\centering
+		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
+		'\\ra{1.2}
+		'\\begin{tabularx}{\\columnwidth}{Xllllll} \\toprule
+		'Query Type & Clauses & Same & Different & Some & None\\\\ \\midrule
+		'<for(t <- sortedTypes){><getLine(t)>\\\\ \\midrule
+		'<}>
+		'\\bottomrule
+		'\\end{tabularx}
+		'\\\\
+		'\\vspace{2ex}
+		'\\footnotesize
+		' Clause comparison counts for pattern QCP3b
+		'<if(!captionOnTop){>\\caption{Clause comparison counts for pattern QCP3b\\label{tbl:clause-comparison-counts}}<}>
+		'\\end{table<if(tablestar){>*<}>}
+		'\\npfourdigitnosep
+		'\\npnoaddmissingzero
+		";
+		
+	writeFile(tables + "qcp3bClauseComparison.tex", res);
+	return res; 
+	
+	
 }
 
 public str qcpCountsAsLatexTable(bool captionOnTop = false, bool tablestar = false){
