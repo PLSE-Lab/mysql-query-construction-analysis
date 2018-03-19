@@ -31,7 +31,7 @@ loc examples = |project://QCPAnalysis/results/examples/|;
 	3) returns the location of the example
 */
 public loc getExample(str qcp, int exampleNum = 0){
-	models = groupSQLModelsCorups();
+	models = groupSQLModelsCorpus();
 	return getExample(qcp, models, exampleNum);
 }
 
