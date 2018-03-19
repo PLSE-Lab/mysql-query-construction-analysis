@@ -18,7 +18,7 @@ public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, 
 					 | parseError();// query did not parse
 					 
 public data PartialStatement = unknownStatementType() // SELECT/DELETE/INSERT cannot be determined
-							 | connectiveWithoutWhere();
+							 | connectiveWithoutWhere(str queryType);
 						
 
 public data Exp = name(SQLName name)
