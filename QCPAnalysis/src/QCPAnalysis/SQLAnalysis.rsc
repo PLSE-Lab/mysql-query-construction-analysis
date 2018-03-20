@@ -316,7 +316,7 @@ data ClauseInfo = selectClauses(ClauseComp select, ClauseComp from, ClauseComp w
 
 @doc{represents the differences in yields for a specific set of model yields}
 data YieldInfo = sameType(ClauseInfo clauseInfo)
-			   | differentTypes(set[str] types);				
+			   | differentTypes(set[ClauseInfo] clauseInfos);				
 
 @doc{determine how a set of parsed queries are different}
 public YieldInfo compareYields(set[SQLQuery] parsed){
@@ -327,8 +327,19 @@ public YieldInfo compareYields(set[SQLQuery] parsed){
 		return compareYields(someType, parsed);
 	}
 	else{
-		// todo: collect more information about what this case generally looks like
-		return differentTypes(types);
+		typeMap = ( );
+		for(p <- parsed){
+			aType = getName(p);
+			if(aType notin typeMap){
+				typeMap += (aType : {p});
+			}
+			else{
+				typeMap[aType] += {p};
+			}
+		}
+		
+		comparisons = {compareYields(t, p).clauseInfo | t <- typeMap, p := typeMap[t]};
+		return differentTypes(comparisons);
 	}
 }
 private YieldInfo compareYields("selectQuery", set[SQLQuery] parsed){
@@ -482,13 +493,7 @@ public ClauseCompMap extractClauseComparison(SQLModelRel models){
 		res["other"]["count"].same += 1;
 	}
 	
-	for(model <- models){
-		yi = model.info;
-		if(!(yi is sameType)){
-			continue;	
-		}
-		
-		ci = model.info.clauseInfo;
+	void extract(ClauseInfo ci){
 		if(selectClauses(select, from, where, groupBy, having, orderBy, limit, joins) := ci){
 			pairs = {<"select", select>, <"from", from>, <"where", where>, <"groupBy", groupBy>,
 					 <"having", having>, <"orderBy", orderBy>, <"limit", limit>, <"joins", joins>};
@@ -517,6 +522,20 @@ public ClauseCompMap extractClauseComparison(SQLModelRel models){
 		}
 		else{
 			incMap("other");
+		}
+	}
+	
+	for(model <- models){
+		yi = model.info;
+		if(yi is sameType){
+			ci = model.info.clauseInfo;
+			extract(ci);
+		}
+		else{
+			println(model.info);
+			for(ci <- model.info.clauseInfos){
+				extract(ci);
+			}
 		}
 	}
 	return res;
