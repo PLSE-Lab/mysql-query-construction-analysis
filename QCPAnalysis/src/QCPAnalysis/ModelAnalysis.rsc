@@ -27,11 +27,19 @@ data FragmentCategories = fcat(
 	int globalComputed,// computed global names
 	int parameterNames, // parameters
 	int parameterProps, // properties of parameters
-	int parameterComputed, // properties of parameters
+	int parameterComputed, // computed property names
 	int computed // dynamic fragments that are not names
 	);
 
 FragmentCategories initFC() = fcat(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+map[str, int] fcToAbbreviatedMap(fcat(literal, localVars, localProps, localComputed, globalVars, globalProps, globalComputed, 
+										parameterNames, parameterProps, parameterComputed, computed))
+	= ("L" : literal, "LV" : localVars, "LP" : localProps, "LC" : localComputed,
+	   "GV" : globalVars, "GP" : globalProps, "GC" : globalComputed, 
+	   "PN" : parameterNames, "PP" : parameterProps, "PC" : parameterComputed,
+	   "C" : computed
+	);
 
 public set[QueryFragment] flattenFragment(QueryFragment qf) {
 	if (qf is compositeFragment) {
@@ -214,4 +222,23 @@ public map[str, FragmentCategories] sumFCMap(map[str system, rel[loc callLoc, SQ
 		res[s] = sumFC(fcmap[s]);
 	}
 	return res;
+}
+
+public FragmentCategories totalFCForCorpus(){
+	fcMap = sumFCMap(computeForCorpus());
+	total = initFC();
+	for(p <- fcMap, fc := fcMap[p]){
+		total.literals += fc.literals;
+		total.localVars += fc.localVars;
+		total.localProps += fc.localProps;
+		total.localComputed += fc.localComputed;
+		total.globalVars += fc.globalVars;
+		total.globalProps += fc.globalProps;
+		total.globalComputed += fc.globalComputed;
+		total.parameterNames += fc.parameterNames;
+		total.parameterProps += fc.parameterProps;
+		total.parameterComputed += fc.parameterComputed;
+		total.computed += fc.computed;
+	}
+	return total;
 }
