@@ -169,26 +169,13 @@ public map[tuple[str,str], map[str, int]] groupPatternCountsBySystem(){
 @doc{group models based on pattern from the whole corpus}
 public map[str, SQLModelRel] groupSQLModelsCorpus(){
 
-	res = ();
+	res = (qcp0 : {}, qcp1 : {}, qcp2 : {}, qcp3a : {}, qcp3b : {}, qcp3c : {}, qcp4 : {}, unknown : {}, parseError : {}, otherType : {});
 	Corpus corpus = getCorpus();
-	
-	void addModelsWithPattern(str pattern, map[str, SQLModelRel] models){
-		if(pattern in models){
-			if(pattern in res){
-				res[pattern] = res[pattern] + models[pattern];
-			}
-			else{
-				res = res + (pattern : models[pattern]);
-			}
-		}
-		
-	}
 		
 	for(p <- corpus, v := corpus[p]){
 		models = groupSQLModels(p, v);
-		patterns = [qcp0, qcp1, qcp2, qcp3a, qcp3b, qcp3c, unknown, parseError, otherType];
-		for(pattern <- patterns){
-			addModelsWithPattern(pattern, models);
+		for(pattern <- models){
+			res[pattern] = res[pattern] + models[pattern];
 		}
 	}
 	return res;	
