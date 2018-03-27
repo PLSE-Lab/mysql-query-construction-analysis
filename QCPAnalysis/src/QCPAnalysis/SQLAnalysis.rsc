@@ -250,8 +250,6 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 		if(head(yield) is staticPiece){
 			return qcp0;
 		}
-		// TODO: this only hanles the basic case where a single function parameter provides the value
-		// of the whole query
 		if(head(yield) is namePiece || head(yield) is dynamicPiece){
 			return qcp4;
 		}
@@ -259,6 +257,10 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 	
 	if(parsed is parseError){
 		return parseError;
+	}
+	
+	if(parsed is partialStatement){
+		return qcp2;
 	}
 	
 	if(!(parsed is selectQuery || parsed is insertQuery || parsed is updateQuery || parsed is deleteQuery)){
