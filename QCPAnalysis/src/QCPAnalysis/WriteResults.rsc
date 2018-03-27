@@ -402,10 +402,12 @@ public str fragmentCategoriesAsLatexTable(bool captionOnTop=false, bool tablesta
 	pForSort = [ < toUpperCase(p), p > | p <- getCorpus() ];
 	pForSort = sort(pForSort, bool(tuple[str,str] t1, tuple[str,str] t2) { return t1[0] < t2[0]; });
 	
+	cForSort = ["L", "LV", "LP", "LC", "GV", "GP", "GC", "PN", "PP", "PC", "C"];
+	
 	str getLine(str p){
 		fc = fcToAbbreviatedMap(categoriesMap[p]);
 		res = "<getSensibleName(p)>";
-		for(category <- fc, counts := fc[category]){
+		for(category <- cForSort, counts := fc[category]){
 			res += "& <counts>";
 		}
 		return res; 
@@ -413,7 +415,7 @@ public str fragmentCategoriesAsLatexTable(bool captionOnTop=false, bool tablesta
 	
 	str getTotalLine(){
 		res = "\\textbf{total}";
-		for(category <- totals, counts := totals[category]){
+		for(category <- cForSort, counts := totals[category]){
 			res += "& <counts>";
 		}
 		return res; 
@@ -427,7 +429,7 @@ public str fragmentCategoriesAsLatexTable(bool captionOnTop=false, bool tablesta
 		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
 		'\\ra{1.2}
 		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrrrrrrr} \\toprule
-		'System <for(c <- totals){> & <c> <}> \\\\ \\midrule
+		'System <for(c <- cForSort){> & <c> <}> \\\\ \\midrule
 		'<for(<_,p> <- pForSort){><getLine(p)> \\\\
 		'<}>\\midrule
 		'<getTotalLine()> \\\\
