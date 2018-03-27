@@ -7,6 +7,7 @@ module QCPAnalysis::WriteResults
 import QCPAnalysis::QCPCorpus;
 import QCPAnalysis::SQLAnalysis;
 import QCPAnalysis::SQLModel;
+import QCPAnalysis::ModelAnalysis;
 
 import lang::php::ast::AbstractSyntax;
 import lang::php::util::Corpus;
@@ -391,6 +392,61 @@ public str qcpCountsAsLatexTable(bool captionOnTop = false, bool tablestar = fal
 		";
 		
 	writeFile(tables + "qcpCounts.tex", res);
+	return res;
+}
+
+public str fragmentCategoriesAsLatexTable(bool captionOnTop=false, bool tablestar = false){
+	categoriesMap = sumFCMap(computeForCorpus());
+	totals = fcToAbbreviatedMap(totalFCForCorpus());
+	
+	pForSort = [ < toUpperCase(p), p > | p <- getCorpus() ];
+	pForSort = sort(pForSort, bool(tuple[str,str] t1, tuple[str,str] t2) { return t1[0] < t2[0]; });
+	
+	str getLine(str p){
+		fc = fcToAbbreviatedMap(categoriesMap[p]);
+		res = "<getSensibleName(p)>";
+		for(category <- fc, counts := fc[category]){
+			res += "& <counts>";
+		}
+		return res; 
+	}
+	
+	str getTotalLine(){
+		res = "\\textbf{total}";
+		for(category <- totals, counts := totals[category]){
+			res += "& <counts>";
+		}
+		return res; 
+	}
+	
+	str res =
+		"\\npaddmissingzero
+		'\\npfourdigitsep
+		'\\begin{table<if(tablestar){>*<}>}
+		'\\centering
+		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
+		'\\ra{1.2}
+		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrrrrrrr} \\toprule
+		'System <for(c <- totals){> & <c> <}> \\\\ \\midrule
+		'<for(<_,p> <- pForSort){><getLine(p)> \\\\
+		'<}>\\midrule
+		'<getTotalLine()> \\\\
+		'\\bottomrule
+		'\\end{tabularx}
+		'\\\\
+		'\\vspace{2ex}
+		'\\footnotesize
+		' Counts of each Fragment Category in the corpus. The table headings for each fragment category have the following
+		' abbreviations: L for literals, LV for local variables, LP for properties of local variables, LC for computed local names, 
+		' GV for global variables, GP for properties of global variables, GC for computed global names, PN for parameters,
+		' PP for properties of parameters, PC for computed property names and C for computed fragments that are not names
+		'<if(!captionOnTop){>\\caption{Fragment Category Counts by System\\label{tbl:fragment-category-counts}}<}>
+		'\\end{table<if(tablestar){>*<}>}
+		'\\npfourdigitnosep
+		'\\npnoaddmissingzero
+		";
+		
+	writeFile(tables + "fragmentCategories.tex", res);
 	return res;
 }
 
