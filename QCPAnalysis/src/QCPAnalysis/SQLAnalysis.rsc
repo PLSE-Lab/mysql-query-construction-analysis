@@ -344,6 +344,7 @@ public YieldInfo compareYields(set[SQLQuery] parsed){
 		// if this matches, we throw away the partial yields
 		if(partialSameType(comparisons)){
 			comparisons = {c | c <- comparisons, !(c is partial)};
+			return sameType(getOneFrom(comparisons));
 		}
 		return differentTypes(comparisons);
 	}
@@ -564,7 +565,6 @@ public ClauseCompMap extractClauseComparison(SQLModelRel models){
 			extract(ci);
 		}
 		else{
-			println(model.info);
 			for(ci <- model.info.clauseInfos){
 				extract(ci);
 			}
@@ -582,13 +582,13 @@ public ClauseCountMap extractClauseCounts(SQLModelRel models){
 			res[queryType] += (clause : counts.same + counts.some + counts.different);
 		}
 		
-		// to get the total number of queries of this query type, we can just pick a clause
-		// then add up the same/some/different/none counts
 		if(queryType == "partial"){
 			res[queryType] += ("total queries" : res[queryType]["select"] + res[queryType]["insert"]
 												 + res[queryType]["update"] + res[queryType]["delete"]
 												 + res[queryType]["unknown"]);
 		}
+		// to get the total number of queries of this query type, we can just pick a clause
+		// then add up the same/some/different/none counts
 		else{
 			aClause = getOneFrom(clauses);
 			counts = clauses[aClause];
