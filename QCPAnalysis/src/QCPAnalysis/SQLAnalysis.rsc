@@ -260,6 +260,7 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 	}
 	
 	if(parsed is partialStatement){
+	
 		return qcp2;
 	}
 	
@@ -301,6 +302,7 @@ data ClauseInfo = selectClauses(ClauseComp select, ClauseComp from, ClauseComp w
 					ClauseComp select, ClauseComp onDuplicateSetOps)
 				| deleteClauses(ClauseComp from, ClauseComp using, ClauseComp where, 
 					ClauseComp orderBy, ClauseComp limit)
+				| partial(str queryType)
 				| otherQueryType(str queryType);
 
 @doc{represents the differences in yields for a specific set of model yields}
@@ -313,12 +315,22 @@ public YieldInfo compareYields(set[SQLQuery] parsed){
 	types = {getName(p) | p <- parsed};
 	
 	if(size(types) == 1){
+		if(partialStatement(t) := getOneFrom(parsed)){
+			return compareYields(t is unknownStatementType ? "unknown" : "partial" + toLowerCase(t.queryType), parsed);
+		}
 		return compareYields(someType, parsed);
 	}
 	else{
 		typeMap = ( );
 		for(p <- parsed){
-			aType = getName(p);
+			aType = "";
+			if(partialStatement(t)  := p){
+				aType = t is unknownStatementType ? "unknown" : "partial" + toLowerCase(t.queryType);
+			}
+			else{
+				aType = getName(p);
+			}
+			
 			if(aType notin typeMap){
 				typeMap += (aType : {p});
 			}
@@ -328,9 +340,29 @@ public YieldInfo compareYields(set[SQLQuery] parsed){
 		}
 		
 		comparisons = {compareYields(t, p).clauseInfo | t <- typeMap, p := typeMap[t]};
+		// in some cases, one yield is a full query and another is a partial statement. this
+		// checks for this to make sure we really have a case of differentTypes
+		// if this matches, we throw away the partial yields
+		if(partialSameType(comparisons)){
+			comparisons = {c | c <- comparisons, !(c is partial)};
+		}
 		return differentTypes(comparisons);
 	}
 }
+
+private bool partialSameType(set[ClauseInfo] comparisons){
+	types = {};
+	for(c <- comparisons){
+		if(partial(t) := c){
+			types += t + "Clauses";
+		}
+		else{
+			types += getName(c);
+		}
+	}
+	return size(types) == 1;
+}
+
 private YieldInfo compareYields("selectQuery", set[SQLQuery] parsed){
 	res = selectClauses(none(), none(), none(), none(), none(), none(), none(), none());
 	
@@ -396,6 +428,12 @@ private YieldInfo compareYields("deleteQuery", set[SQLQuery] parsed){
 }
 
 private YieldInfo compareYields(str queryType, set[SQLQuery] parsed){
+	if(queryType == "unknown"){
+		return sameType(partial("unknown"));
+	}
+	if(/partial<x:[a-z]+>/ := queryType){
+		return sameType(partial(x));
+	}
 	return sameType(otherQueryType(queryType));
 }
 
