@@ -129,12 +129,12 @@ public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar
 	Corpus corpus = getCorpus();
 	pForSort = [ < toUpperCase(p), p > | p <- corpus ];
 	pForSort = sort(pForSort, bool(tuple[str,str] t1, tuple[str,str] t2) { return t1[0] < t2[0]; });
-	sortedTypes = ["select", "insert", "update", "delete", "other"];
-	totals = <0, 0, 0, 0, 0>;
+	sortedTypes = ["select", "insert", "update", "delete", "partial", "other"];
+	totals = <0, 0, 0, 0, 0, 0>;
 	
-	str getLine(str p, str v){
+	str getLine(str p, v){
 		counts = extractClauseCounts(getModels(p, v));
-		res = "<getSensibleName(p)> & <v>";
+		res = "<getSensibleName(p)>";
 		int i = 0;
 		for(t <- sortedTypes){
 			count = counts[t]["total queries"];
@@ -146,7 +146,7 @@ public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar
 	}
 	
 	str getTotalLine(){
-		res = "\\textbf{totals} & -";
+		res = "\\textbf{totals}";
 		int i = 0;
 		for(t <- sortedTypes){
 			res +=  "& \\numprint{<totals[i]>}";
@@ -162,9 +162,9 @@ public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar
 		'\\centering
 		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
 		'\\ra{1.2}
-		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrr} \\toprule
-		'System & Version & SELECT & INSERT & UPDATE & DELETE & OTHER\\\\ \\midrule
-		'<for(<_,p> <- pForSort, v := corpus[p]){><getLine(p,v)> \\\\
+		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrrr} \\toprule
+		'System & SELECT & INSERT & UPDATE & DELETE & PARTIAL & OTHER\\\\ \\midrule
+		'<for(<_,p> <- pForSort, v := corpus[p]){><getLine(p, v)> \\\\
 		'<}>\\midrule
 		'<getTotalLine()> \\\\
 		'\\bottomrule
