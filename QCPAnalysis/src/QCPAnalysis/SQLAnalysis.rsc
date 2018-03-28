@@ -260,7 +260,6 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 	}
 	
 	if(parsed is partialStatement){
-	
 		return qcp2;
 	}
 	
@@ -519,6 +518,9 @@ public ClauseCompMap extractClauseComparison(SQLModelRel models){
 	void incMap("other"){
 		res["other"]["count"].same += 1;
 	}
+	void incMap("partial", s){
+		res["partial"][s].same += 1;
+	}
 	
 	void extract(ClauseInfo ci){
 		if(selectClauses(select, from, where, groupBy, having, orderBy, limit, joins) := ci){
@@ -546,6 +548,9 @@ public ClauseCompMap extractClauseComparison(SQLModelRel models){
 			for(<name, clauseComp> <- pairs){
 				incMap("delete", name, clauseComp);
 			}
+		}
+		else if(partial(t) := ci){
+			incMap("partial", t);
 		}
 		else{
 			incMap("other");
@@ -593,6 +598,7 @@ private ClauseCompMap buildInitialClauseCompMap(){
 		"insert"  : ("into": zeros, "values": zeros, "setOps": zeros, "select": zeros, "onDuplicateSetOps": zeros),
 		"update"  : ("tables": zeros, "setOps": zeros, "where": zeros, "orderBy": zeros, "limit": zeros),
 		"delete"  : ("from": zeros, "using": zeros, "where": zeros, "orderBy": zeros, "limit": zeros),
+		"partial" : ("select" : zeros, "insert" : zeros, "update" : zeros, "delete" : zeros, "unknown" : zeros),
 		"other"   : ("count": zeros)
 	);
 	
