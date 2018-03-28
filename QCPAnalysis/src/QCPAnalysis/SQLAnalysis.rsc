@@ -584,9 +584,16 @@ public ClauseCountMap extractClauseCounts(SQLModelRel models){
 		
 		// to get the total number of queries of this query type, we can just pick a clause
 		// then add up the same/some/different/none counts
-		aClause = getOneFrom(clauses);
-		counts = clauses[aClause];
-		res[queryType] += ("total queries" : counts.same + counts.some + counts.different + counts.none);
+		if(queryType == "partial"){
+			res[queryType] += ("total queries" : res[queryType]["select"] + res[queryType]["insert"]
+												 + res[queryType]["update"] + res[queryType]["delete"]
+												 + res[queryType]["unknown"]);
+		}
+		else{
+			aClause = getOneFrom(clauses);
+			counts = clauses[aClause];
+			res[queryType] += ("total queries" : counts.same + counts.some + counts.different + counts.none);
+		}
 	}
 	return res;
 }
