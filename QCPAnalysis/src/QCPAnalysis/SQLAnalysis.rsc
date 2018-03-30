@@ -169,26 +169,13 @@ public map[tuple[str,str], map[str, int]] groupPatternCountsBySystem(){
 @doc{group models based on pattern from the whole corpus}
 public map[str, SQLModelRel] groupSQLModelsCorpus(){
 
-	res = ();
+	res = (qcp0 : {}, qcp1 : {}, qcp2 : {}, qcp3a : {}, qcp3b : {}, qcp3c : {}, qcp4 : {}, unknown : {}, parseError : {}, otherType : {});
 	Corpus corpus = getCorpus();
-	
-	void addModelsWithPattern(str pattern, map[str, SQLModelRel] models){
-		if(pattern in models){
-			if(pattern in res){
-				res[pattern] = res[pattern] + models[pattern];
-			}
-			else{
-				res = res + (pattern : models[pattern]);
-			}
-		}
-		
-	}
 		
 	for(p <- corpus, v := corpus[p]){
 		models = groupSQLModels(p, v);
-		patterns = [qcp0, qcp1, qcp2, qcp3a, qcp3b, qcp3c, unknown, parseError, otherType];
-		for(pattern <- patterns){
-			addModelsWithPattern(pattern, models);
+		for(pattern <- models){
+			res[pattern] = res[pattern] + models[pattern];
 		}
 	}
 	return res;	
@@ -263,8 +250,6 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 		if(head(yield) is staticPiece){
 			return qcp0;
 		}
-		// TODO: this only hanles the basic case where a single function parameter provides the value
-		// of the whole query
 		if(head(yield) is namePiece || head(yield) is dynamicPiece){
 			return qcp4;
 		}
@@ -272,6 +257,10 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 	
 	if(parsed is parseError){
 		return parseError;
+	}
+	
+	if(parsed is partialStatement){
+		return qcp2;
 	}
 	
 	if(!(parsed is selectQuery || parsed is insertQuery || parsed is updateQuery || parsed is deleteQuery)){
@@ -312,6 +301,7 @@ data ClauseInfo = selectClauses(ClauseComp select, ClauseComp from, ClauseComp w
 					ClauseComp select, ClauseComp onDuplicateSetOps)
 				| deleteClauses(ClauseComp from, ClauseComp using, ClauseComp where, 
 					ClauseComp orderBy, ClauseComp limit)
+				| partial(str queryType)
 				| otherQueryType(str queryType);
 
 @doc{represents the differences in yields for a specific set of model yields}
@@ -324,12 +314,22 @@ public YieldInfo compareYields(set[SQLQuery] parsed){
 	types = {getName(p) | p <- parsed};
 	
 	if(size(types) == 1){
+		if(partialStatement(t) := getOneFrom(parsed)){
+			return compareYields(t is unknownStatementType ? "unknown" : "partial" + toLowerCase(t.queryType), parsed);
+		}
 		return compareYields(someType, parsed);
 	}
 	else{
 		typeMap = ( );
 		for(p <- parsed){
-			aType = getName(p);
+			aType = "";
+			if(partialStatement(t)  := p){
+				aType = t is unknownStatementType ? "unknown" : "partial" + toLowerCase(t.queryType);
+			}
+			else{
+				aType = getName(p);
+			}
+			
 			if(aType notin typeMap){
 				typeMap += (aType : {p});
 			}
@@ -339,9 +339,30 @@ public YieldInfo compareYields(set[SQLQuery] parsed){
 		}
 		
 		comparisons = {compareYields(t, p).clauseInfo | t <- typeMap, p := typeMap[t]};
+		// in some cases, one yield is a full query and another is a partial statement. this
+		// checks for this to make sure we really have a case of differentTypes
+		// if this matches, we throw away the partial yields
+		if(partialSameType(comparisons)){
+			comparisons = {c | c <- comparisons, !(c is partial)};
+			return sameType(getOneFrom(comparisons));
+		}
 		return differentTypes(comparisons);
 	}
 }
+
+private bool partialSameType(set[ClauseInfo] comparisons){
+	types = {};
+	for(c <- comparisons){
+		if(partial(t) := c){
+			types += t + "Clauses";
+		}
+		else{
+			types += getName(c);
+		}
+	}
+	return size(types) == 1;
+}
+
 private YieldInfo compareYields("selectQuery", set[SQLQuery] parsed){
 	res = selectClauses(none(), none(), none(), none(), none(), none(), none(), none());
 	
@@ -407,6 +428,12 @@ private YieldInfo compareYields("deleteQuery", set[SQLQuery] parsed){
 }
 
 private YieldInfo compareYields(str queryType, set[SQLQuery] parsed){
+	if(queryType == "unknown"){
+		return sameType(partial("unknown"));
+	}
+	if(/partial<x:[a-z]+>/ := queryType){
+		return sameType(partial(x));
+	}
 	return sameType(otherQueryType(queryType));
 }
 
@@ -492,6 +519,9 @@ public ClauseCompMap extractClauseComparison(SQLModelRel models){
 	void incMap("other"){
 		res["other"]["count"].same += 1;
 	}
+	void incMap("partial", s){
+		res["partial"][s].same += 1;
+	}
 	
 	void extract(ClauseInfo ci){
 		if(selectClauses(select, from, where, groupBy, having, orderBy, limit, joins) := ci){
@@ -520,6 +550,9 @@ public ClauseCompMap extractClauseComparison(SQLModelRel models){
 				incMap("delete", name, clauseComp);
 			}
 		}
+		else if(partial(t) := ci){
+			incMap("partial", t);
+		}
 		else{
 			incMap("other");
 		}
@@ -532,7 +565,6 @@ public ClauseCompMap extractClauseComparison(SQLModelRel models){
 			extract(ci);
 		}
 		else{
-			println(model.info);
 			for(ci <- model.info.clauseInfos){
 				extract(ci);
 			}
@@ -550,11 +582,18 @@ public ClauseCountMap extractClauseCounts(SQLModelRel models){
 			res[queryType] += (clause : counts.same + counts.some + counts.different);
 		}
 		
+		if(queryType == "partial"){
+			res[queryType] += ("total queries" : res[queryType]["select"] + res[queryType]["insert"]
+												 + res[queryType]["update"] + res[queryType]["delete"]
+												 + res[queryType]["unknown"]);
+		}
 		// to get the total number of queries of this query type, we can just pick a clause
 		// then add up the same/some/different/none counts
-		aClause = getOneFrom(clauses);
-		counts = clauses[aClause];
-		res[queryType] += ("total queries" : counts.same + counts.some + counts.different + counts.none);
+		else{
+			aClause = getOneFrom(clauses);
+			counts = clauses[aClause];
+			res[queryType] += ("total queries" : counts.same + counts.some + counts.different + counts.none);
+		}
 	}
 	return res;
 }
@@ -566,6 +605,7 @@ private ClauseCompMap buildInitialClauseCompMap(){
 		"insert"  : ("into": zeros, "values": zeros, "setOps": zeros, "select": zeros, "onDuplicateSetOps": zeros),
 		"update"  : ("tables": zeros, "setOps": zeros, "where": zeros, "orderBy": zeros, "limit": zeros),
 		"delete"  : ("from": zeros, "using": zeros, "where": zeros, "orderBy": zeros, "limit": zeros),
+		"partial" : ("select" : zeros, "insert" : zeros, "update" : zeros, "delete" : zeros, "unknown" : zeros),
 		"other"   : ("count": zeros)
 	);
 	
