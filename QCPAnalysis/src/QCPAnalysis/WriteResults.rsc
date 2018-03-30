@@ -51,6 +51,20 @@ private loc getExample(str qcp, map[str, SQLModelRel] models, int exampleNum){
 }
 
 /**
+	getPartialExample finds a QCP2 query in the corpus that is a partial statement (query text hole)
+*/
+public loc getPartialExample(int exampleNum = 0){
+	models = groupSQLModelsCorpus()[qcp2];
+	matches = {};
+	for(m <- models){
+		if(sameType(partial(t)) := m.info && t != "unknown"){
+			matches += m;
+		}
+	}
+	return writeExample(qcp2, matches, exampleNum);
+}
+
+/**
 	getExamples finds numExamples random examples (from either a specific system, or the whole corpus) for a 
 	specified pattern. and for each example:
 		1) generates a dot graph for the model of this example
