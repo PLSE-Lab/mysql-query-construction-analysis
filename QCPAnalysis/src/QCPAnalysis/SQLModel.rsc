@@ -101,8 +101,16 @@ public QueryFragment expr2qf(Expr ex, QCPSystemInfo qcpi, bool simplify=true) {
 			case var(name(name(vn))) :
 				return nameFragment(varName(vn));
 			
-			case fetchArrayDim(var(name(name(vn))),_) :
+			case fetchArrayDim(var(name(name(vn))),noExpr()) :
 				return nameFragment(varName(vn));
+
+			case fetchArrayDim(var(name(name(vn))),someExpr(idxExpr)) : {
+				if (scalar(string(idxName)) := idxExpr) {
+					return nameFragment(elementName(vn, idxName));
+				} else {
+					return nameFragment(varName(vn));
+				}
+			}
 				
 			case var(expr(Expr e)) :
 				return nameFragment(computedName(e));
@@ -455,8 +463,9 @@ data SQLPiece = staticPiece(str literal) | namePiece(str name) | dynamicPiece();
 alias SQLYield = list[SQLPiece];
 
 public set[LabeledYield] wow = { };
+public SQLModel wowModel;
 
-public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
+public set[SQLYield] yields(SQLModel m, bool filterYields=false, bool limitYields=true) {
 	SQLYield yieldForFragment(literalFragment(str s)) = [ staticPiece(s) ];
 	SQLYield yieldForFragment(nameFragment(Name n)) = [ yieldForName(n) ];
 	SQLYield yieldForFragment(dynamicFragment(Expr e)) = [ dynamicPiece() ];
@@ -467,6 +476,7 @@ public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
 	SQLYield yieldForFragment(globalFragment(Name n)) = [ yieldForName(n) ];
 	
 	SQLPiece yieldForName(varName(str varName)) = namePiece(varName);
+	SQLPiece yieldForName(elementName(str varName, str indexName)) = namePiece("<varName>[\'<indexName>\']");
 	SQLPiece yieldForName(computedName(Expr computedName)) = namePiece("UNKNOWN_NAME");
 	SQLPiece yieldForName(propertyName(Expr targetObject, str propertyName)) = namePiece("UNKNOWN_TARGET.<propertyName>");
 	SQLPiece yieldForName(computedPropertyName(Expr targetObject, Expr computedPropertyName)) = namePiece("UNKNOWN_TARGET.UNKNOWN_PROPERTY");
@@ -533,11 +543,13 @@ public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
 						}
 					}
 					println("Found <size(nameExpansions)> expansions");
-					if (size(nameExpansions) > 1000000) {
-						println("WOW!");
-						wow = nameExpansions;
+					if (size(nameExpansions) > 1000) {
+						println("Limiting yields for call location <m.callLoc>");
+						tempExpansions = { te | te <- (toList(nameExpansions))[0..1000] };
+						nameExpansions = tempExpansions;
 					}
 				}
+				// TODO: This is the biggest use of time in the profile (all of it is in the top 4)
 				expansionCache[fragment] = 
 				       { ne | ne <- nameExpansions, size(ne) != 1 || [labeledPiece(dynamicPiece(),_)] !:= ne } + 
 				       { addLabels(yieldForFragment(fragment), edgeInfo) | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] := ne };
