@@ -143,15 +143,32 @@ public lrel[str, real] qcpPercentages(Corpus corpus = getCorpus()){
 	percentages = (qcp : 0.0 | qcp <- invert(QCPs));
 	patternCounts = countPatternsInCorpus(corpus = corpus);
 	total = (0 | it + e | qcp <- patternCounts, int e := patternCounts[qcp]);
+	
 	for(qcp <- percentages){
 		if(qcp in patternCounts){
 			percentages[qcp] += patternCounts[qcp];
 			percentages[qcp] /= total;
 		}
 	}
+	
 	invMap = invertUnique(percentages);
 	sorted = sort(domain(invMap));
 	return [<pattern, percent> | percent <- sorted, pattern := invertUnique(QCPs)[invMap[percent]]];
+}
+
+public lrel[str, real] fragmentCategoriesPercentages(Corpus corpus = getCorpus()){
+	fc = fcToAbbreviatedMap(totalFCForCorpus(corpus = corpus));
+	percentages = (c : 0.0 | c <- fc);
+	total = (0 | it + e | c <- fc, e := fc[c]);
+	
+	for(p <- percentages){
+		percentages[p] += fc[p];
+		percentages[p] /= total;
+	}
+	
+	invMap = invert(percentages);
+	sorted = sort(domain(invMap));
+	return [<f, p> | p <- sorted, f <- invMap[p]];
 }
 
 public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar = false){
