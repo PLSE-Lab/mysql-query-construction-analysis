@@ -139,6 +139,21 @@ private loc writeExample(str qcp, SQLModelRel matches, int exampleNum){
 	return model.location;
 }
 
+public lrel[str, real] qcpPercentages(Corpus corpus = getCorpus()){
+	percentages = (qcp : 0.0 | qcp <- invert(QCPs));
+	patternCounts = countPatternsInCorpus(corpus = corpus);
+	total = (0 | it + e | qcp <- patternCounts, int e := patternCounts[qcp]);
+	for(qcp <- percentages){
+		if(qcp in patternCounts){
+			percentages[qcp] += patternCounts[qcp];
+			percentages[qcp] /= total;
+		}
+	}
+	invMap = invertUnique(percentages);
+	sorted = sort(domain(invMap));
+	return [<pattern, percent> | percent <- sorted, pattern := invertUnique(QCPs)[invMap[percent]]];
+}
+
 public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar = false){
 	Corpus corpus = getCorpus();
 	pForSort = [ < toUpperCase(p), p > | p <- corpus ];

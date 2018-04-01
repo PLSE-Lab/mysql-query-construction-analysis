@@ -131,9 +131,8 @@ public int getRanking(tuple[loc location, SQLModel model, rel[SQLYield, str, SQL
 }
 
 @doc{returns the corpus wide counts of each pattern}
-public map[str, int] countPatternsInCorpus(){
+public map[str, int] countPatternsInCorpus(Corpus corpus = getCorpus()){
 	res = ();
-	Corpus corpus = getCorpus();
 	for(p <- corpus, v := corpus[p]){
 		sysCounts = countPatternsInSystem(p, v);
 		println("<p>, <v>, <sysCounts>");
