@@ -151,9 +151,9 @@ public lrel[str, real] qcpPercentages(Corpus corpus = getCorpus()){
 		}
 	}
 	
-	invMap = invertUnique(percentages);
+	invMap = invert(percentages);
 	sorted = sort(domain(invMap));
-	return [<pattern, percent> | percent <- sorted, pattern := invertUnique(QCPs)[invMap[percent]]];
+	return [<pattern, percent> | percent <- sorted, pattern <- {invertUnique(QCPs)[qcp] | qcp <- invMap[percent]}];
 }
 
 public lrel[str, real] fragmentCategoriesPercentages(Corpus corpus = getCorpus()){
