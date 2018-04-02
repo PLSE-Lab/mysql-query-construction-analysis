@@ -174,14 +174,9 @@ public lrel[str, real] fragmentCategoryPercentages(Corpus corpus = getCorpus()){
 
 public lrel[str, real] queryTypePercentages(Corpus corpus = getCorpus()){
 	typeCounts = ("select" : 0, "insert" : 0, "update" : 0, "delete" : 0, "partial" : 0, "other" : 0);
-	for(p <- corpus, v := corpus[p]){
-		counts = extractClauseCounts(getModels(p, v));
-		int i = 0;
-		for(t <- typeCounts){
-			count = counts[t]["total queries"];
-			typeCounts[t] += count;
-			i += 1;	
-		}
+	counts = extractClauseCounts(getModelsCorpus(corpus = corpus));
+	for(t <- typeCounts){
+		typeCounts[t] = counts[t]["total queries"];
 	}
 	total = (0 | it + e | t <- typeCounts, e := typeCounts[t]);
 	
