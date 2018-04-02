@@ -250,6 +250,9 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 	}
 	
 	if(parsed is partialStatement){
+		if(size(yield) == 1 && (head(yield) is namePiece || head(yield) is dynamicPiece)){
+			return qcp4;
+		}
 		return qcp2;
 	}
 	
@@ -260,9 +263,6 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 	if(size(yield) == 1){
 		if(head(yield) is staticPiece){
 			return qcp0;
-		}
-		if(head(yield) is namePiece || head(yield) is dynamicPiece){
-			return qcp4;
 		}
 	}
 	
