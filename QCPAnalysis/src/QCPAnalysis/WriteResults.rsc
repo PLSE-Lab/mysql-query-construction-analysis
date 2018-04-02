@@ -20,6 +20,7 @@ import List;
 import String;
 import Set;
 import Map;
+import util::Math;
 
 loc tables = |project://QCPAnalysis/results/tables/|;
 loc examples = |project://QCPAnalysis/results/examples/|;
@@ -169,6 +170,24 @@ public lrel[str, real] fragmentCategoriesPercentages(Corpus corpus = getCorpus()
 	invMap = invert(percentages);
 	sorted = sort(domain(invMap));
 	return [<f, p> | p <- sorted, f <- invMap[p]];
+}
+
+public lrel[str, real] queryTypePercentages(Corpus corpus = getCorpus()){
+	typeCounts = ("select" : 0, "insert" : 0, "update" : 0, "delete" : 0, "partial" : 0, "other" : 0);
+	for(p <- corpus, v := corpus[p]){
+		counts = extractClauseCounts(getModels(p, v));
+		int i = 0;
+		for(t <- typeCounts){
+			count = counts[t]["total queries"];
+			typeCounts[t] += count;
+			i += 1;	
+		}
+	}
+	total = (0 | it + e | t <- typeCounts, e := typeCounts[t]);
+	
+	invMap = invert(typeCounts);
+	sorted = sort(domain(invMap));
+	return [<t, toReal(p) / total> | p <- sorted, t <- invMap[p]];
 }
 
 public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar = false){
