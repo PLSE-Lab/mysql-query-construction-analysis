@@ -157,7 +157,7 @@ public lrel[str, real] qcpPercentages(Corpus corpus = getCorpus()){
 	return [<pattern, percent> | percent <- sorted, pattern <- {invertUnique(QCPs)[qcp] | qcp <- invMap[percent]}];
 }
 
-public lrel[str, real] fragmentCategoriesPercentages(Corpus corpus = getCorpus()){
+public lrel[str, real] fragmentCategoryPercentages(Corpus corpus = getCorpus()){
 	fc = fcToAbbreviatedMap(totalFCForCorpus(corpus = corpus));
 	percentages = (c : 0.0 | c <- fc);
 	total = (0 | it + e | c <- fc, e := fc[c]);
