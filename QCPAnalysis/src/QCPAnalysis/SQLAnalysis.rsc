@@ -862,9 +862,8 @@ public int holesInExpr(Exp expr){
 	}
 }
 
-public SQLModelRel getModelsCorpus(){
+public SQLModelRel getModelsCorpus(Corpus corpus = getCorpus()){
 	res = {};
-	Corpus corpus = getCorpus();
 	for(p <- corpus, v := corpus[p]){
 		res = res + getModels(p, v);
 	}

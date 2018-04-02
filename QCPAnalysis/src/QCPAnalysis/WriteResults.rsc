@@ -190,6 +190,23 @@ public lrel[str, real] queryTypePercentages(Corpus corpus = getCorpus()){
 	return [<t, toReal(p) / total> | p <- sorted, t <- invMap[p]];
 }
 
+public map[str, lrel[str, real]] clausePercentages(Corpus corpus = getCorpus()){
+	sortedTypes = ["select", "insert", "update", "delete"];
+	counts = extractClauseCounts(getModelsCorpus(corpus = corpus));
+	percentages = (t : [] | t <- sortedTypes);
+	for(t <- sortedTypes){
+		for(clause <- counts[t]){
+			if(clause == "total queries"){
+				continue;
+			}
+			percentages[t] += <clause, toReal(counts[t][clause]) / counts[t]["total queries"]>;
+		}
+		percentages[t] = sort(percentages[t], bool(tuple[str, real] t1, tuple[str, real] t2) { return t1[1] < t2[1];});
+	}
+	
+	return percentages;
+}
+
 public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar = false){
 	Corpus corpus = getCorpus();
 	pForSort = [ < toUpperCase(p), p > | p <- corpus ];
