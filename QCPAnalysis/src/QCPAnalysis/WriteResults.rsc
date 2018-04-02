@@ -248,8 +248,6 @@ public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar
 		'\\end{tabularx}
 		'\\\\
 		'\\vspace{2ex}
-		'\\footnotesize
-		' Counts for the number of each query type in each system in the corpus.
 		'<if(!captionOnTop){>\\caption{Query Type Counts by System.\\label{tbl:query-type-counts}}<}>
 		'\\end{table<if(tablestar){>*<}>}
 		'\\npfourdigitnosep
@@ -318,8 +316,6 @@ public str clauseCountsAsLatexTable(bool captionOnTop = false, bool tablestar = 
 		'\\end{tabularx}
 		'\\\\
 		'\\vspace{2ex}
-		'\\footnotesize
-		' Counts of each clause for each query type.
 		'<if(!captionOnTop){>\\caption{Clause Counts for each Query Type.\\label{tbl:clause-counts}}<}>
 		'\\end{table<if(tablestar){>*<}>}
 		'\\npfourdigitnosep
@@ -401,8 +397,6 @@ public str qcp3bYieldComparisonAsLatexTable(bool captionOnTop = false, bool tabl
 		'\\end{tabularx}
 		'\\\\
 		'\\vspace{2ex}
-		'\\footnotesize
-		' Clause comparison counts for pattern QCP3b
 		'<if(!captionOnTop){>\\caption{Clause comparison counts for pattern QCP3b\\label{tbl:clause-comparison-counts}}<}>
 		'\\end{table<if(tablestar){>*<}>}
 		'\\npfourdigitnosep
