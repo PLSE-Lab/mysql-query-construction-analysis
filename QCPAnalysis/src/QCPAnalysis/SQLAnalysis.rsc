@@ -244,16 +244,7 @@ public str classifyQCP3Query(rel[SQLYield, str, SQLQuery] parsedYields, YieldInf
 
 @doc{classify a single yield}
 private str classifyYield(SQLYield yield, SQLQuery parsed){
-	
-	if(size(yield) == 1){
-		if(head(yield) is staticPiece){
-			return qcp0;
-		}
-		if(head(yield) is namePiece || head(yield) is dynamicPiece){
-			return qcp4;
-		}
-	}
-	
+
 	if(parsed is parseError){
 		return parseError;
 	}
@@ -264,6 +255,15 @@ private str classifyYield(SQLYield yield, SQLQuery parsed){
 	
 	if(!(parsed is selectQuery || parsed is insertQuery || parsed is updateQuery || parsed is deleteQuery)){
 		return otherType;
+	}
+	
+	if(size(yield) == 1){
+		if(head(yield) is staticPiece){
+			return qcp0;
+		}
+		if(head(yield) is namePiece || head(yield) is dynamicPiece){
+			return qcp4;
+		}
 	}
 	
 	if(hasDynamicPiece(yield)){
@@ -506,7 +506,6 @@ alias ClauseCountMap = map[str queryType, map[str, int] clauseCounts];
 
 public ClauseCompMap extractClauseComparison(SQLModelRel models){
 	res = buildInitialClauseCompMap();
-	
 	void incMap(str queryType, str clause, ClauseComp cc){
 		switch(cc){
 			case same(_) 	  : res[queryType][clause].same += 1;
