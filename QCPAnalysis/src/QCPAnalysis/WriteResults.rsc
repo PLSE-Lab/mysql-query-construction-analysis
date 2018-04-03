@@ -397,7 +397,7 @@ public str qcp3bYieldComparisonAsLatexTable(bool captionOnTop = false, bool tabl
 		'\\end{tabularx}
 		'\\\\
 		'\\vspace{2ex}
-		'<if(!captionOnTop){>\\caption{Clause comparison counts for pattern QCP3b\\label{tbl:clause-comparison-counts}}<}>
+		'<if(!captionOnTop){>\\caption{Clause Comparison Counts for Pattern QCP3b\\label{tbl:clause-comparison-counts}}<}>
 		'\\end{table<if(tablestar){>*<}>}
 		'\\npfourdigitnosep
 		'\\npnoaddmissingzero
