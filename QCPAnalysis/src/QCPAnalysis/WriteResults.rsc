@@ -397,7 +397,7 @@ public str qcp3bYieldComparisonAsLatexTable(bool captionOnTop = false, bool tabl
 		'\\end{tabularx}
 		'\\\\
 		'\\vspace{2ex}
-		'<if(!captionOnTop){>\\caption{Clause Comparison Counts for Pattern QCP3b\\label{tbl:clause-comparison-counts}}<}>
+		'<if(!captionOnTop){>\\caption{Clause Comparison Counts for Pattern QCP3b.\\label{tbl:clause-comparison-counts}}<}>
 		'\\end{table<if(tablestar){>*<}>}
 		'\\npfourdigitnosep
 		'\\npnoaddmissingzero
@@ -513,7 +513,7 @@ public str fragmentCategoriesAsLatexTable(bool captionOnTop=false, bool tablesta
 		' abbreviations: L for literals, LV for local variables, LP for properties of local variables, LC for computed local names, 
 		' GV for global variables, GP for properties of global variables, GC for computed global names, PN for parameters,
 		' PP for properties of parameters, PC for computed property names and C for computed fragments that are not names
-		'<if(!captionOnTop){>\\caption{Fragment Category Counts by System\\label{tbl:fragment-category-counts}}<}>
+		'<if(!captionOnTop){>\\caption{Fragment Category Counts by System.\\label{tbl:fragment-category-counts}}<}>
 		'\\end{table<if(tablestar){>*<}>}
 		'\\npfourdigitnosep
 		'\\npnoaddmissingzero
