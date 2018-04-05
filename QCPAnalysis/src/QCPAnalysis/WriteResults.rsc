@@ -128,7 +128,7 @@ private loc writeExample(str qcp, SQLModelRel matches, int exampleNum){
 		'\\end{lstlisting}
 		'
 		'\\end{enumerate}
-		'\\caption{<toUpperCase(pattern)>: Yield<pluralYield>, Query String<pluralString>, and AST<pluralAST>}
+		'\\caption{<toUpperCase(pattern)>: Yield<pluralYield>, Query String<pluralString>, and AST<pluralAST>.}
 		'\\label{fig:<pattern>_<exampleNum>_yields}
 		'\\end{figure*}
 		";
