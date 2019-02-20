@@ -13,8 +13,19 @@ find a copy of this virtual machine [here][vm]. Once you download this, just
 unzip it and you should be able to open and run it using VirtualBox. A 
 [walk-through video][video] is also available that will walk you through
 running the software in the VM. You can also use this to help you walk
-through the code if you install it yourself.
+through the code if you install it yourself. Note that it is a good idea
+to update the code on the virtual machine to make sure that any improvements
+or bug fixes we have made since the VM was created are available. You can do
+this from a terminal using the following commands:
 
+```
+cd PHPAnalysis/sql-parser
+git pull
+cd ../rascal/php-analysis
+git pull
+cd ../mysql-query-construction-analysis
+git pull
+```
 
 [vbox]: https://www.virtualbox.org/
 [vm]: https://drive.google.com/open?id=0BzLdPikm-ppZQ1FqR3QxalV4ZFE
