@@ -8,8 +8,8 @@ import lang::php::ast::AbstractSyntax;
 
 import src::lang::php::analysis::sql::SQLModel;
 import src::lang::php::analysis::sql::QCPSystemInfo;
-import QCPAnalysis::ParseSQL::AbstractSyntax;
-import QCPAnalysis::ParseSQL::RunSQLParser;
+import src::lang::sql::mysql::AbstractSyntax;
+import src::lang::sql::mysql::RunSQLParser;
 import src::lang::php::analysis::sql::QCPCorpus;
 
 import IO;

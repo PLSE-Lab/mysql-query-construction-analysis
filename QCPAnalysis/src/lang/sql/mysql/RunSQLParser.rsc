@@ -1,6 +1,6 @@
-module QCPAnalysis::ParseSQL::RunSQLParser
+module src::lang::sql::mysql::RunSQLParser
 
-import QCPAnalysis::ParseSQL::AbstractSyntax;
+import src::lang::sql::mysql::AbstractSyntax;
 
 import lang::php::util::Utils;
 import lang::php::util::Config;

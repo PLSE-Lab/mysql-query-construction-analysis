@@ -1,4 +1,4 @@
-module QCPAnalysis::ParseSQL::AbstractSyntax
+module src::lang::sql::mysql::AbstractSyntax
 
 import lang::php::ast::AbstractSyntax;
 
