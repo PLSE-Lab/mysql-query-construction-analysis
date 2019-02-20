@@ -1,4 +1,4 @@
-module QCPAnalysis::SQLModel
+module src::lang::php::analysis::sql::SQLModel
 
 import lang::php::ast::AbstractSyntax;
 import lang::php::ast::System;
@@ -17,8 +17,8 @@ import lang::php::pp::PrettyPrinter;
 import lang::php::util::Config;
 import lang::php::util::Corpus;
 
-import QCPAnalysis::Utils;
-import QCPAnalysis::QCPSystemInfo;
+import src::lang::php::analysis::sql::Utils;
+import src::lang::php::analysis::sql::QCPSystemInfo;
 
 import Set;
 import IO;

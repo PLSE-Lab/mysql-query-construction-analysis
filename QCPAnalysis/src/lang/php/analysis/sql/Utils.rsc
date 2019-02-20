@@ -1,4 +1,4 @@
-module QCPAnalysis::Utils
+module src::lang::php::analysis::sql::Utils
 
 import lang::php::ast::AbstractSyntax;
 import lang::php::ast::System;

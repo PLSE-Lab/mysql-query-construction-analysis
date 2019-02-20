@@ -12,7 +12,7 @@ import lang::php::analysis::callgraph::SimpleCG;
 import lang::php::analysis::includes::IncludesInfo;
 import lang::php::analysis::usedef::UseDef;
 
-import QCPAnalysis::QCPCorpus;
+import src::lang::php::analysis::sql::QCPCorpus;
 
 import IO;
 import ValueIO;

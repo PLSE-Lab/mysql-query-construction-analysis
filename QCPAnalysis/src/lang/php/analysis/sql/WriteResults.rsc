@@ -2,12 +2,12 @@
  * output results of analyzing query construction patterns
  */
 
-module QCPAnalysis::WriteResults
+module src::lang::php::analysis::sql::WriteResults
 
-import QCPAnalysis::QCPCorpus;
-import QCPAnalysis::SQLAnalysis;
-import QCPAnalysis::SQLModel;
-import QCPAnalysis::ModelAnalysis;
+import src::lang::php::analysis::sql::QCPCorpus;
+import src::lang::php::analysis::sql::SQLAnalysis;
+import src::lang::php::analysis::sql::SQLModel;
+import src::lang::php::analysis::sql::ModelAnalysis;
 
 import lang::php::ast::AbstractSyntax;
 import lang::php::util::Corpus;
