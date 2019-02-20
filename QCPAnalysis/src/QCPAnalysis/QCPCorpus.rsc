@@ -21,14 +21,13 @@ private Corpus originalCorpus = (
 	"WebChess" 		: "0.9.0"
 	);
 	
-private Corpus newCorpus = (
+private Corpus corpus2017 = (
 	"firesoftboard" : "2.0.5",
 	"MyPHPSchool"	: "0.3.1",
 	"OMS"			: "1.0.1",
 	"OpenClinic" 	: "0.8.2",
 	"UseBB"			: "1.0.16",
 	"web2project"	: "3.3",
-	// 2017 additions below
 	"inoERP" 		: "0.5.1",
 	"PHPFusion"		: "7.02.07",
 	"LinPHA"		: "1.3.4",
@@ -37,6 +36,14 @@ private Corpus newCorpus = (
 	"AddressBook"   : "8.2.5.2",
 	"OcoMon"		: "2.0RC6"
 	);
+	
+private Corpus corpus2018 = (
+	"cpg" : "1.5.46",
+	"mantisbt" : "2.10.0",
+	"SugarCE" : "6.5.26",
+	"orangehrm" : "4.0",
+	"SchoolERP" : "1.0"
+);
 
 private map[str,int] systemNumbers = (
 	"AddressBook" : 1,
@@ -55,7 +62,12 @@ private map[str,int] systemNumbers = (
 	"Timeclock" : 14,
 	"UseBB" : 15,
 	"web2project" : 16,
-	"WebChess" : 17
+	"WebChess" : 17,
+	"cpg" : 18,
+	"mantisbt" : 19,
+	"SugarCE" : 20,
+	"orangehrm" : 21,
+	"SchoolERP" : 22
 );
 
 public map[str,int] getSystemsWithNumbers() = systemNumbers;
@@ -70,15 +82,23 @@ public str getSystemForNumber(int n) {
 	return "There is no system with id <n>"; 
 }
 
+public System loadSystemForNumber(int n) {
+	systemByNumber = invertUnique(systemNumbers);
+	if (n in systemByNumber) {
+		return loadBinary(systemByNumber[n], (originalCorpus+corpus2017+corpus2018)[systemByNumber[n]]);
+	}
+	throw "No system with number <n> exists";
+}
+
 public str getSensibleName("faqforge") = "FAQ Forge";
 public str getSensibleName("firesoftboard") = "Fire-Soft-Board";
 public default str getSensibleName(str p) = p;
 
-private Corpus corpus = originalCorpus + newCorpus;
+private Corpus corpus = originalCorpus + corpus2017 + corpus2018;
 
-
-public Corpus getOriginalCorpus() = originalCorpus();
-public Corpus getNewCorpus() = newCorpus();
+public Corpus getOriginalCorpus() = originalCorpus;
+public Corpus getCorpus2017() = corpus2017;
+public Corpus getCorpus2018 = corpus2018;
 public Corpus getCorpus() = corpus;
 
 public void buildCorpus() {

@@ -7,21 +7,27 @@ public data SQLQuery = selectQuery(list[Exp] selectExpressions, list[Exp] from, 
 					 | insertQuery(Into into, list[list[str]] values, list[SetOp] setOps, SQLQuery select, list[SetOp] onDuplicateSetOps)
 					 | deleteQuery(list[Exp] from, list[str] using, Where where, OrderBy order, Limit limit)
 					 | setQuery(list[SetOp] setOps)
+					 | setOptionsQuery(str option, str val)
 					 | dropQuery(list[Exp] fields, Exp table)
 					 | alterQuery(Exp table) //TODO: altered fields and options
 					 | replaceQuery(Into into, list[list[str]] values, list[SetOp] setOps, SQLQuery select)
 					 | truncateQuery(Exp table)
 					 | noQuery()// only here for queries that have the option to contain a SELECT query inside them
-					 | unknownQuery()// logic to translate this query into rascal is not yet implemented 
+					 | unknownQuery()// logic to translate this query type into rascal is not yet implemented 
+					 | partialStatement(PartialStatement statement)// part of the query text is contained in one or more query holes
 					 | parseError();// query did not parse
+					 
+public data PartialStatement = unknownStatementType() // SELECT/DELETE/INSERT cannot be determined
+							 | connectiveWithoutWhere(str queryType);
+						
 
 public data Exp = name(SQLName name)
 			    | literal(str literalVal)
 			    | call(str functionName)//TODO: function params
 				| star()
-				| hole(int holeID)
 				| unknownExp(str expression)
-				| aliased(Exp exp, str theAlias);
+				| aliased(Exp exp, str theAlias)
+				| noExp();
 				
 public data SQLName = column(str column)
 					| table(str table)

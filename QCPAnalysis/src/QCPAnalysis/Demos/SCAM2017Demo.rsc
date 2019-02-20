@@ -10,6 +10,7 @@ import QCPAnalysis::QCPSystemInfo;
 import QCPAnalysis::ParseSQL::AbstractSyntax;
 import QCPAnalysis::ParseSQL::RunSQLParser;
 import QCPAnalysis::QCPCorpus;
+import QCPAnalysis::SQLAnalysis;
 
 import IO;
 import ValueIO;
@@ -26,7 +27,7 @@ public void showSystems() {
 }
 
 @doc{Sort a set of calls by the locations of the calls}
-private lrel[Expr callExpr, loc callLoc] sortCalls(rel[Expr callExpr, loc callLoc] calls) {
+public lrel[Expr callExpr, loc callLoc] sortCalls(rel[Expr callExpr, loc callLoc] calls) {
 	bool compareCall(<Expr c1Call, loc c1Loc>, <Expr c2Call, loc c2Loc>) {
 		if (c1Loc.path == c2Loc.path) {
 			return c1Loc.offset < c2Loc.offset;
@@ -116,4 +117,18 @@ public rel[SQLYield yield, str queryWithHoles, SQLQuery parsed] showQueriesForNu
 		res += < yld, queryString, parsed >;
 	}
 	return res;
+}
+
+@doc{classify a particular model based on our current patterns}
+public str classifyModelForNumberedCall(int systemNumber, int callNumber){
+	callModel = buildModelForNumberedCall(systemNumber, callNumber);
+	return classifySQLModel(callModel);
+}
+
+@doc{build a dot graph for a specified call and save it to a specified location}
+public void buildDotForNumberedCall(int systemNumber, int callNumber, 
+		loc writeTo = baseLoc + "/dots/<systemNumber>_<callNumber>"){
+		
+	callModel = buildModelForNumberedCall(systemNumber, callNumber);
+	renderSQLModelAsDot(callModel, writeTo, title = "System: <systemNumber> Call: <callNumber>");
 }

@@ -53,7 +53,7 @@ do this if the Rascal scripts in QCPAnalysis complain about missing Rascal
 modules.
 
 Finally, to parse SQL queries, you will also want to check out our modified
-MySQL parser. You find find the GitHub page for this parser [here][mysql-parser].
+MySQL parser. You can find the GitHub page for this parser [here][mysql-parser].
 You should `git clone` this into the PHPAnalysis directory, creating a new
 directory called sql-parser. Once you do this, you will also need to download
 [Composer][composer], a package manager for PHP. You can just follow the instructions

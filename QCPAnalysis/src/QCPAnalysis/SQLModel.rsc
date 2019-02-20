@@ -72,8 +72,10 @@ public str printEdgeInfo(Name n, set[EdgeInfo] eis) {
 	}	
 }
 
+alias ContainmentRel = rel[Lab containedNode, set[Expr] preds, Lab containingNode];
+
 alias FragmentRel = rel[Lab sourceLabel, QueryFragment sourceFragment, Name name, Lab targetLabel, QueryFragment targetFragment, EdgeInfo edgeInfo];
-data SQLModel = sqlModel(FragmentRel fragmentRel, QueryFragment startFragment, Lab startLabel, loc callLoc);
+data SQLModel = sqlModel(FragmentRel fragmentRel, ContainmentRel containmentRel, QueryFragment startFragment, Lab startLabel, loc callLoc);
 
 @doc{Turn a specific expression into a possibly-nested query fragment.}
 public QueryFragment expr2qf(Expr ex, QCPSystemInfo qcpi, bool simplify=true) {
@@ -99,8 +101,16 @@ public QueryFragment expr2qf(Expr ex, QCPSystemInfo qcpi, bool simplify=true) {
 			case var(name(name(vn))) :
 				return nameFragment(varName(vn));
 			
-			case fetchArrayDim(var(name(name(vn))),_) :
+			case fetchArrayDim(var(name(name(vn))),noExpr()) :
 				return nameFragment(varName(vn));
+
+			case fetchArrayDim(var(name(name(vn))),someExpr(idxExpr)) : {
+				if (scalar(string(idxName)) := idxExpr) {
+					return nameFragment(elementName(vn, idxName));
+				} else {
+					return nameFragment(varName(vn));
+				}
+			}
 				
 			case var(expr(Expr e)) :
 				return nameFragment(computedName(e));
@@ -176,7 +186,7 @@ public rel[loc callLoc, CFG graph] cfgsWithCalls(System s, set[str] functionName
 	return res;
 }
 
-public Expr getQueryExpr(call(name(name("mysql_query")),[actualParameter(Expr e,_),*_])) = e;
+public Expr getQueryExpr(call(name(name("mysql_query")),[actualParameter(Expr e,_,false),*_])) = e;
 public default Expr getQueryExpr(Expr e) { throw "Unhandled query expression <e>"; }
  
 public Expr queryParameter(exprNode(Expr e,_)) = getQueryExpr(e);
@@ -204,13 +214,95 @@ public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions =
 	}
 	
 	res = addEdgeInfo(res, slicedCFG);
-	return sqlModel(res, startingFragment, inputNode.l, callLoc);
+	crel = computeContainmentRel(res, slicedCFG);
+	return sqlModel(res, crel, startingFragment, inputNode.l, callLoc);
+}
+
+ContainmentRel computeContainmentRel(FragmentRel frel, CFG slicedCFG) {
+	// Map the labels to their labeled nodes, to make it easier to find them later
+	nodesForLabels = ( n.l : n | n <- slicedCFG.nodes );
+	
+	// Get the entry node for the current CFG
+	entryNode = getEntryNode(slicedCFG);
+	
+	// The resulting containment relation, which relates contained nodes x predicates x containers
+	ContainmentRel res = { };
+	
+	// Get the labels of the target nodes in frel, we want to know if those
+	// nodes are only reachable under certain conditions
+	targetLabels = frel<3>;	
+
+	// Get the nodes for each of these labels
+	targetNodes = { n | n <- slicedCFG.nodes, n.l in targetLabels };
+	
+	// Get the information on which headers dominate the target nodes
+	containsRel = containers(slicedCFG);
+	
+	// We are only interested in conditional containers (ifs and ternary
+	// expressions) since the loop headers don't add useful information.
+	// So, remove them for now -- we can always put them back later if
+	// they would be helpful.
+	containsRel = { < n, cn > | < n, cn > <- containsRel,
+								(headerNode(Stmt s,_,_) := cn && s is \if) ||
+								(headerNode(Expr e,_,_) := cn && e is ternary) };
+	
+	// Get a graph of the CFG to make it easier to find the proper
+	// nodes. Also get the inverse so we can isolate the path. We
+	// also remove the backedges so we don't get relationships that are
+	// reachable in the graph but not mirrored in the tree (e.g., an if
+	// inside a loop would attach both conditions to everything)
+	slicedCFG = removeBackEdges(slicedCFG);
+	g = cfgAsGraph(slicedCFG);
+	ig = invert(g);
+	
+	// The slicedCFG may be smaller, so remove the nodes that are now gone from the map
+	nodesForLabels = ( n.l : n | n <- slicedCFG.nodes );
+
+	// For each target node, get the containers and the predicates	
+	for (tn <- targetNodes) {
+		// Get the nodes that reach this node in the CFG
+		reachedFrom = (ig*)[tn];
+		set[Expr] preds = { };
+		for (h <- containsRel[tn]) {
+			// Get the nodes the header nodes (h) reaches in the CFG
+			reachableFrom = (g*)[h];
+			
+			// The path is nodes that are reached from the header (going forwards) and
+			// are reached from the target node (going backwards)
+			nodesOnPath = reachedFrom & reachableFrom;
+			
+			// Since we work with the labels, this makes it easy to see which we have on the path
+			labelsOnPath = { n.l | n <- nodesOnPath };
+			
+			// Get edges on the path, which have a source and target that are both on the
+			// path. Note that we used ig* and g* above, so the header and target nodes
+			// are possible sources and targets. 
+			edgesOnPath = { e | e <- slicedCFG.edges, e.from in labelsOnPath, e.to in labelsOnPath };
+			
+			// Winnow this down to just those edges that are tied back to the header.
+			// NOTE: The condition is commented out since edges with predicates don't always directly come
+			// from the header or have a head field
+			conditionEdgesOnPath = edgesOnPath; // { e | e <- edgesOnPath, e has header, e.header == h.l };
+			
+			// Extract the conditions from each edge and add that to the preds for this
+			// target node.
+			for (e <- conditionEdgesOnPath) {
+				if (e has why) preds = preds + e.why;
+				if (e has whyNot) preds = preds + unaryOperation(e.whyNot,booleanNot());
+				if (e has whys) preds = preds + toSet(e.whys);
+				if (e has whyNots) preds = preds + { unaryOperation(wn,booleanNot()) | wn <- e.whyNots };
+			}
+			
+			res = res + < tn.l, preds, h.l >;
+		}		
+	}
+	
+	return res;
 }
 
 FragmentRel addEdgeInfo(FragmentRel frel, CFG slicedCFG) {
 	nodesForLabels = ( n.l : n | n <- slicedCFG.nodes );
 	entryNode = getEntryNode(slicedCFG);
-	rel[CFGNode,CFGNode] containedIn = { };
 	
 	// Get the labels of the target nodes in frel, we want to know if those
 	// nodes are only reachable under certain conditions
@@ -264,7 +356,7 @@ FragmentRel addEdgeInfo(FragmentRel frel, CFG slicedCFG) {
 			edgesOnPath = { e | e <- slicedCFG.edges, e.from in labelsOnPath, e.to in labelsOnPath };
 			
 			// Winnow this down to just those edges that are tied back to the header.
-			conditionEdgesOnPath = { e | e <- edgesOnPath, e has header, e.header == h.l };
+			conditionEdgesOnPath = edgesOnPath; // { e | e <- edgesOnPath, e has header, e.header == h.l };
 			
 			// Extract the conditions from each edge and add that to the preds for this
 			// target node.
@@ -309,7 +401,7 @@ FragmentRel addEdgeInfo(FragmentRel frel, CFG slicedCFG) {
 	return frel;		 
 }
 
-public rel[CFGNode,CFGNode] containers(CFG inputCFG) {
+public rel[CFGNode containedNode, CFGNode containerNode] containers(CFG inputCFG) {
 	map[Lab, set[Lab]] resMap = ( );
 	nodesForLabels = ( n.l : n | n <- inputCFG.nodes );
 
@@ -326,19 +418,28 @@ public rel[CFGNode,CFGNode] containers(CFG inputCFG) {
 		workset = workset - n;
 		resStart = resMap[n.l] ? {};
 		
+		// The containing nodes that reach n through incoming labels
 		set[Lab] inbound = { *(resMap[ni.l]? {}) | ni <- gInverted[n]};
+		
+		// The containing nodes that pass through n
 		set[Lab] outbound = inbound;
 		
+		// If n is a footer node, this "closes" the containment, so we remove the
+		// associated header node. If n is a header node, this is a new container,
+		// so we add it
 		if (n is footerNode) {
 			outbound = outbound - { l | l <- inbound, l == n.header };
 		} else if (n is headerNode) {
 			outbound = outbound + n.l;
 		}
 		
+		// The container nodes that contain n
 		resMap[n.l] = outbound;
 		
 		resEnd = resMap[n.l] ? {};
 		
+		// If we added new containers, downstream nodes need to be recalculated, so
+		// add those into the worklist
 		if (resStart != resEnd) {
 			newElements = [ gi | gi <- g[n], gi notin workset ];
 			worklist = newElements + worklist;
@@ -361,7 +462,10 @@ alias LabeledYield = list[LabeledPiece];
 data SQLPiece = staticPiece(str literal) | namePiece(str name) | dynamicPiece();
 alias SQLYield = list[SQLPiece];
 
-public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
+public set[LabeledYield] wow = { };
+public SQLModel wowModel;
+
+public set[SQLYield] yields(SQLModel m, bool filterYields=false, bool limitYields=true) {
 	SQLYield yieldForFragment(literalFragment(str s)) = [ staticPiece(s) ];
 	SQLYield yieldForFragment(nameFragment(Name n)) = [ yieldForName(n) ];
 	SQLYield yieldForFragment(dynamicFragment(Expr e)) = [ dynamicPiece() ];
@@ -372,6 +476,7 @@ public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
 	SQLYield yieldForFragment(globalFragment(Name n)) = [ yieldForName(n) ];
 	
 	SQLPiece yieldForName(varName(str varName)) = namePiece(varName);
+	SQLPiece yieldForName(elementName(str varName, str indexName)) = namePiece("<varName>[\'<indexName>\']");
 	SQLPiece yieldForName(computedName(Expr computedName)) = namePiece("UNKNOWN_NAME");
 	SQLPiece yieldForName(propertyName(Expr targetObject, str propertyName)) = namePiece("UNKNOWN_TARGET.<propertyName>");
 	SQLPiece yieldForName(computedPropertyName(Expr targetObject, Expr computedPropertyName)) = namePiece("UNKNOWN_TARGET.UNKNOWN_PROPERTY");
@@ -388,41 +493,90 @@ public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
 	SQLYield stripLabels(LabeledYield ly) = [ stripLabels(lp) | lp <- ly ];
 	set[SQLYield] stripLabels(set[LabeledYield] ls) = { stripLabels(li) | li <- ls };
 
+	map[tuple[Lab sourceLabel, QueryFragment sourceFragment],rel[Name name, Lab targetLabel, QueryFragment targetFragment, EdgeInfo edgeInfo]] fragmentRelMap =
+		( < sourceLabel, sourceFragment > : { } | < sourceLabel, sourceFragment > <- m.fragmentRel<0,1> );
+	
+	for (< sourceLabel, sourceFragment, n, targetLabel, targetFragment, edgeInfo > <- m.fragmentRel ) {
+		fragmentRelMap[ < sourceLabel, sourceFragment > ] += < n, targetLabel, targetFragment, edgeInfo >;
+	}
+		
+	map[tuple[QueryFragment,Lab], set[LabeledYield]] buildCache = ( );
+				   
 	set[LabeledYield] buildPieces(QueryFragment inputFragment, Lab l, set[EdgeInfo] edgeInfo, set[Lab] alreadyVisited) {
+		if (<inputFragment, l> in buildCache) {
+			return buildCache[<inputFragment,l>];
+		}
+		
 		// Get the possible expansions for each at this location
-		expansionsWithConditions = m.fragmentRel[l, inputFragment];
+		expansionsWithConditions = (<l, inputFragment> in fragmentRelMap) ? fragmentRelMap[<l, inputFragment>] : { };
 		expansions = expansionsWithConditions<0,1,2>;
 		
+		map[QueryFragment, set[LabeledYield]] expansionCache = ( );
 		set[LabeledYield] performExpansion(QueryFragment fragment) {
+			if (fragment in expansionCache) {
+				return expansionCache[fragment];
+			}
+			
 			if (fragment is nameFragment) {
 				if (isEmpty(expansions[fragment.name])) {
-					return { labeledPiece(yieldForFragment(fragment), edgeInfo); }
+					expansionCache[fragment] = { labeledPiece(yieldForFragment(fragment), edgeInfo) };
+					return expansionCache[fragment];
 				}
 				
 				nameExpansions = { *buildPieces(lf,ll,edgeInfo + expansionsWithConditions[fragment.name,ll,lf], alreadyVisited+l) 
 								 | < ll, lf > <- expansions[fragment.name], 
 								   ll != l && ll notin alreadyVisited } +
 							     { addLabels([ dynamicPiece() ], edgeInfo) | < ll, lf > <- expansions[fragment.name], ll == l || ll in alreadyVisited };
-				return { ne | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] !:= ne } + 
+							     
+				// This is a heuristic: if we have an edge condition stating that a name is non-null,
+				// then we discard empty replacements for the name since we specifically were filtering
+				// those out in the code. TODO: This should ensure the assignment comes from outside, but
+				// there is no reason to check to ensure something isn't empty and then set it to empty
+				// to insert it into q query. This is really protecting against defaults set higher up
+				// in the code that are reachable in the CFG.
+				if (varName(vn) := fragment.name) {
+					nameCheckConds = { vn | edgeCondsInfo(set[Expr] conds, _) <- edgeInfo, var(name(name(vn))) <- conds };
+					if (size(nameCheckConds) > 0) {
+						emptyExpansions = { lp | lp:[labeledPiece(staticPiece(""),_)] <- nameExpansions };
+						if (size(emptyExpansions) > 0) {
+							nameExpansions = nameExpansions - emptyExpansions;
+						}
+					}
+					println("Found <size(nameExpansions)> expansions");
+					if (size(nameExpansions) > 1000) {
+						println("Limiting yields for call location <m.callLoc>");
+						tempExpansions = { te | te <- (toList(nameExpansions))[0..1000] };
+						nameExpansions = tempExpansions;
+					}
+				}
+				// TODO: This is the biggest use of time in the profile (all of it is in the top 4)
+				expansionCache[fragment] = 
+				       { ne | ne <- nameExpansions, size(ne) != 1 || [labeledPiece(dynamicPiece(),_)] !:= ne } + 
 				       { addLabels(yieldForFragment(fragment), edgeInfo) | ne <- nameExpansions, [labeledPiece(dynamicPiece(),_)] := ne };
+				return expansionCache[fragment];
 			} else if (fragment is compositeFragment) {
 				compositeYield = performExpansion(fragment.fragments[0]);
 				for (f <- fragment.fragments[1..]) {
 					nextYield = performExpansion(f);
 					compositeYield = { cyi + nyi | cyi <- compositeYield, nyi <- nextYield };
 				}
-				return compositeYield;
+				expansionCache[fragment] = compositeYield;
+				return expansionCache[fragment];
 			} else if (fragment is concatFragment) {
 				leftYield = performExpansion(fragment.left);
 				rightYield = performExpansion(fragment.right);
 				concatYield = { lyi + ryi | lyi <- leftYield, ryi <- rightYield };
-				return concatYield;
+				expansionCache[fragment] = concatYield;
+				return expansionCache[fragment];
 			} else {
-				return { addLabels(yieldForFragment(fragment), edgeInfo) };
+				expansionCache[fragment] = { addLabels(yieldForFragment(fragment), edgeInfo) };
+				return expansionCache[fragment];
 			} 
 		}
 		
-		return performExpansion(inputFragment);
+		res = performExpansion(inputFragment);
+		buildCache[<inputFragment,l>] = res;
+		return res;
 	}
 		
 	SQLYield mergeStatics(SQLYield y) {
@@ -444,14 +598,44 @@ public set[SQLYield] yields(SQLModel m, bool filterYields=false) {
 	}
 	
 	labeledYields = buildPieces(m.startFragment, m.startLabel, {}, {});
-	infeasibleYields = { ly | ly <- labeledYields, 
-						      [_*,labeledPiece(_,ei1),_*,labeledPiece(_,ei2),_*] := ly,
-						      {_*, edgeCondsInfo(conds1, h1), _*} := ei1, {_*, edgeCondsInfo(conds2,h1), _*} := ei2,
-						      (conds1 & conds2) != conds1 && (conds1 & conds2) != conds2};
-	feasibleYields = filterYields ? (labeledYields - infeasibleYields) : labeledYields;
-		
+
+	feasibleYields = filterYields ? removeInfeasibleYields(labeledYields) : labeledYields;
+
 	regularYields = stripLabels(feasibleYields);
 	return simplifyYields(regularYields);
+}
+
+public set[SQLYield] removeInfeasibleYields(set[SQLYield] labeledYields) {
+	infeasibleYields = { } ;
+
+	yieldsLoop: for (ly <- labeledYields) {
+		pieces = [ lp | lp:labeledPiece(_,_) <- ly ];
+		condsHeaders = { h | lp <- pieces, edgeCondsInfo(_, h) <- lp.edgeInfo };
+		condsMap = ( h : [ ] | h <- condsHeaders );
+		for (lp <- pieces, edgeCondsInfo(conds, h) <- lp.edgeInfo) {
+			condsMap[h] = condsMap[h] + conds;
+		}
+		for (h <- condsMap) {
+			worklist = condsMap[h];
+			while (size(worklist) > 1) {
+				item1 = worklist[0]; worklist = worklist[1..];
+				for (item2 <- worklist) {
+					itemInter = item1 & item2;
+					if ( itemInter != item1 && itemInter != item2 ) {
+						infeasibleYields = infeasibleYields + ly;
+						continue yieldsLoop;
+					}
+				}
+			}
+		}
+		//if ([_*,labeledPiece(_,ei1),_*,labeledPiece(_,ei2),_*] := ly,
+		//	{_*, edgeCondsInfo(conds1, h1), _*} := ei1, {_*, edgeCondsInfo(conds2,h1), _*} := ei2,
+		//	(conds1 & conds2) != conds1 && (conds1 & conds2) != conds2) {
+		//	infeasibleYields = infeasibleYields + ly;
+		//}
+	}
+
+	return labeledYields - infeasibleYields;
 }
 
 @doc{converts a yield to a string parsable by the sql parser}
@@ -491,8 +675,11 @@ public rel[loc, SQLModel] buildModelsForSystem(str systemName, str systemVersion
 public rel[loc, SQLModel] buildModelsForSystem(System s, QCPSystemInfo qcpi) {
 	allCalls = { < c@at, c > | /c:call(name(name("mysql_query")), _) := s };
 	rel[loc, SQLModel] res = { };
+	int buildCount = 0;
+	int totalToBuild = size(allCalls<0>);	
 	for (l <- allCalls<0>) {
-		println("Building model for call at location <l>");
+		buildCount += 1;
+		println("Building model <buildCount> of <totalToBuild> for call at location <l>");
 		res = res + < l, buildModel(qcpi, l) >;
 	}
 	return res;
@@ -537,7 +724,7 @@ public void printYields(rel[loc, SQLModel] models) {
 //public default str getEdgeLabel(QueryFragment qf) = "";
 
 // TODO: Add code to visualize model as dot graph...
-public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "") {
+public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "", bool showConditions = true) {
 	nodes = m.fragmentRel<1> + m.fragmentRel<4>;
 	if (isEmpty(nodes)) {
 		nodes = { m.startFragment };
@@ -550,9 +737,9 @@ public void renderSQLModelAsDot(SQLModel m, loc writeTo, str title = "") {
 	} 
 	
 	nodes = [ "\"<nodeMap[n]>\" [ label = \"<escapeForDot(printQueryFragment(n))>\", labeljust=\"l\" ];" | n <- nodes ];
-	edges = [ "\"<nodeMap[n1]>\" -\> \"<nodeMap[n2]>\" [ label = \"<printEdgeInfo(nm,m.fragmentRel[l1,n1,nm,l2,n2])>\"];" | < l1, n1, nm, l2, n2 > <- m.fragmentRel<0,1,2,3,4> ];
+	edges = [ "\"<nodeMap[n1]>\" -\> \"<nodeMap[n2]>\" [ label = \"< showConditions ? printEdgeInfo(nm,m.fragmentRel[l1,n1,nm,l2,n2]) : "">\"];" | < l1, n1, nm, l2, n2 > <- m.fragmentRel<0,1,2,3,4> ];
 	str dotGraph = "digraph \"SQLModel\" {
-				   '	graph [ label = \"SQL Model<size(title)>0?" for <title>":"">\" ];
+				   '	graph [ label = \"SQL Model<size(title)>0?" for <title>":"">\" , ranksep=1, dpi=400];
 				   '	node [ shape = box ];
 				   '	<intercalate("\n", nodes)>
 				   '	<intercalate("\n",edges)>
@@ -570,4 +757,12 @@ public map[int,SQLModel] renderSQLModelsAsDot(set[SQLModel] ms) {
 		id += 1;
 	}
 	return res;
+}
+
+public CFG getCFGForModel(QCPSystemInfo qcpi, SQLModel sqlm) {
+	inputSystem = qcpi.sys;
+	callLoc = sqlm.callLoc;
+	inputCFGLoc = findContainingCFGLoc(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
+	inputCFG = findContainingCFG(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
+	return inputCFG;
 }
