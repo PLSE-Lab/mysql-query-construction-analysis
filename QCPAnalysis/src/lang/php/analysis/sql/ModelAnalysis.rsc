@@ -1,4 +1,4 @@
-module src::lang::php::analysis::sql::ModelAnalysis
+module lang::php::analysis::sql::ModelAnalysis
 
 import lang::php::ast::AbstractSyntax;
 import lang::php::ast::System;
@@ -7,10 +7,10 @@ import lang::php::util::Config;
 import lang::php::util::Corpus;
 import lang::php::analysis::cfg::CFG;
 
-import src::lang::php::analysis::sql::Utils;
-import src::lang::php::analysis::sql::QCPSystemInfo;
-import src::lang::php::analysis::sql::SQLModel;
-import src::lang::php::analysis::sql::QCPCorpus;
+import lang::php::analysis::sql::Utils;
+import lang::php::analysis::sql::QCPSystemInfo;
+import lang::php::analysis::sql::SQLModel;
+import lang::php::analysis::sql::QCPCorpus;
 
 import Set;
 import Relation;

@@ -1,4 +1,4 @@
-module src::lang::php::analysis::sql::QCPCorpus
+module lang::php::analysis::sql::QCPCorpus
 
 import lang::php::util::Corpus;
 import lang::php::util::Utils;

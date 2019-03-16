@@ -1,4 +1,4 @@
-module QCPAnalysis::QCPSystemInfo
+module lang::php::analysis::sql::QCPSystemInfo
 
 import lang::php::ast::AbstractSyntax;
 import lang::php::ast::System;
@@ -12,7 +12,7 @@ import lang::php::analysis::callgraph::SimpleCG;
 import lang::php::analysis::includes::IncludesInfo;
 import lang::php::analysis::usedef::UseDef;
 
-import src::lang::php::analysis::sql::QCPCorpus;
+import lang::php::analysis::sql::QCPCorpus;
 
 import IO;
 import ValueIO;

@@ -1,4 +1,4 @@
-module src::lang::php::analysis::sql::SQLAnalysis
+module lang::php::analysis::sql::SQLAnalysis
 
 import lang::php::util::Utils;
 import lang::php::util::Config;
@@ -6,11 +6,11 @@ import lang::php::ast::System;
 import lang::php::util::Corpus;
 import lang::php::ast::AbstractSyntax;
 
-import src::lang::php::analysis::sql::SQLModel;
-import src::lang::php::analysis::sql::QCPSystemInfo;
-import src::lang::sql::mysql::AbstractSyntax;
-import src::lang::sql::mysql::RunSQLParser;
-import src::lang::php::analysis::sql::QCPCorpus;
+import lang::php::analysis::sql::SQLModel;
+import lang::php::analysis::sql::QCPSystemInfo;
+import lang::sql::mysql::AbstractSyntax;
+import lang::sql::mysql::RunSQLParser;
+import lang::php::analysis::sql::QCPCorpus;
 
 import IO;
 import ValueIO;
