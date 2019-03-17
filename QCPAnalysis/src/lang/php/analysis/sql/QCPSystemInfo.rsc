@@ -29,7 +29,7 @@ data QCPSystemInfo = qcpSystemInfo(
 	map[loc,map[loc,Uses]] systemUses
 	);
 
-public QCPSystemInfo extractQCPSystemInfo(System s, bool buildDefUse = false) {
+public QCPSystemInfo extractQCPSystemInfo(System s, bool buildDefUse = false, bool computeCallGraph = false) {
 	map[loc,map[loc,CFG]] systemCFGs = ( );
 	for (l <- s.files) {
 		systemCFGs[l] = buildCFGs(s.files[l], buildBasicBlocks=false);
@@ -37,7 +37,10 @@ public QCPSystemInfo extractQCPSystemInfo(System s, bool buildDefUse = false) {
 	methodCalls = { < mc@at, methodName, mc > | /mc:methodCall(_,name(name(methodName)),_) := s };
 	functionCalls = { < c@at, functionName, c > | /c:call(name(name(functionName)),_) := s };
 	
-	invertedCallGraph = invert(computeSystemCallGraph(s));
+	invertedCallGraph = { };
+	if (computeCallGraph) {
+		invertedCallGraph = invert(computeSystemCallGraph(s));
+	}
 	
 	IncludesInfo iinfo = loadIncludesInfo(s.name, s.version);
 	
