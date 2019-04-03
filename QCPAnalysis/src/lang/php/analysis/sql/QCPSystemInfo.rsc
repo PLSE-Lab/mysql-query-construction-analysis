@@ -70,15 +70,19 @@ public QCPSystemInfo readQCPSystemInfo(str systemName, str systemVersion) {
 	return readBinaryValueFile(#QCPSystemInfo, qcpLoc + "<systemName>-<systemVersion>.info");
 }
 
-public void extractQCPSystemInfo(str systemName, str systemVersion) {
+public bool QCPSystemInfoExists(str systemName, str systemVersion) = exists(qcpLoc + "<systemName>-<systemVersion>.info");
+	
+public void extractQCPSystemInfo(str systemName, str systemVersion, bool overwrite=false) {
+	if (!overwrite && QCPSystemInfoExists(systemName,systemVersion)) return;
+	
 	pt = loadBinary(systemName, systemVersion);
 	writeQCPSystemInfo(systemName, systemVersion, extractQCPSystemInfo(pt));		
 }
 
-public void extractQCPSystemInfo() {
+public void extractQCPSystemInfo(bool overwrite=false) {
 	corpus = getCorpus();
 	for (systemName <- corpus) {
-		extractQCPSystemInfo(systemName, corpus[systemName]);
+		extractQCPSystemInfo(systemName, corpus[systemName], overwrite=overwrite);
 	}
 }
 

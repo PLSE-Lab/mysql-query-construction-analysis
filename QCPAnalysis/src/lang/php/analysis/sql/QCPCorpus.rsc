@@ -13,6 +13,7 @@ import lang::php::analysis::signatures::Summaries;
 import Node;
 import ValueIO;
 import Map;
+import IO;
 
 private Corpus originalCorpus = (
 	"faqforge" 		: "1.3.2",
@@ -115,15 +116,15 @@ public void buildCorpusItem(str p, str v){
 		throw "invalid corpus item or version";
 }
 
-public void buildCorpusInfo() {
+public void buildCorpusInfo(bool forceBuild=true) {
 	for (p <- corpus, v := corpus[p]) {
 		buildCorpusInfo(p,v);
 	}
 }
 
-public void buildCorpusInfo(str p, str v) {
+public void buildCorpusInfo(str p, str v, bool forceBuild=true) {
 	pt = loadBinary(p,v);
-	buildIncludesInfo(pt, forceBuild=true);
+	buildIncludesInfo(pt, forceBuild=forceBuild);
 }
 
 public void buildSummaries(){
@@ -151,3 +152,34 @@ public rel[str exprType, loc useLoc] exprTypesAndLocsInCorpus() {
 public set[str] exprTypesInCorpus() = exprTypesAndLocsInCorpus()<0>;
 
 public set[loc] locsExprType(str t) = exprTypesAndLocsInCorpus()[t];
+
+private loc sqlCorpusLoc = |home:///PHPAnalysis/sql-corpus|;
+
+public loc getSQLCorpusRoot() {
+	return sqlCorpusLoc;
+}
+
+public set[str] getSQLSystems() {
+	return { l.file | l <- sqlCorpusLoc.ls, isDirectory(l) };
+}
+
+public set[loc] getSQLCorpus() {
+	return { l | l <- sqlCorpusLoc.ls, isDirectory(l) };
+}
+
+public void buildSQLSystems(bool overwrite=true) {
+	for (l <- getSQLCorpus()) {
+		buildCurrent(l,overwrite=overwrite);
+	}
+}
+
+public void buildSQLSystemsIncludes(bool forceBuild=true) {
+	for (l <- getSQLCorpus()) {
+		buildCorpusInfo(l.file,"current",forceBuild=forceBuild);
+	}
+}
+
+
+public System loadSQLSystem(str systemName) {
+	return loadBinary(systemName, "current");
+}

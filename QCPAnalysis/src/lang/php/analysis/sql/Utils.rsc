@@ -27,27 +27,3 @@ public Expr simplifyParams(Expr c:methodCall(_,NameOrExpr methodName, list[Actua
 	}
 	return c[parameters=simplifiedParameters];
 }
-
-private loc sqlCorpusLoc = |file:///Users/mhills/PHPAnalysis/sql-corpus|;
-
-public loc getCorpusLoc() {
-	return sqlCorpusLoc;
-}
-
-public set[str] getSQLSystems() {
-	return { l.file | l <- sqlCorpusLoc.ls, isDirectory(l) };
-}
-
-public System loadSQLSystem(str systemName) {
-	return loadBinary(systemName, "current");
-}
-
-alias CallRel = rel[str systemName, str callName, Expr callExpr, loc at];
-
-public CallRel getSystemCalls(System pt) {
-	if (! (pt has name)) {
-		throw "Should only use named systems";
-	}
-	
-	return { < pt.name, cn, c, c@at > | /c:call(name(name(str cn)),_) := pt, /mysql/ := cn };
-}

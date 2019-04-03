@@ -75,7 +75,7 @@ public str printEdgeInfo(Name n, set[EdgeInfo] eis) {
 alias ContainmentRel = rel[Lab containedNode, set[Expr] preds, Lab containingNode];
 
 alias FragmentRel = rel[Lab sourceLabel, QueryFragment sourceFragment, Name name, Lab targetLabel, QueryFragment targetFragment, EdgeInfo edgeInfo];
-data SQLModel = sqlModel(FragmentRel fragmentRel, ContainmentRel containmentRel, QueryFragment startFragment, Lab startLabel, loc callLoc);
+data SQLModel = sqlModel(FragmentRel fragmentRel, ContainmentRel containmentRel, QueryFragment startFragment, Lab startLabel, loc callLoc) | emptyModel();
 
 @doc{Turn a specific expression into a possibly-nested query fragment.}
 public QueryFragment expr2qf(Expr ex, QCPSystemInfo qcpi, bool simplify=true) {
@@ -125,16 +125,16 @@ public QueryFragment expr2qf(Expr ex, QCPSystemInfo qcpi, bool simplify=true) {
 				return nameFragment(computedPropertyName(target, e));
 			
 			case staticPropertyFetch(name(name(target)), name(name(vn))) :
-				return nameFragment(staticPopertyName(target, vn));
+				return nameFragment(staticPropertyName(target, vn));
 				
 			case staticPropertyFetch(name(name(target)), Expr e) :
-				return nameFragment(computedStaticPopertyName(target, e));
+				return nameFragment(computedStaticPropertyName(target, e));
 			
 			case staticPropertyFetch(expr(Expr target), name(name(vn))) :
-				return nameFragment(computedStaticPopertyName(target, vn));
+				return nameFragment(computedStaticPropertyName(target, vn));
 				
 			case staticPropertyFetch(expr(Expr target), Expr e) :
-				return nameFragment(computedStaticPopertyName(target, e));
+				return nameFragment(computedStaticPropertyName(target, e));
 		
 			default:
 				return dynamicFragment(e);
@@ -186,36 +186,78 @@ public rel[loc callLoc, CFG graph] cfgsWithCalls(System s, set[str] functionName
 	return res;
 }
 
-public Expr getQueryExpr(call(name(name("mysql_query")),[actualParameter(Expr e,_,false),*_])) = e;
-public default Expr getQueryExpr(Expr e) { throw "Unhandled query expression <e>"; }
- 
-public Expr queryParameter(exprNode(Expr e,_)) = getQueryExpr(e);
-public default Expr queryParameter(CFGNode n) { throw "Unexpected parameter <n>"; }
- 
-public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, set[str] functions = { "mysql_query" }) {
+public Expr getQueryExpr(map[str,int] functionParams, map[str,int] methodParams, map[tuple[str,str],int] staticParams, Expr callExpr) {
+	if (call(name(name(fn)),actuals) := callExpr) {
+		if (fn in functionParams && size(actuals) > functionParams[fn] ) {
+			if (actualParameter(Expr e,_,false) := actuals[functionParams[fn]]) {
+				return e;
+			} else {
+				throw "Looking for parameter at index <functionParams[mn]> but only <size(actuals)> actuals";
+			}
+		} else {
+			throw "Looking for parameter at index <functionParams[mn]> but only <size(actuals)> actuals";
+		}		
+	} else if (methodCall(_,name(name(mn)),actuals) := callExpr) {
+		if (mn in methodParams && size(actuals) > methodParams[mn] ) {
+			if (actualParameter(Expr e,_,false) := actuals[methodParams[mn]]) {
+				return e;
+			} else {
+				throw "Looking for parameter at index <methodParams[mn]> but only <size(actuals)> actuals";
+			}
+		} else {
+			throw "Looking for parameter at index <methodParams[mn]> but only <size(actuals)> actuals";
+		}			
+	} else if (staticCall(name(name(cln)), name(name(mn)), actuals) := callExpr) {
+		if (<cln,mn> in staticParams && size(actuals) > staticParams[mn] ) {
+			if (actualParameter(Expr e,_,false) := actuals[staticParams[<cln,mn>]]) {
+				return e;
+			} else {
+				throw "Looking for parameter at index <staticParams[mn]> but only <size(actuals)> actuals";
+			}
+		} else {
+			throw "Looking for parameter at index <staticParams[mn]> but only <size(actuals)> actuals";
+		}
+	}
+	
+	throw "Unhandled query expression <callExpr>";
+}
+
+public Expr queryParameter(map[str,int] functionParams, map[str,int] methodParams, map[tuple[str,str],int] staticParams, exprNode(Expr e,_)) {
+	return getQueryExpr(functionParams, methodParams, staticParams, e);
+}
+
+public default Expr queryParameter(map[str,int] functionParams, map[str,int] methodParams, map[tuple[str,str],int] staticParams, CFGNode n) { 
+	throw "Unexpected parameter <n>"; 
+}
+
+public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, map[str,int] functionParams, map[str,int] methodParams, map[tuple[str,str],int] staticParams) {
 	inputSystem = qcpi.sys;
 	inputCFGLoc = findContainingCFGLoc(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
 	inputCFG = findContainingCFG(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
 	iinfo = qcpi.iinfo;
-	inputNode = findNodeForExpr(inputCFG, callLoc);
+	try {
+		inputNode = findNodeForExpr(inputCFG, callLoc);
 
-	< qcpi, d > = getDefs(qcpi, callLoc.top, inputCFGLoc);
-	< qcpi, u > = getUses(qcpi, callLoc.top, inputCFGLoc);
-	slicedCFG = basicSlice(inputCFG, inputNode, u[inputNode.l]<0>, d = d, u = u);
-	nodesForLabels = ( n.l : n | n <- inputCFG.nodes );
-	
-	queryExp = queryParameter(inputNode);
-	startingFragment = expr2qf(queryExp, qcpi);
-	FragmentRel res = { };
-	solve(res) {
-		for ( < l, f > <- (res<3,4> + < inputNode.l, startingFragment>) ) {
-			res = res + expandFragment(l, f, u, d, qcpi);
-		} 
+		< qcpi, d > = getDefs(qcpi, callLoc.top, inputCFGLoc);
+		< qcpi, u > = getUses(qcpi, callLoc.top, inputCFGLoc);
+		slicedCFG = basicSlice(inputCFG, inputNode, u[inputNode.l]<0>, d = d, u = u);
+		nodesForLabels = ( n.l : n | n <- inputCFG.nodes );
+		
+		queryExp = queryParameter(functionParams, methodParams, staticParams, inputNode);
+		startingFragment = expr2qf(queryExp, qcpi);
+		FragmentRel res = { };
+		solve(res) {
+			for ( < l, f > <- (res<3,4> + < inputNode.l, startingFragment>) ) {
+				res = res + expandFragment(l, f, u, d, qcpi);
+			} 
+		}
+		
+		res = addEdgeInfo(res, slicedCFG);
+		crel = computeContainmentRel(res, slicedCFG);
+		return sqlModel(res, crel, startingFragment, inputNode.l, callLoc);
+	} catch _ : {
+		return emptyModel();
 	}
-	
-	res = addEdgeInfo(res, slicedCFG);
-	crel = computeContainmentRel(res, slicedCFG);
-	return sqlModel(res, crel, startingFragment, inputNode.l, callLoc);
 }
 
 ContainmentRel computeContainmentRel(FragmentRel frel, CFG slicedCFG) {
@@ -668,19 +710,22 @@ public void testcode() {
 	cfgs = cfgsWithCalls(pt,functionNames={"mysql_query"});
 }
 
-public rel[loc, SQLModel] buildModelsForSystem(str systemName, str systemVersion) {
-	return buildModelsForSystem(loadBinary(systemName, systemVersion), readQCPSystemInfo(systemName, systemVersion));
+public rel[loc, SQLModel] buildModelsForSystem(str systemName, str systemVersion, System s, set[loc] callLocs, map[str,int] functionParams, map[str,int] methodParams, map[tuple[str,str],int] staticParams) {
+	return buildModelsForSystem(s, readQCPSystemInfo(systemName, systemVersion), callLocs, functionParams, methodParams, staticParams);
 }
 
-public rel[loc, SQLModel] buildModelsForSystem(System s, QCPSystemInfo qcpi) {
-	allCalls = { < c@at, c > | /c:call(name(name("mysql_query")), _) := s };
+public rel[loc, SQLModel] buildModelsForSystem(str systemName, str systemVersion, set[loc] callLocs, map[str,int] functionParams, map[str,int] methodParams, map[tuple[str,str],int] staticParams) {
+	return buildModelsForSystem(loadBinary(systemName, systemVersion), readQCPSystemInfo(systemName, systemVersion), callLocs, functionParams, methodParams, staticParams);
+}
+
+public rel[loc, SQLModel] buildModelsForSystem(System s, QCPSystemInfo qcpi, set[loc] callLocs, map[str,int] functionParams, map[str,int] methodParams, map[tuple[str,str],int] staticParams) {
 	rel[loc, SQLModel] res = { };
 	int buildCount = 0;
-	int totalToBuild = size(allCalls<0>);	
-	for (l <- allCalls<0>) {
+	int totalToBuild = size(callLocs);	
+	for (l <- callLocs) {
 		buildCount += 1;
 		println("Building model <buildCount> of <totalToBuild> for call at location <l>");
-		res = res + < l, buildModel(qcpi, l) >;
+		res = res + < l, buildModel(qcpi, l, functionParams, methodParams, staticParams) >;
 	}
 	return res;
 }
@@ -699,11 +744,11 @@ public bool modelsFileExists(str systemName, str systemVersion) {
 	return exists(modelsLoc + "<systemName>-<systemVersion>.bin");
 }
 
-public void buildAndSaveModelsForCorpus(Corpus corpus, bool overwrite=false) {
+public void buildAndSaveModelsForCorpus(Corpus corpus, map[str,int] functionParams, map[str,int] methodParams, map[tuple[str,str],int] staticParams, bool overwrite=false) {
 	for (systemName <- corpus, systemVersion := corpus[systemName]) {
 		if (!modelsFileExists(systemName, systemVersion) || overwrite) {
 			qcpi = readQCPSystemInfo(systemName, systemVersion);
-			mrel = buildModelsForSystem(qcpi.sys, qcpi);
+			mrel = buildModelsForSystem(qcpi.sys, qcpi, functionParams, methodParams, staticParams);
 			writeModels(systemName, systemVersion, mrel);
 		}
 	}	
