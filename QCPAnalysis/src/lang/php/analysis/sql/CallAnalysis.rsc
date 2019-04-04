@@ -308,6 +308,7 @@ public rel[loc, SQLModel] buildQueryModels(str systemName, CallRel queryCalls, m
 	callLocs = buildForWrappers ? (standardLocs + wrappedLocs) : standardLocs;
 	res = buildModelsForSystem(systemName, "current", pt, callLocs, functionParams, methodParams, staticParams);
 	writeModels(systemName, "current", res);	
+	
 	return res;
 }
 

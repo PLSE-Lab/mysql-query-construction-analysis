@@ -93,7 +93,7 @@ public tuple[QCPSystemInfo qcpi, Defs d] getDefs(QCPSystemInfo qcpi, loc fileLoc
 	throw "getDefs must be called with the system name and version explicitly provided";
 }
 
-public tuple[QCPSystemInfo qcpi, Defs d] getDefs(str systemName, str systemVersion, QCPSystemInfo qcpi, loc fileLoc, loc cfgLoc) {
+public tuple[QCPSystemInfo qcpi, Defs d] getDefs(str systemName, str systemVersion, QCPSystemInfo qcpi, loc fileLoc, loc cfgLoc, bool serialize=false) {
 	if (fileLoc in qcpi.systemDefs && cfgLoc in qcpi.systemDefs[fileLoc]) {
 		return < qcpi, qcpi.systemDefs[fileLoc][cfgLoc] >;
 	}
@@ -102,7 +102,9 @@ public tuple[QCPSystemInfo qcpi, Defs d] getDefs(str systemName, str systemVersi
 		qcpi.systemDefs[fileLoc] = ( );
 	}
 	qcpi.systemDefs[fileLoc][cfgLoc] = d;
-	writeQCPSystemInfo(systemName, systemVersion, qcpi);
+	if (serialize) {
+		writeQCPSystemInfo(systemName, systemVersion, qcpi);
+	}
 	return < qcpi, d >;
 }
 
@@ -113,7 +115,7 @@ public tuple[QCPSystemInfo qcpi, Uses u] getUses(QCPSystemInfo qcpi, loc fileLoc
 	throw "getUses must be called with the system name and version explicitly provided";
 }
 
-public tuple[QCPSystemInfo qcpi, Uses u] getUses(str systemName, str systemVersion, QCPSystemInfo qcpi, loc fileLoc, loc cfgLoc) {
+public tuple[QCPSystemInfo qcpi, Uses u] getUses(str systemName, str systemVersion, QCPSystemInfo qcpi, loc fileLoc, loc cfgLoc, bool serialize=false) {
 	if (fileLoc in qcpi.systemUses && cfgLoc in qcpi.systemUses[fileLoc]) {
 		return < qcpi, qcpi.systemUses[fileLoc][cfgLoc] >;
 	}
@@ -123,6 +125,8 @@ public tuple[QCPSystemInfo qcpi, Uses u] getUses(str systemName, str systemVersi
 		qcpi.systemUses[fileLoc] = ( );
 	}
 	qcpi.systemUses[fileLoc][cfgLoc] = u;
-	writeQCPSystemInfo(systemName, systemVersion, qcpi);
+	if (serialize) {
+		writeQCPSystemInfo(systemName, systemVersion, qcpi);
+	}
 	return < qcpi, u >;
 }

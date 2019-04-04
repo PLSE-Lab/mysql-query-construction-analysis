@@ -230,7 +230,7 @@ public default Expr queryParameter(map[str,int] functionParams, map[str,int] met
 	throw "Unexpected parameter <n>"; 
 }
 
-public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, map[str,int] functionParams, map[str,int] methodParams, map[tuple[str,str],int] staticParams) {
+public tuple[SQLModel,QCPSystemInfo] buildModel(QCPSystemInfo qcpi, loc callLoc, map[str,int] functionParams, map[str,int] methodParams, map[tuple[str,str],int] staticParams) {
 	inputSystem = qcpi.sys;
 	inputCFGLoc = findContainingCFGLoc(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
 	inputCFG = findContainingCFG(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
@@ -254,9 +254,9 @@ public SQLModel buildModel(QCPSystemInfo qcpi, loc callLoc, map[str,int] functio
 		
 		res = addEdgeInfo(res, slicedCFG);
 		crel = computeContainmentRel(res, slicedCFG);
-		return sqlModel(res, crel, startingFragment, inputNode.l, callLoc);
+		return < sqlModel(res, crel, startingFragment, inputNode.l, callLoc), qcpi >;
 	} catch _ : {
-		return emptyModel();
+		return < emptyModel(), qcpi >;
 	}
 }
 
@@ -725,8 +725,10 @@ public rel[loc, SQLModel] buildModelsForSystem(System s, QCPSystemInfo qcpi, set
 	for (l <- callLocs) {
 		buildCount += 1;
 		println("Building model <buildCount> of <totalToBuild> for call at location <l>");
-		res = res + < l, buildModel(qcpi, l, functionParams, methodParams, staticParams) >;
+		< callModel, qcpi > = buildModel(qcpi, l, functionParams, methodParams, staticParams);
+		res = res + < l,  callModel >;
 	}
+	writeQCPSystemInfo(s.name, s.version, qcpi);
 	return res;
 }
 
