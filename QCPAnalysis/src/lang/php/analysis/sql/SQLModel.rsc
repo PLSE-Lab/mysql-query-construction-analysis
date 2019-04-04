@@ -192,10 +192,10 @@ public Expr getQueryExpr(map[str,int] functionParams, map[str,int] methodParams,
 			if (actualParameter(Expr e,_,false) := actuals[functionParams[fn]]) {
 				return e;
 			} else {
-				throw "Looking for parameter at index <functionParams[mn]> but only <size(actuals)> actuals";
+				throw "Looking for parameter at index <functionParams[fn]> but only <size(actuals)> actuals";
 			}
 		} else {
-			throw "Looking for parameter at index <functionParams[mn]> but only <size(actuals)> actuals";
+			throw "Looking for parameter at index <functionParams[fn]> but only <size(actuals)> actuals";
 		}		
 	} else if (methodCall(_,name(name(mn)),actuals) := callExpr) {
 		if (mn in methodParams && size(actuals) > methodParams[mn] ) {
