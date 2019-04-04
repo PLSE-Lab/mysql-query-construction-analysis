@@ -311,11 +311,11 @@ public rel[loc, SQLModel] buildQueryModels(str systemName, CallRel queryCalls, m
 	return res;
 }
 
-public rel[loc, SQLModel] buildQueryModels(CallRel queryCalls, map[str, set[QueryWrapper]] wrapperMap, bool buildForWrappers = true, bool overwrite=false) {
+public rel[loc, SQLModel] buildQueryModels(CallRel queryCalls, map[str, set[QueryWrapper]] wrapperMap, bool buildForWrappers = true, bool overwrite=false, set[str] excludes = {}) {
 	currentSystems = getSQLSystems();
 	rel[loc, SQLModel] res = { };
 	
-	for (s <- currentSystems) {
+	for (s <- currentSystems, s notin excludes) {
 		if (!overwrite && modelsFileExists(s, "current")) {
 			res = res + readModels(s, "current");
 		} else {
