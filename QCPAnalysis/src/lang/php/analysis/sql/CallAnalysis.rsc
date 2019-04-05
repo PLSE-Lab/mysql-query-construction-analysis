@@ -13,6 +13,7 @@ import lang::php::pp::PrettyPrinter;
 import lang::php::analysis::sql::QCPCorpus;
 import lang::php::analysis::sql::QCPSystemInfo;
 import lang::php::analysis::sql::SQLModel;
+import lang::php::analysis::sql::ModelAnalysis;
 
 import IO;
 import ValueIO;
@@ -312,7 +313,7 @@ public rel[loc, SQLModel] buildQueryModels(str systemName, CallRel queryCalls, m
 	return res;
 }
 
-public rel[loc, SQLModel] buildQueryModels(CallRel queryCalls, map[str, set[QueryWrapper]] wrapperMap, bool buildForWrappers = true, bool overwrite=false, set[str] excludes = {}) {
+public rel[loc, SQLModel] buildQueryModels(CallRel queryCalls, map[str, set[QueryWrapper]] wrapperMap, bool buildForWrappers = true, bool overwrite=false, set[str] excludes = defaultExcludes) {
 	currentSystems = getSQLSystems();
 	rel[loc, SQLModel] res = { };
 	
@@ -325,4 +326,42 @@ public rel[loc, SQLModel] buildQueryModels(CallRel queryCalls, map[str, set[Quer
 	}
 	
 	return res;
+}
+
+// Build the SQL ASTs for each model
+public void buildSQLInfo(set[str] systems, bool overwrite=false, set[str] excludes = defaultExcludes) {
+	for (s <- systems, s notin excludes) {
+		if (!exists(analysisLoc + "<s>-current.bin") || overwrite) {
+			getModels(s, "current");
+		}
+	}  
+}
+
+public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] computeFragmentCategories(rel[loc,SQLModel] models) {
+	return computeForRelation(models);
+} 
+
+public void generateFCForSystem(str s) {
+	models = readModels(s,"current");
+	fcrel = computeForRelation(models);
+	writeFC(s,"current",fcrel);
+}
+
+public void generateFCForAllSystems(set[str] systems, set[str] excludes = defaultExcludes) {
+	for (s <- systems, s notin excludes) {
+		println("Generating Fragment Categories for <s>");
+		generateFCForSystem(s);
+	}
+}
+
+public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] getFCForSystem(str s) {
+	return readFC(s, "current");
+}
+
+public void writeCorpusFC(rel[loc callLoc, SQLModel sqm, FragmentCategories fc] fcrel) {
+	writeFC(fcrel);
+}
+
+public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] readCorpusFC() {
+	return readFC();
 }

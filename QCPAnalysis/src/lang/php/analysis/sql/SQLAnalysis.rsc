@@ -99,7 +99,7 @@ public real rankSystem(str p, str v){
 		total += score;
 		count = count + 1;
 	}
-	return total / count;
+	return (count == 0) ? 0.0 : (total / count);
 }
 
 @doc{gets the "ranking" for this model, indicating how easy it will be to transform}
@@ -650,7 +650,7 @@ public HoleInfo extractHoleInfo(selectQuery(selectExpr, from, where, group, havi
 			continue;
 		}
 		if(j is joinUsing){
-			for(u <- using){
+			for(u <- j.using){
 				res["name"] += holesInString(u);
 			}
 		}	
@@ -878,7 +878,7 @@ public SQLModelRel getModels(str p, str v){
  	}
  	else{
 	 	models = modelsFileExists(p, v) ? readModels(p, v) : buildModelsForSystem(p, v);
- 		for(<l,m> <- models){
+ 		for(<l,m> <- models, m is sqlModel){
  			yieldsAndParsed = {};
  			modelYields = yields(m);
  			int i = 0;
@@ -886,16 +886,23 @@ public SQLModelRel getModels(str p, str v){
  				 if(i < maxYields){
  				 	 println("yield <i> for call at <l>");
  				 	 sql = yield2String(y);
- 				 	 parsed = runParser(sql);
- 					 yieldsAndParsed = yieldsAndParsed + <y, sql, parsed>;
- 					 i = i + 1;
+ 				 	 sql = replaceAll(sql, ":", "");
+ 				 	 try {
+	 				 	 parsed = runParser(sql);
+	 					 yieldsAndParsed = yieldsAndParsed + <y, sql, parsed>;
+	 					 i = i + 1;
+	 				 } catch parseException : {
+	 				 	println("Exception caught during SQL parse: <parseException>");
+	 				 }
  				}
  				else{
  					break;
  				}
  			}
- 			yieldInfo = compareYields(yieldsAndParsed<2>);
- 			modelsRel = modelsRel + <l, m, yieldsAndParsed, yieldInfo>;
+ 			if (size(yieldsAndParsed<2>) > 0) {
+ 				yieldInfo = compareYields(yieldsAndParsed<2>);
+ 				modelsRel = modelsRel + <l, m, yieldsAndParsed, yieldInfo>;
+ 			}
  		} 
  		writeBinaryValueFile(analysisLoc + "<p>-<v>.bin", modelsRel, compression=false);	
  	}
@@ -915,6 +922,7 @@ public void rebuildYieldInfo(){
  				if(i < maxYields){
 				 	 println("yield <i> for call at <l>");
  				 	 sql = yield2String(y);
+ 				 	 sql = replaceAll(sql, ":", "");
  				 	 parsed = runParser(sql);
  					 yieldsAndParsed = yieldsAndParsed + <y, sql, parsed>;
  					 i = i + 1;
@@ -928,5 +936,37 @@ public void rebuildYieldInfo(){
  			modelInfo.info = yieldInfo;
 		}
 		writeBinaryValueFile(analysisLoc + "<p>-<v>.bin", modelsRel, compression=false);
+	}
+}
+
+public void rebuildYieldInfoForCurrentSystems(set[str] systems){
+	for(p <- systems){
+		modelsRel = getModels(p, "current");
+		for(modelInfo <- modelsRel, modelInfo.model is sqlModel){
+			yieldsAndParsed = {};
+ 			modelYields = yields(modelInfo.model);
+ 			int i = 0;
+ 			for(y <- modelYields){
+ 				if(i < maxYields){
+				 	 println("yield <i> for call at <modelInfo.location>");
+ 				 	 sql = yield2String(y);
+ 				 	 sql = replaceAll(sql, ":", "");
+ 				 	 try {
+	 				 	 parsed = runParser(sql);
+	 					 yieldsAndParsed = yieldsAndParsed + <y, sql, parsed>;
+	 					 i = i + 1;
+	 				 } catch parseException : {
+	 				 	println("Exception caught during SQL parse: <parseException>");
+	 				 }
+ 				}
+ 				else{
+ 					break;
+ 				}
+ 			}
+ 			yieldInfo = compareYields(yieldsAndParsed<2>);
+ 			modelInfo.yieldsRel = yieldsAndParsed;
+ 			modelInfo.info = yieldInfo;
+		}
+		writeBinaryValueFile(analysisLoc + "<p>-current.bin", modelsRel, compression=false);
 	}
 }

@@ -1,6 +1,6 @@
-module src::lang::sql::mysql::RunSQLParser
+module lang::sql::mysql::RunSQLParser
 
-import src::lang::sql::mysql::AbstractSyntax;
+import lang::sql::mysql::AbstractSyntax;
 
 import lang::php::util::Utils;
 import lang::php::util::Config;

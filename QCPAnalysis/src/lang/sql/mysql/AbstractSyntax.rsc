@@ -1,4 +1,4 @@
-module src::lang::sql::mysql::AbstractSyntax
+module lang::sql::mysql::AbstractSyntax
 
 import lang::php::ast::AbstractSyntax;
 

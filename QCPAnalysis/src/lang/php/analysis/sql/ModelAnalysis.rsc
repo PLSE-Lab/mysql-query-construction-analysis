@@ -20,25 +20,29 @@ import ValueIO;
 data FragmentCategories = fcat(
 	int literals, // string literals
 	int localVars, // local variables
+	int localArrayVars, // local array variables
 	int localProps, // properties of locally-defined variables
 	int localComputed, // computed local names
 	int globalVars, // global variables
+	int globalArrayVars, // global array variables
 	int globalProps, // properties of globally-defined variables
 	int globalComputed,// computed global names
 	int parameterNames, // parameters
+	int parameterArrayVars, // parameter array variables
 	int parameterProps, // properties of parameters
 	int parameterComputed, // computed property names
 	int computed // dynamic fragments that are not names
 	);
 
-FragmentCategories initFC() = fcat(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+FragmentCategories initFC() = fcat(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-map[str, int] fcToAbbreviatedMap(fcat(literal, localVars, localProps, localComputed, globalVars, globalProps, globalComputed, 
-										parameterNames, parameterProps, parameterComputed, computed))
+map[str, int] fcToAbbreviatedMap(fcat(literal, localVars, localArrayVars, localProps, localComputed, globalVars, 
+									  globalArrayVars, globalProps, globalComputed, 
+										parameterNames, parameterArrayVars, parameterProps, parameterComputed, computed))
 	= ("L" : literal, "LV" : localVars, "LP" : localProps, "LC" : localComputed,
 	   "GV" : globalVars, "GP" : globalProps, "GC" : globalComputed, 
 	   "PN" : parameterNames, "PP" : parameterProps, "PC" : parameterComputed,
-	   "C" : computed
+	   "C" : computed, "LA" : localArrayVars, "GA" : globalArrayVars, "PA" : parameterArrayVars
 	);
 
 public set[QueryFragment] flattenFragment(QueryFragment qf) {
@@ -85,6 +89,8 @@ public FragmentCategories computeFragmentCategories(SQLModel sqm) {
 						fc.localComputed += 1;
 					case computedStaticPropertyName(Expr computedClassName, Expr computedPropertyName) :
 						fc.localComputed += 1;
+					case elementName(str varName, str indexName) :
+						fc.localArrayVars += 1;
 					default:
 						throw "Unrecognized name fragment case: <n>";
 				}				
@@ -124,6 +130,8 @@ public FragmentCategories computeFragmentCategories(SQLModel sqm) {
 						fc.parameterComputed += 1;
 					case computedStaticPropertyName(Expr computedClassName, Expr computedPropertyName) :
 						fc.parameterComputed += 1;
+					case elementName(str varName, str indexName) :
+						fc.parameterArrayVars += 1;
 					default:
 						throw "Unrecognized input param fragment case: <n>";
 				}				
@@ -147,6 +155,8 @@ public FragmentCategories computeFragmentCategories(SQLModel sqm) {
 						fc.globalComputed += 1;
 					case computedStaticPropertyName(Expr computedClassName, Expr computedPropertyName) :
 						fc.globalComputed += 1;
+					case elementName(str varName, str indexName) :
+						fc.globalArrayVars += 1;
 					default:
 						throw "Unrecognized global fragment case: <n>";
 				}				
@@ -168,6 +178,18 @@ public void writeFC(str systemName, str systemVersion, rel[loc callLoc, SQLModel
 	writeBinaryValueFile(analysisLoc + "<systemName>-<systemVersion>.bin", fc);
 }
 
+public void writeFC(rel[loc callLoc, SQLModel sqm, FragmentCategories fc] fc) {
+	writeBinaryValueFile(analysisLoc + "fc-all-systems.bin", fc);
+}
+
+public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] readFC(str systemName, str systemVersion) {
+	return readBinaryValueFile(#rel[loc callLoc, SQLModel sqm, FragmentCategories fc], analysisLoc + "<systemName>-<systemVersion>.bin");
+}
+
+public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] readFC() {
+	return readBinaryValueFile(#rel[loc callLoc, SQLModel sqm, FragmentCategories fc], analysisLoc + "fc-all-systems.bin");
+}
+
 public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] computeForSystem(str systemName, str systemVersion, bool useCache=true) {
 	rel[loc callLoc, SQLModel sqm, FragmentCategories fc] res = { };
 	
@@ -187,6 +209,16 @@ public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] computeForSystem(st
 	
 	writeFC(systemName, systemVersion, res);
 	return res;	
+}
+
+public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] computeForRelation(rel[loc, SQLModel] models) {
+	rel[loc callLoc, SQLModel sqm, FragmentCategories fc] res = { };
+	
+	for ( < l, m > <- models, m is sqlModel ) {
+		res = res + < l, m, computeFragmentCategories(m) >;
+	}
+	
+	return res;
 }
 
 public map[str system, rel[loc callLoc, SQLModel sqm, FragmentCategories fc] fcrel] computeForCorpus(Corpus corpus = getCorpus()) {
@@ -211,6 +243,9 @@ public FragmentCategories sumFC(rel[loc,SQLModel,FragmentCategories] fcrel) {
 		fc.parameterProps += fci.parameterProps;
 		fc.parameterComputed += fci.parameterComputed;
 		fc.computed += fci.computed;
+		fc.localArrayVars += fci.localArrayVars;
+		fc.globalArrayVars += fci.globalArrayVars;
+		fc.parameterArrayVars += fci.parameterArrayVars;
 	}
 	return fc;
 }
@@ -238,6 +273,9 @@ public FragmentCategories totalFCForCorpus(Corpus corpus = getCorpus()){
 		total.parameterProps += fc.parameterProps;
 		total.parameterComputed += fc.parameterComputed;
 		total.computed += fc.computed;
+		total.localArrayVars += fc.localArrayVars;
+		total.globalArrayVars += fc.globalArrayVars;
+		total.parameterArrayVars += fc.parameterArrayVars;		
 	}
 	return total;
 }

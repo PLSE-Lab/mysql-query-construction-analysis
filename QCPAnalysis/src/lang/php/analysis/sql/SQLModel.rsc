@@ -518,6 +518,8 @@ public set[LabeledYield] wow = { };
 public SQLModel wowModel;
 
 public set[SQLYield] yields(SQLModel m, bool filterYields=false, bool limitYields=true) {
+	if (m is emptyModel) return { };
+	
 	SQLYield yieldForFragment(literalFragment(str s)) = [ staticPiece(s) ];
 	SQLYield yieldForFragment(nameFragment(Name n)) = [ yieldForName(n) ];
 	SQLYield yieldForFragment(dynamicFragment(Expr e)) = [ dynamicPiece() ];

@@ -100,7 +100,7 @@ private Corpus corpus = originalCorpus + corpus2017 + corpus2018;
 public Corpus getOriginalCorpus() = originalCorpus;
 public Corpus getCorpus2017() = corpus2017;
 public Corpus getCorpus2018 = corpus2018;
-public Corpus getCorpus() = corpus;
+public Corpus getCorpus() = getSQLSystemsAsCorpus(); //corpus;
 
 public void buildCorpus() {
 	for (p <- corpus, v := corpus[p]) {
@@ -159,12 +159,18 @@ public loc getSQLCorpusRoot() {
 	return sqlCorpusLoc;
 }
 
-public set[str] getSQLSystems() {
-	return { l.file | l <- sqlCorpusLoc.ls, isDirectory(l) };
+public set[str] defaultExcludes ={ "dolibarr", "mybb", "php-webshells", "php-malware-finder", "webshell"};
+
+public set[str] getSQLSystems(set[str] excludes = defaultExcludes) {
+	return { l.file | l <- sqlCorpusLoc.ls, isDirectory(l), l.file notin excludes };
 }
 
-public set[loc] getSQLCorpus() {
-	return { l | l <- sqlCorpusLoc.ls, isDirectory(l) };
+public Corpus getSQLSystemsAsCorpus(set[str] excludes = defaultExcludes) {
+	return ( s : "current" | s <- getSQLSystems(excludes=excludes) );
+}
+
+public set[loc] getSQLCorpus(set[str] excludes = defaultExcludes) {
+	return { l | l <- sqlCorpusLoc.ls, isDirectory(l), l.file notin excludes };
 }
 
 public void buildSQLSystems(bool overwrite=true) {
