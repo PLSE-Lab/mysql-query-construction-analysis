@@ -144,14 +144,14 @@ public QueryFragment expr2qf(Expr ex, QCPSystemInfo qcpi, bool simplify=true) {
 	return expr2qfAux(ex);
 }
 
-public FragmentRel expandFragment(Lab l, QueryFragment qf, Uses u, Defs d, QCPSystemInfo qcpi) {
+public FragmentRel expandFragment(Lab l, QueryFragment qf, UsesMap u, DefsMap d, QCPSystemInfo qcpi) {
 	FragmentRel res = { };
 	
 	// TODO: Do we want all names in the fragment, or just leaf node names?
 	set[Name] usedNames = { n | /nameFragment(Name n) := qf };
 	//println("Found <size(usedNames)> names in fragment");
 	
-	for (n <- usedNames, ul <- u[l, n], < de, dl > <- d[ul, n]) {
+	for (n <- usedNames, ul <- u[<l, n>], < de, dl > <- d[<ul, n>]) {
 		if (de is defExpr) {
 			newFragment = expr2qf(de.e, qcpi);
 			res = res + < l, qf, n, dl, newFragment, noInfo() >;
@@ -168,7 +168,7 @@ public FragmentRel expandFragment(Lab l, QueryFragment qf, Uses u, Defs d, QCPSy
 		}
 	}
 	
-	for (n <- usedNames, n notin u[l]<0>) {
+	for (n <- usedNames, <l,n> notin u) {
 		res = res + < l, qf, n, l, unknownFragment(), noInfo() >;
 	}
 	
@@ -208,7 +208,7 @@ public Expr getQueryExpr(map[str,int] functionParams, map[str,int] methodParams,
 			throw "Looking for parameter at index <methodParams[mn]> but only <size(actuals)> actuals";
 		}			
 	} else if (staticCall(name(name(cln)), name(name(mn)), actuals) := callExpr) {
-		if (<cln,mn> in staticParams && size(actuals) > staticParams[mn] ) {
+		if (<cln,mn> in staticParams && size(actuals) > staticParams[<cln,mn>] ) {
 			if (actualParameter(Expr e,_,false) := actuals[staticParams[<cln,mn>]]) {
 				return e;
 			} else {
@@ -230,6 +230,9 @@ public default Expr queryParameter(map[str,int] functionParams, map[str,int] met
 	throw "Unexpected parameter <n>"; 
 }
 
+alias DefsMap = map[tuple[Lab, Name], rel[DefExpr definedAs, Lab definedAt]];
+alias UsesMap = map[tuple[Lab, Name], set[Lab]];
+
 public tuple[SQLModel,QCPSystemInfo] buildModel(QCPSystemInfo qcpi, loc callLoc, map[str,int] functionParams, map[str,int] methodParams, map[tuple[str,str],int] staticParams) {
 	inputSystem = qcpi.sys;
 	inputCFGLoc = findContainingCFGLoc(inputSystem.files[callLoc.top], qcpi.systemCFGs[callLoc.top], callLoc);
@@ -240,6 +243,13 @@ public tuple[SQLModel,QCPSystemInfo] buildModel(QCPSystemInfo qcpi, loc callLoc,
 
 		< qcpi, d > = getDefs(qcpi, callLoc.top, inputCFGLoc);
 		< qcpi, u > = getUses(qcpi, callLoc.top, inputCFGLoc);
+	
+		DefsMap defsMap = ( <dl,dn> : { } | <dl,dn> <- d<0,1> );
+		for (<dl, dn, de, dat> <- d) defsMap[<dl,dn>] = defsMap[<dl,dn>] + <de,dat>;
+		
+		UsesMap usesMap = ( < ul, un > : { } | < ul, un > <- u<0,1> );
+		for (<ul, un, uat> <- u) usesMap[<ul, un>] = usesMap[<ul, un>] + uat;
+		 
 		slicedCFG = basicSlice(inputCFG, inputNode, u[inputNode.l]<0>, d = d, u = u);
 		nodesForLabels = ( n.l : n | n <- inputCFG.nodes );
 		
@@ -248,7 +258,7 @@ public tuple[SQLModel,QCPSystemInfo] buildModel(QCPSystemInfo qcpi, loc callLoc,
 		FragmentRel res = { };
 		solve(res) {
 			for ( < l, f > <- (res<3,4> + < inputNode.l, startingFragment>) ) {
-				res = res + expandFragment(l, f, u, d, qcpi);
+				res = res + expandFragment(l, f, usesMap, defsMap, qcpi);
 			} 
 		}
 		
