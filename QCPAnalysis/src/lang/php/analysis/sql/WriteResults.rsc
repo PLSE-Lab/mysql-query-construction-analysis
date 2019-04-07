@@ -22,7 +22,7 @@ import Set;
 import Map;
 import util::Math;
 
-loc tables = |project://QCPAnalysis/results/tables/|;
+loc tables = |file:///tmp/|;
 loc examples = |project://QCPAnalysis/results/examples/|;
 
 /**
@@ -202,16 +202,15 @@ public map[str, lrel[str, real]] clausePercentages(Corpus corpus = getCorpus()){
 	return percentages;
 }
 
-public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar = false){
+public str queryTypeCountsAsLatexTable(bool captionOnTop = true, bool tablestar = false){
 	Corpus corpus = getCorpus();
-	pForSort = [ < toUpperCase(p), p > | p <- corpus ];
-	pForSort = sort(pForSort, bool(tuple[str,str] t1, tuple[str,str] t2) { return t1[0] < t2[0]; });
+	top20 = getTop20Rel();
 	sortedTypes = ["select", "insert", "update", "delete", "partial", "other"];
 	totals = <0, 0, 0, 0, 0, 0>;
 	
 	str getLine(str p, v){
 		counts = extractClauseCounts(getModels(p, v));
-		res = "<getSensibleName(p)>";
+		res = "<p> ";
 		int i = 0;
 		for(t <- sortedTypes){
 			count = counts[t]["total queries"];
@@ -223,7 +222,7 @@ public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar
 	}
 	
 	str getTotalLine(){
-		res = "\\textbf{totals}";
+		res = "TOTAL ";
 		int i = 0;
 		for(t <- sortedTypes){
 			res +=  "& \\numprint{<totals[i]>}";
@@ -237,11 +236,11 @@ public str queryTypeCountsAsLatexTable(bool captionOnTop = false, bool tablestar
 		'\\npfourdigitsep
 		'\\begin{table<if(tablestar){>*<}>}
 		'\\centering
-		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
+		'<if(captionOnTop){>\\caption{Query Type Counts by System.\\label{tbl:query-type-counts}}<}>
 		'\\ra{1.2}
 		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrrr} \\toprule
 		'System & SELECT & INSERT & UPDATE & DELETE & PARTIAL & OTHER\\\\ \\midrule
-		'<for(<_,p> <- pForSort, v := corpus[p]){><getLine(p, v)> \\\\
+		'<for(item <- top20){><getLine(item.repoName, "current")> \\\\
 		'<}>\\midrule
 		'<getTotalLine()> \\\\
 		'\\bottomrule
@@ -326,7 +325,7 @@ public str clauseCountsAsLatexTable(bool captionOnTop = false, bool tablestar = 
 	return res;
 }
 
-public str qcp3bYieldComparisonAsLatexTable(bool captionOnTop = false, bool tablestar = false){
+public str qcp3bYieldComparisonAsLatexTable(bool captionOnTop = true, bool tablestar = false){
 	models = groupSQLModelsCorpus()[qcp3b];
 	counts = extractClauseComparison(models);
 	sortedTypes  = ["select", "insert", "update", "delete"];
@@ -387,7 +386,7 @@ public str qcp3bYieldComparisonAsLatexTable(bool captionOnTop = false, bool tabl
 		'\\npfourdigitsep
 		'\\begin{table<if(tablestar){>*<}>}
 		'\\centering
-		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
+		'<if(captionOnTop){>\\caption{Clause Comparison Counts for Pattern QCP3b.\\label{tbl:clause-comparison-counts}}<}>
 		'\\ra{1.2}
 		'\\begin{tabularx}{\\columnwidth}{Xllllll} \\toprule
 		'Query Type & Clauses & Same & Different & Some & None\\\\ \\midrule
@@ -409,19 +408,18 @@ public str qcp3bYieldComparisonAsLatexTable(bool captionOnTop = false, bool tabl
 	
 }
 
-public str qcpCountsAsLatexTable(bool captionOnTop = false, bool tablestar = false){
+public str qcpCountsAsLatexTable(bool captionOnTop = true, bool tablestar = true){
 	Corpus corpus = getCorpus();
 	counts = groupPatternCountsBySystem();
 	totals = counts[<"total", "0.0">];
 	delete(counts, "total");//total should be printed last
 	
-	pForSort = [ < toUpperCase(p), p > | p <- corpus ];
-	pForSort = sort(pForSort, bool(tuple[str,str] t1, tuple[str,str] t2) { return t1[0] < t2[0]; });
+	top20 = getTop20Rel();
 	sortedQ = [qcp0, qcp1, qcp2, qcp3a, qcp3b, qcp3c, qcp4, otherType, parseError, unknown];
 	
 	str getLine(str p, str v){
 		sysCounts = counts[<p, v>];
-		res = "<getSensibleName(p)> & <v>";
+		res = "<p> ";
 		for(qcp <- sortedQ){
 			res +=  "& \\numprint{<(qcp in sysCounts) ? sysCounts[qcp] : 0>}";
 		}
@@ -429,7 +427,7 @@ public str qcpCountsAsLatexTable(bool captionOnTop = false, bool tablestar = fal
 	}
 	
 	str getTotalLine(){
-		res = "\\textbf{totals} & -";
+		res = "TOTAL ";
 		for(qcp <- sortedQ){
 			res +=  "& \\numprint{<(qcp in totals) ? totals[qcp] : 0>}";
 		}
@@ -441,11 +439,11 @@ public str qcpCountsAsLatexTable(bool captionOnTop = false, bool tablestar = fal
 		'\\npfourdigitsep
 		'\\begin{table<if(tablestar){>*<}>}
 		'\\centering
-		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
+		'<if(captionOnTop){>\\caption{QCP Counts by System, Top 20 Systems and Total.\\label{tbl:qcp-counts}}<}>
 		'\\ra{1.2}
-		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrrrrrr} \\toprule
-		'System & Version & 0 & 1 & 2 & 3a & 3b & 3c & 4 & O & P & U \\\\ \\midrule
-		'<for(<_,p> <- pForSort, v := corpus[p]){><getLine(p,v)> \\\\
+		'\\begin{tabularx}{<if(tablestar){>.82\\textwidth<}else{>\\columnwidth<}>}{Xrrrrrrrrrr} \\toprule
+		'System & QCP0 & QCP1 & QCP2 & QCP3a & QCP3b & QCP3c & QCP4 & O & P & U \\\\ \\midrule
+		'<for(item <- top20){><getLine(item.repoName,"current")> \\\\
 		'<}>\\midrule
 		'<getTotalLine()> \\\\
 		'\\bottomrule
@@ -453,8 +451,8 @@ public str qcpCountsAsLatexTable(bool captionOnTop = false, bool tablestar = fal
 		'\\\\
 		'\\vspace{2ex}
 		'\\footnotesize
-		' Counts for each QCP in each System. QCP names are abbreviated. Numbered patterns
-		' are replaced by their number. O stands for other query type. P stands for parse error.
+		' Counts for each QCP in each System.
+		' O stands for other query type. P stands for parse error.
 		' U stands for models that match no patterns.
 		'<if(!captionOnTop){>\\caption{QCP Counts by System.\\label{tbl:qcp-counts}}<}>
 		'\\end{table<if(tablestar){>*<}>}
@@ -466,28 +464,24 @@ public str qcpCountsAsLatexTable(bool captionOnTop = false, bool tablestar = fal
 	return res;
 }
 
-public str fragmentCategoriesAsLatexTable(bool captionOnTop=false, bool tablestar = false){
-	categoriesMap = sumFCMap(computeForCorpus());
-	totals = fcToAbbreviatedMap(totalFCForCorpus());
+public str fragmentCategoriesAsLatexTable(FCMap fcmap, bool captionOnTop=true, bool tablestar = false){
+	top20 = getTop20Rel();
+	categoriesMap = fcToAbbreviatedMap(totalFC(fcmap));
+	cForSort = ["L", "LV", "LA", "LP", "LC", "GV", "GA", "GP", "GC", "PN", "PA", "PP", "PC", "C"];
 	
-	pForSort = [ < toUpperCase(p), p > | p <- getCorpus() ];
-	pForSort = sort(pForSort, bool(tuple[str,str] t1, tuple[str,str] t2) { return t1[0] < t2[0]; });
-	
-	cForSort = ["L", "LV", "LP", "LC", "GV", "GP", "GC", "PN", "PP", "PC", "C"];
-	
-	str getLine(str p){
-		fc = fcToAbbreviatedMap(categoriesMap[p]);
-		res = "<getSensibleName(p)>";
+	str getLine(tuple[str repoName, str fullName, int fileCount, int lineCount] item){
+		fc = fcToAbbreviatedMap(sumFC(fcmap[item.repoName]));
+		res = "<item.fullName> ";
 		for(category <- cForSort, counts := fc[category]){
-			res += "& <counts>";
+			res += "& <counts> ";
 		}
 		return res; 
 	}
 	
 	str getTotalLine(){
-		res = "\\textbf{total}";
-		for(category <- cForSort, counts := totals[category]){
-			res += "& <counts>";
+		res = "TOTAL ";
+		for(category <- cForSort, counts := categoriesMap[category]){
+			res += "& <counts> ";
 		}
 		return res; 
 	}
@@ -497,11 +491,11 @@ public str fragmentCategoriesAsLatexTable(bool captionOnTop=false, bool tablesta
 		'\\npfourdigitsep
 		'\\begin{table<if(tablestar){>*<}>}
 		'\\centering
-		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
+		'<if(captionOnTop){>\\caption{Query Fragment Category Counts, Top 20 Systems and Total.\\label{tbl:fragment-category-counts}}<}>
 		'\\ra{1.2}
-		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrrrrrrr} \\toprule
+		'\\begin{tabularx}{<if(tablestar){>\\textwidth<}else{>\\columnwidth<}>}{Xrrrrrrrrrrrrrr} \\toprule
 		'System <for(c <- cForSort){> & <c> <}> \\\\ \\midrule
-		'<for(<_,p> <- pForSort){><getLine(p)> \\\\
+		'<for(item <- top20){><getLine(item)> \\\\
 		'<}>\\midrule
 		'<getTotalLine()> \\\\
 		'\\bottomrule
@@ -509,11 +503,11 @@ public str fragmentCategoriesAsLatexTable(bool captionOnTop=false, bool tablesta
 		'\\\\
 		'\\vspace{2ex}
 		'\\footnotesize
-		' Counts of each Fragment Category in the corpus. The table headings for each fragment category have the following
-		' abbreviations: L for literals, LV for local variables, LP for properties of local variables, LC for computed local names, 
-		' GV for global variables, GP for properties of global variables, GC for computed global names, PN for parameters,
-		' PP for properties of parameters, PC for computed property names and C for computed fragments that are not names
-		'<if(!captionOnTop){>\\caption{Fragment Category Counts by System.\\label{tbl:fragment-category-counts}}<}>
+		' Counts of each Query Fragment Category in the corpus. The table headings for each fragment category have the following
+		' abbreviations: L for literals, LV for local variables, LA for local array elements, LP for properties of local variables, LC for computed local names, 
+		' GV for global variables, GA for global array elements, GP for properties of global variables, GC for computed global names, PN for parameters,
+		' PA for elements of array parameters, PP for properties of parameters, PC for computed property names and C for computed fragments that are not names
+		'<if(!captionOnTop){>\\caption{Query Fragment Category Counts, Top 20 Systems and Total.\\label{tbl:fragment-category-counts}}<}>
 		'\\end{table<if(tablestar){>*<}>}
 		'\\npfourdigitnosep
 		'\\npnoaddmissingzero
@@ -562,6 +556,47 @@ public str corpusAsLatexTable(bool captionOnTop=false, bool tablestar = false) {
 	return res;
 }
 
+
+
+public str top20CorpusAsLatexTable(int systemCount, int totalFiles, int totalLines, bool captionOnTop=true, bool tablestar = false) {
+	top20 = getTop20Rel();
+	
+	str getLine(tuple[str repoName, str fullName, int fileCount, int lineCount] item) {
+		return "<item.fullName> & \\numprint{<item.fileCount>} & \\numprint{<item.lineCount>}";
+	}
+	
+	top20Files = ( 0 | it + item.fileCount | item <- top20 );
+	top20Lines = ( 0 | it + item.lineCount | item <- top20 );
+	
+	str res =
+		"\\npaddmissingzero
+		'\\npfourdigitsep
+		'\\begin{table<if(tablestar){>*<}>}
+		'\\centering
+		'<if(captionOnTop){>\\caption{The Corpus, Top 20 Systems.\\label{tbl:php-corpus}}<}>
+		'\\ra{1.2}
+		'\\begin{tabularx}{\\columnwidth}{Xrr} \\toprule
+		'System & File Count & SLOC \\\\ \\midrule
+		'<for(item <- top20){><getLine(item)> \\\\
+		'<}>
+		'\\bottomrule
+		'\\end{tabularx}
+		'\\\\
+		'\\vspace{2ex}
+		'\\footnotesize
+		'The File Count includes all PHP source files, while SLOC includes source lines from these files. 
+		'The top 20 systems in the corpus include a total of \\numprint{<top20Files>} PHP files and
+		'\\numprint{<top20Lines>} lines of PHP code. Across the entire corpus, there are \\numprint{<systemCount>}
+		'systems with \\numprint{<totalFiles>} PHP files and \\numprint{<totalLines>} lines of PHP code. 
+		'\\normalsize
+		'<if(!captionOnTop){>\\caption{The Corpus, Top 20 Systems.\\label{tbl:php-corpus}}<}>
+		'\\end{table<if(tablestar){>*<}>}
+		'\\npfourdigitnosep
+		'\\npnoaddmissingzero
+		";
+	return res;
+}
+
 public int totalCorpusFiles() {
 	Corpus corpus = getCorpus();
 	corpusCounts = { < p, v, lc, fc > | < p, v, lc, fc > <- getSortedCounts(), p in corpus<0>, v := corpus[p] };
@@ -574,4 +609,57 @@ public int totalCorpusLines() {
 	corpusCounts = { < p, v, lc, fc > | < p, v, lc, fc > <- getSortedCounts(), p in corpus<0>, v := corpus[p] };
 	corpusLineCounts = corpusCounts<2>;
 	return ( 0 | it + fc | fc <- corpusLineCounts );
+}
+
+data CallCountInfo = callCountInfo(int directMySQLCalls, int directMySQLiCalls, int directMethodCalls,
+	int functionWrappers, int methodWrappers);
+
+alias CountsMap = map[str systemName, CallCountInfo counts];
+
+public str callCountsTable(CountsMap countsMap, bool captionOnTop=true, bool tablestar = false) {
+	top20 = getTop20Rel();
+	
+	str getLine(str systemName, CallCountInfo info) {
+		return "<systemName> & \\numprint{<info.directMySQLCalls>} & \\numprint{<info.directMySQLiCalls>} & \\numprint{<info.directMethodCalls>} & \\numprint{<info.functionWrappers>} & \\numprint{<info.methodWrappers>}";
+	}
+	
+	directMySQLCalls = ( 0 | it + countsMap[s].directMySQLCalls | s <- countsMap );
+	directMySQLiCalls = ( 0 | it + countsMap[s].directMySQLiCalls | s <- countsMap );
+	directMethodCalls = ( 0 | it + countsMap[s].directMethodCalls | s <- countsMap );
+	functionWrappers = ( 0 | it + countsMap[s].functionWrappers | s <- countsMap );
+	methodWrappers = ( 0 | it + countsMap[s].methodWrappers | s <- countsMap );
+
+	str totalsLine() {
+		return "TOTAL & \\numprint{<directMySQLCalls>} & \\numprint{<directMySQLiCalls>} & \\numprint{<directMethodCalls>} & \\numprint{<functionWrappers>} & \\numprint{<methodWrappers>}";
+	}
+
+	str res =
+		"\\npaddmissingzero
+		'\\npfourdigitsep
+		'\\begin{table<if(tablestar){>*<}>}
+		'\\centering
+		'<if(captionOnTop){>\\caption{Query Calls, Top 20 Systems and Total.\\label{tbl:query-calls}}<}>
+		'\\ra{1.2}
+		'\\begin{tabularx}{\\columnwidth}{Xrrrrr} \\toprule
+		'System & MC & MiC & QC & WF & WM \\\\ \\midrule
+		'<for(item <- top20){><getLine(item.repoName, countsMap[item.repoName])> \\\\
+		'<}>
+		'\\midrule
+		'<totalsLine()> \\\\	
+		'\\bottomrule
+		'\\end{tabularx}
+		'\\\\
+		'\\vspace{2ex}
+		'\\footnotesize
+		'MC, MiC, and QC are the number of direct calls to \\verb|mysql_query|, 
+		'\\verb|mysqli_query|, and the \\verb|query| method, respectively. WF 
+		'counts calls to query wrapper functions, while WM counts calls to query
+		'wrapper methods.
+		'\\normalsize
+		'<if(!captionOnTop){>\\caption{Query Calls, Top 20 Systems and Total.\\label{tbl:query-calls}}<}>
+		'\\end{table<if(tablestar){>*<}>}
+		'\\npfourdigitnosep
+		'\\npnoaddmissingzero
+		";
+	return res;
 }

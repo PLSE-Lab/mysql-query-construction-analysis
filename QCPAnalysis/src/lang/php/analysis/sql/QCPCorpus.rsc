@@ -46,6 +46,35 @@ private Corpus corpus2018 = (
 	"SchoolERP" : "1.0"
 );
 
+private lrel[str repoName, str fullName, int fileCount, int lineCount] top20 = [ 
+	< "php-src", "php/php-src", 290, 18620 >,
+	< "CodeIgniter", "bcit-ci/CodeIgniter", 280, 35597 >,
+	< "WordPress", "WordPress/WordPress", 995, 232799 >,
+	< "piwik", "piwik/piwik", 2581, 252161 >,
+	< "opencart", "opencart/opencart", 2666, 227647 >,
+	< "typecho", "typecho/typecho", 204, 23524 >,
+	< "joomla-cms", "joomla/joomla-cms", 3690, 410378 >,
+	< "PrestaShop", "PrestaShop/PrestaShop", 3027, 262360 >,
+	< "adminer", "vrana/adminer", 144, 25367 >,
+	< "phpspider", "owner888/phpspider", 30, 13875 >,
+	< "KODExplorer", "kalcaddle/KODExplorer", 125, 58257 >,
+	< "FrameworkBenchmarks", "TechEmpower/FrameworkBenchmarks", 274, 7765 >,
+	< "moodle", "moodle/moodle", 10048, 1423013 >,
+	< "Search-Replace-DB", "interconnectit/Search-Replace-DB", 6, 3113 >,
+	< "PHP-MySQLi-Database-Class", "joshcam/PHP-MySQLi-Database-Class", 8, 2509 >,
+	< "Bonfire", "ci-bonfire/Bonfire", 810, 94638 >,
+	< "phpbb", "phpbb/phpbb", 1584, 286184 >,
+	< "charisma", "usmanhalalit/charisma", 47, 8815 >,
+	< "php-crud-api", "mevdschee/php-crud-api", 78, 10268 >,
+	< "thinkphp", "top-think/thinkphp", 319, 51134 >
+];
+
+public list[str] getTop20Systems() = top20<0>;
+
+public list[str] getTop20Repos() = top20<1>;
+
+public lrel[str repoName, str fullName, int fileCount, int lineCount] getTop20Rel() = top20;
+
 private map[str,int] systemNumbers = (
 	"AddressBook" : 1,
 	"faqforge" : 2,

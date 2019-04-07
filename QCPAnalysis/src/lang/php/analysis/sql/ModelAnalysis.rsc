@@ -221,8 +221,10 @@ public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] computeForRelation(
 	return res;
 }
 
-public map[str system, rel[loc callLoc, SQLModel sqm, FragmentCategories fc] fcrel] computeForCorpus(Corpus corpus = getCorpus()) {
-	map[str system, rel[loc callLoc, SQLModel sqm, FragmentCategories fc] fcrel] res = ( );
+alias FCMap = map[str system, rel[loc callLoc, SQLModel sqm, FragmentCategories fc] fcrel];
+
+public FCMap computeForCorpus(Corpus corpus = getCorpus()) {
+	FCMap res = ( );
 	for (systemName <- corpus, systemVersion := corpus[systemName]) {
 		res[systemName] = computeForSystem(systemName, systemVersion);
 	}
@@ -250,7 +252,7 @@ public FragmentCategories sumFC(rel[loc,SQLModel,FragmentCategories] fcrel) {
 	return fc;
 }
 
-public map[str, FragmentCategories] sumFCMap(map[str system, rel[loc callLoc, SQLModel sqm, FragmentCategories fc] fcrel] fcmap) {
+public map[str, FragmentCategories] sumFCMap(FCMap fcmap) {
 	map[str,FragmentCategories] res = ( );
 	for (s <- fcmap<0>) {
 		res[s] = sumFC(fcmap[s]);
@@ -258,10 +260,9 @@ public map[str, FragmentCategories] sumFCMap(map[str system, rel[loc callLoc, SQ
 	return res;
 }
 
-public FragmentCategories totalFCForCorpus(Corpus corpus = getCorpus()){
-	fcMap = sumFCMap(computeForCorpus(corpus = corpus));
+public FragmentCategories totalFC(FCMap fcMap){
 	total = initFC();
-	for(p <- fcMap, fc := fcMap[p]){
+	for(p <- fcMap, fc := sumFC(fcMap[p])){
 		total.literals += fc.literals;
 		total.localVars += fc.localVars;
 		total.localProps += fc.localProps;

@@ -14,6 +14,8 @@ import lang::php::analysis::sql::QCPCorpus;
 import lang::php::analysis::sql::QCPSystemInfo;
 import lang::php::analysis::sql::SQLModel;
 import lang::php::analysis::sql::ModelAnalysis;
+import lang::php::analysis::sql::WriteResults;
+import lang::php::analysis::sql::SQLAnalysis;
 
 import IO;
 import ValueIO;
@@ -237,12 +239,14 @@ public map[str, set[QueryWrapper]] findWrappers(CallRel methodLocs, bool filterL
 	return res;
 }
 
-public void writeWrapperMap(map[str, set[QueryWrapper]] wrapperMap) {
+alias WrapperMap = map[str, set[QueryWrapper]];
+
+public void writeWrapperMap(WrapperMap wrapperMap) {
 	writeBinaryValueFile(callInfoLoc + "wrapper-map.info", wrapperMap, compression=false);
 }
 
-public map[str, set[QueryWrapper]] readWrapperMap() {
-	return readBinaryValueFile(#map[str, set[QueryWrapper]], callInfoLoc + "wrapper-map.info");
+public WrapperMap readWrapperMap() {
+	return readBinaryValueFile(#WrapperMap, callInfoLoc + "wrapper-map.info");
 }
 
 public rel[str e, loc at] queryCallTargets(CallRel queryCalls) {
@@ -257,27 +261,59 @@ public map[str,int] getDefaultQueryMethodParamPositions() {
 	return ( "query" : 0 );
 }
 
-public data QueryWrapper
-	= functionWrapper(str wrapperName, str paramName, int queryParamPos, loc wrapperLoc, str wrappedFunction, loc wrappedCallLoc)
-	| methodWrapper(str wrapperName, str paramName, int queryParamPos, loc wrapperLoc, str wrappedFunction, loc wrappedCallLoc)
-	| staticMethodWrapper(str wrapperClass, str wrapperName, str paramName, int queryParamPos, loc wrapperLoc, str wrappedFunction, loc wrappedCallLoc)
-	;
-
-public CallRel wrapperCalls(System pt, set[QueryWrapper] wrappers) {
+public CallRel wrapperCalls(System pt, set[QueryWrapper] wrappers, bool checkParams = true) {
 	CallRel res = { };
 	for (w <- wrappers) {
 		if (functionWrapper(str wrapperName, _, _, _, _, _) := w) {
-			res = res + { < pt.name, wrapperName, c, c@at > | /c:call(name(name(wrapperName)),_) := pt };
+			if (!checkParams) {
+				res = res + { < pt.name, wrapperName, c, c@at > | /c:call(name(name(wrapperName)),_) := pt };
+			} else {
+				res = res + { < pt.name, wrapperName, c, c@at > | /c:call(name(name(wrapperName)),actuals) := pt, w.queryParamPos < size(actuals) };
+			}
 		} else if (methodWrapper(str wrapperName, _, _, _, _, _) := w) {
-			res = res + { < pt.name, wrapperName, c, c@at > | /c:methodCall(_, name(name(wrapperName)),_) := pt };		
+			if (!checkParams) {
+				res = res + { < pt.name, wrapperName, c, c@at > | /c:methodCall(_, name(name(wrapperName)),_) := pt };
+			} else {
+				res = res + { < pt.name, wrapperName, c, c@at > | /c:methodCall(_, name(name(wrapperName)),actuals) := pt, w.queryParamPos < size(actuals) };
+			}
 		} else if (staticMethodWrapper(str wrapperClass, str wrapperName, _, _, _, _, _) := w) {
-			res = res + { < pt.name, wrapperName, c, c@at > | /c:staticCall(name(name(wrapperClass)), name(name(wrapperName)),_) := pt };
+			if (!checkParams) {
+				res = res + { < pt.name, wrapperName, c, c@at > | /c:staticCall(name(name(wrapperClass)), name(name(wrapperName)),_) := pt };
+			} else {
+				res = res + { < pt.name, wrapperName, c, c@at > | /c:staticCall(name(name(wrapperClass)), name(name(wrapperName)),actuals) := pt, w.queryParamPos < size(actuals) };
+			}
 		}
 	}
 	return res;
 }
 
-public rel[loc, SQLModel] buildQueryModels(str systemName, CallRel queryCalls, map[str, set[QueryWrapper]] wrapperMap, bool buildForWrappers = true) {
+public void writeWrapperCalls(CallRel wrapperCalls) {
+	writeBinaryValueFile(callInfoLoc + "wrapper-calls.info", wrapperCalls, compression=false);
+}
+
+public CallRel readWrapperCalls() {
+	return readBinaryValueFile(#CallRel, callInfoLoc + "wrapper-calls.info");
+}
+
+public CallRel wrapperCalls(set[str] systems, WrapperMap wrapperMap, set[str] excludes = defaultExcludes) {
+	CallRel res = { };
+	
+	for (s <- systems, s notin excludes) {
+		// Load the system being analyzed
+		System pt = loadBinary(s, "current");
+	
+		// Get the wrappers for this system
+		wrappers = wrapperMap[s];
+		
+		// Get the call locs for wrapped calls
+		res = res + wrapperCalls(pt, wrappers);
+	}
+	
+	return res;
+}
+
+
+public rel[loc, SQLModel] buildQueryModels(str systemName, CallRel queryCalls, WrapperMap wrapperMap, bool buildForWrappers = true) {
 	// Load the system being analyzed
 	System pt = loadBinary(systemName, "current");
 	
@@ -313,7 +349,7 @@ public rel[loc, SQLModel] buildQueryModels(str systemName, CallRel queryCalls, m
 	return res;
 }
 
-public rel[loc, SQLModel] buildQueryModels(CallRel queryCalls, map[str, set[QueryWrapper]] wrapperMap, bool buildForWrappers = true, bool overwrite=false, set[str] excludes = defaultExcludes) {
+public rel[loc, SQLModel] buildQueryModels(CallRel queryCalls, WrapperMap wrapperMap, bool buildForWrappers = true, bool overwrite=false, set[str] excludes = defaultExcludes) {
 	currentSystems = getSQLSystems();
 	rel[loc, SQLModel] res = { };
 	
@@ -362,6 +398,54 @@ public void writeCorpusFC(rel[loc callLoc, SQLModel sqm, FragmentCategories fc] 
 	writeFC(fcrel);
 }
 
-public rel[loc callLoc, SQLModel sqm, FragmentCategories fc] readCorpusFC() {
-	return readFC();
+public FCMap readCorpusFC(set[str] systems, set[str] excludes = defaultExcludes) {
+	FCMap fcMap = ( );
+	for (s <- systems, s notin excludes) {
+		fcMap[s] = readFC(s,"current");
+	}
+	return fcMap;
+}
+
+public str generateCorpusTable() { 
+	return top20CorpusAsLatexTable(78, 91839, 10657061);
+}
+
+public CallCountInfo countsInfoForSystem(str systemName, CallRel calls, CallRel wrapperCalls, WrapperMap wrapperMap) {
+	systemCalls = calls[systemName];
+	
+	// Direct calls
+	mysqlCalls = size(systemCalls["mysql_query"]);
+	mysqliCalls = size(systemCalls["mysqli_query"]);
+	queryCalls = size(systemCalls["query"]);
+	
+	// Get the wrappers for this system
+	wrappers = wrapperMap[systemName];
+	
+	// Indirect calls
+	indirectFunctionCalls = size({ wc | wc <- wrapperCalls[systemName], wc[1] is call });
+	indirectMethodCalls = size({ wc | wc <- wrapperCalls[systemName], wc[1] is methodCall || wc[1] is staticCall });
+
+	return callCountInfo(mysqlCalls, mysqliCalls, queryCalls, indirectFunctionCalls, indirectMethodCalls);		
+}
+
+public CountsMap countsInfoForSystems(set[str] systems, CallRel calls, CallRel wrapperCalls, WrapperMap wrapperMap, set[str] excludes = defaultExcludes) {
+	CountsMap res = ( );
+	
+	for (s <- systems, s notin excludes) {
+		res[s] = countsInfoForSystem(s, calls, wrapperCalls, wrapperMap);
+	}
+	
+	return res;
+}
+
+public void writeCountsMap(CountsMap countsMap) {
+	writeBinaryValueFile(callInfoLoc + "counts-map.info", countsMap, compression=false);
+}
+
+public CountsMap readCountsMap() {
+	return readBinaryValueFile(#CountsMap, callInfoLoc + "counts-map.info");
+}
+
+public CallRel filterCalls(CallRel calls, set[str] excludes = defaultExcludes) {
+	return { lt | lt:<s,_,_,_> <- calls, s notin excludes };
 }
