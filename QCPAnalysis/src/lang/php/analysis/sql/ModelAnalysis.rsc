@@ -231,6 +231,15 @@ public FCMap computeForCorpus(Corpus corpus = getCorpus()) {
 	return res;
 }
 
+public FCMap computeForSystems(rel[str,loc] callLocs, rel[loc callLoc, SQLModel sqm, FragmentCategories fc] fcrel) {
+	FCMap res = ( s : { } | s <- callLocs<0> );
+	for (s <- callLocs<0>) {
+		systemLocs = callLocs[s];
+		res[s] = { lt | lt:<l,_,_> <- fcrel, l in systemLocs };
+	}
+	return res;
+}
+
 public FragmentCategories sumFC(rel[loc,SQLModel,FragmentCategories] fcrel) {
 	FragmentCategories fc = initFC();
 	for (< l, sqm, fci > <- fcrel ) {
