@@ -261,7 +261,7 @@ public map[str,int] getDefaultQueryMethodParamPositions() {
 	return ( "query" : 0 );
 }
 
-public CallRel wrapperCalls(System pt, set[QueryWrapper] wrappers, bool checkParams = true) {
+public CallRel wrapperFunctionCalls(System pt, set[QueryWrapper] wrappers, bool checkParams = true) {
 	CallRel res = { };
 	for (w <- wrappers) {
 		if (functionWrapper(str wrapperName, _, _, _, _, _) := w) {
@@ -270,13 +270,29 @@ public CallRel wrapperCalls(System pt, set[QueryWrapper] wrappers, bool checkPar
 			} else {
 				res = res + { < pt.name, wrapperName, c, c@at > | /c:call(name(name(wrapperName)),actuals) := pt, w.queryParamPos < size(actuals) };
 			}
-		} else if (methodWrapper(str wrapperName, _, _, _, _, _) := w) {
+		}
+	}
+	return res;
+}
+
+public CallRel wrapperMethodCalls(System pt, set[QueryWrapper] wrappers, bool checkParams = true) {
+	CallRel res = { };
+	for (w <- wrappers) {
+		if (methodWrapper(str wrapperName, _, _, _, _, _) := w) {
 			if (!checkParams) {
 				res = res + { < pt.name, wrapperName, c, c@at > | /c:methodCall(_, name(name(wrapperName)),_) := pt };
 			} else {
 				res = res + { < pt.name, wrapperName, c, c@at > | /c:methodCall(_, name(name(wrapperName)),actuals) := pt, w.queryParamPos < size(actuals) };
 			}
-		} else if (staticMethodWrapper(str wrapperClass, str wrapperName, _, _, _, _, _) := w) {
+		}
+	}
+	return res;
+}
+
+public CallRel wrapperStaticCalls(System pt, set[QueryWrapper] wrappers, bool checkParams = true) {
+	CallRel res = { };
+	for (w <- wrappers) {
+		if (staticMethodWrapper(str wrapperClass, str wrapperName, _, _, _, _, _) := w) {
 			if (!checkParams) {
 				res = res + { < pt.name, wrapperName, c, c@at > | /c:staticCall(name(name(wrapperClass)), name(name(wrapperName)),_) := pt };
 			} else {
@@ -287,15 +303,31 @@ public CallRel wrapperCalls(System pt, set[QueryWrapper] wrappers, bool checkPar
 	return res;
 }
 
-public void writeWrapperCalls(CallRel wrapperCalls) {
-	writeBinaryValueFile(callInfoLoc + "wrapper-calls.info", wrapperCalls, compression=false);
+public void writeWrapperFunctionCalls(CallRel wrapperCalls) {
+	writeBinaryValueFile(callInfoLoc + "wrapper-function-calls.info", wrapperCalls, compression=false);
 }
 
-public CallRel readWrapperCalls() {
-	return readBinaryValueFile(#CallRel, callInfoLoc + "wrapper-calls.info");
+public CallRel readWrapperFunctionCalls() {
+	return readBinaryValueFile(#CallRel, callInfoLoc + "wrapper-function-calls.info");
 }
 
-public CallRel wrapperCalls(set[str] systems, WrapperMap wrapperMap, set[str] excludes = defaultExcludes) {
+public void writeWrapperMethodCalls(CallRel wrapperCalls) {
+	writeBinaryValueFile(callInfoLoc + "wrapper-method-calls.info", wrapperCalls, compression=false);
+}
+
+public CallRel readWrapperMethodCalls() {
+	return readBinaryValueFile(#CallRel, callInfoLoc + "wrapper-method-calls.info");
+}
+
+public void writeWrapperStaticCalls(CallRel wrapperCalls) {
+	writeBinaryValueFile(callInfoLoc + "wrapper-static-calls.info", wrapperCalls, compression=false);
+}
+
+public CallRel readWrapperStaticCalls() {
+	return readBinaryValueFile(#CallRel, callInfoLoc + "wrapper-static-calls.info");
+}
+
+public CallRel wrapperFunctionCalls(set[str] systems, WrapperMap wrapperMap, set[str] excludes = defaultExcludes) {
 	CallRel res = { };
 	
 	for (s <- systems, s notin excludes) {
@@ -306,12 +338,45 @@ public CallRel wrapperCalls(set[str] systems, WrapperMap wrapperMap, set[str] ex
 		wrappers = wrapperMap[s];
 		
 		// Get the call locs for wrapped calls
-		res = res + wrapperCalls(pt, wrappers);
+		res = res + wrapperFunctionCalls(pt, wrappers);
 	}
 	
 	return res;
 }
 
+public CallRel wrapperMethodCalls(set[str] systems, WrapperMap wrapperMap, set[str] excludes = defaultExcludes) {
+	CallRel res = { };
+	
+	for (s <- systems, s notin excludes) {
+		// Load the system being analyzed
+		System pt = loadBinary(s, "current");
+	
+		// Get the wrappers for this system
+		wrappers = wrapperMap[s];
+		
+		// Get the call locs for wrapped calls
+		res = res + wrapperMethodCalls(pt, wrappers);
+	}
+	
+	return res;
+}
+
+public CallRel wrapperStaticCalls(set[str] systems, WrapperMap wrapperMap, set[str] excludes = defaultExcludes) {
+	CallRel res = { };
+	
+	for (s <- systems, s notin excludes) {
+		// Load the system being analyzed
+		System pt = loadBinary(s, "current");
+	
+		// Get the wrappers for this system
+		wrappers = wrapperMap[s];
+		
+		// Get the call locs for wrapped calls
+		res = res + wrapperStaticCalls(pt, wrappers);
+	}
+	
+	return res;
+}
 
 public rel[loc, SQLModel] buildQueryModels(str systemName, CallRel queryCalls, WrapperMap wrapperMap, bool buildForWrappers = true) {
 	// Load the system being analyzed
@@ -448,4 +513,16 @@ public CountsMap readCountsMap() {
 
 public CallRel filterCalls(CallRel calls, set[str] excludes = defaultExcludes) {
 	return { lt | lt:<s,_,_,_> <- calls, s notin excludes };
+}
+
+public CallRel getDefiniteCalls() {
+	return readCorpusQueryFunctionCalls() + readWrapperFunctionCalls() + readWrapperStaticCalls();
+}
+
+public CallRel getInferredCalls() {
+	return readCorpusFilteredQueryMethodCalls() + readWrapperMethodCalls();
+}
+
+public CallRel getAllCalls() {
+	return getDefiniteCalls() + getInferredCalls();
 }
