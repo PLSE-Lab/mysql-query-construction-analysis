@@ -32,8 +32,8 @@ loc examples = |project://QCPAnalysis/results/examples/|;
 	2) generates a latex figure for the yields, query strings, and SQL ASTs for the example
 	3) returns the location of the example
 */
-public loc getExample(str qcp, int exampleNum = 0){
-	models = groupSQLModelsCorpus();
+public loc getExample(set[str] systems, str qcp, int exampleNum = 0, set[loc] locFilter = { }){
+	models = groupSQLModelsCorpus(systems, locFilter=locFilter);
 	return getExample(qcp, models, exampleNum);
 }
 
@@ -46,7 +46,7 @@ private loc getExample(str qcp, map[str, SQLModelRel] models, int exampleNum){
 	try 
 		matches = models[qcp];
 	catch : 
-		throw "there are no models matching pattern: <qcp>";
+		throw "there are no models matching pattern: <qcp>, we have <models<0>>";
 	
 	return writeExample(qcp, matches, exampleNum);
 }
@@ -202,44 +202,66 @@ public map[str, lrel[str, real]] clausePercentages(Corpus corpus = getCorpus()){
 	return percentages;
 }
 
-public str queryTypeCountsAsLatexTable(bool captionOnTop = true, bool tablestar = false){
+public str queryTypeCountsAsLatexTable(set[str] systems, set[loc] regularCalls, set[loc] wrappedCalls, bool captionOnTop = true, bool tablestar = true){
 	Corpus corpus = getCorpus();
 	top20 = getTop20Rel();
 	sortedTypes = ["select", "insert", "update", "delete", "partial", "other"];
 	totals = <0, 0, 0, 0, 0, 0>;
+	totals2 = <0, 0, 0, 0, 0, 0>;
 	
 	str getLine(str p, v){
-		counts = extractClauseCounts(getModels(p, v));
+		counts = extractClauseCounts(getModels(p, v, locFilter=regularCalls));
+		counts2 = extractClauseCounts(getModels(p, v, locFilter=wrappedCalls));
 		res = "<p> ";
 		int i = 0;
 		for(t <- sortedTypes){
 			count = counts[t]["total queries"];
-			res += "& \\numprint{<count>}";
-			totals[i] += count;
+			count2 = counts2[t]["total queries"];
+			if (count == count2) {
+				res += "& \\numprint{<count>}";
+			} else {
+				res += "& \\numprint{<count>}/\\numprint{<count2>}";
+			}
 			i += 1;	
 		}
 		return res;
 	}
 	
 	str getTotalLine(){
+		for (s <- systems) {
+			counts = extractClauseCounts(getModels(s, "current", locFilter=regularCalls));
+			counts2 = extractClauseCounts(getModels(s, "current", locFilter=wrappedCalls));
+			i = 0;
+			for(t <- sortedTypes){
+				count = counts[t]["total queries"];
+				count2 = counts2[t]["total queries"];
+				totals[i] += count;
+				totals2[i] += count2;
+				i += 1;
+			}	
+		}
 		res = "TOTAL ";
 		int i = 0;
 		for(t <- sortedTypes){
-			res +=  "& \\numprint{<totals[i]>}";
+			if (totals[i] == totals2[i]) {
+				res +=  "& \\numprint{<totals[i]>}";
+			} else {
+				res +=  "& \\numprint{<totals[i]>}/\\numprint{<totals2[i]>}";
+			}
 			i += 1;
 		}
 		return res;
 	}
 	
-		str res =
+	str res =
 		"\\npaddmissingzero
 		'\\npfourdigitsep
 		'\\begin{table<if(tablestar){>*<}>}
 		'\\centering
 		'<if(captionOnTop){>\\caption{Query Type Counts by System.\\label{tbl:query-type-counts}}<}>
 		'\\ra{1.2}
-		'\\begin{tabularx}{\\columnwidth}{Xrrrrrrrr} \\toprule
-		'System & SELECT & INSERT & UPDATE & DELETE & PARTIAL & OTHER\\\\ \\midrule
+		'\\begin{tabularx}{\\textwidth}{Xrrrrrrrr} \\toprule
+		'System & SELECT & INSERT & UPDATE & DELETE & PARTIAL & OTHER \\\\ \\midrule
 		'<for(item <- top20){><getLine(item.repoName, "current")> \\\\
 		'<}>\\midrule
 		'<getTotalLine()> \\\\
@@ -257,8 +279,8 @@ public str queryTypeCountsAsLatexTable(bool captionOnTop = true, bool tablestar 
 	return res;
 }
 
-public str clauseCountsAsLatexTable(bool captionOnTop = false, bool tablestar = false){
-	counts = extractClauseCounts(getModelsCorpus());
+public str clauseCountsAsLatexTable(set[str] systems, bool captionOnTop = true, bool tablestar = false){
+	counts = extractClauseCounts(getModelsCorpus(systems));
 	sortedTypes  = ["select", "insert", "update", "delete"];
 	sortedSelect = ["select", "from", "where", "groupBy", "having", "orderBy", "limit", "joins", "total queries"];
 	sortedInsert = ["into", "values", "setOps", "select", "onDuplicateSetOps", "total queries"];
@@ -305,7 +327,7 @@ public str clauseCountsAsLatexTable(bool captionOnTop = false, bool tablestar = 
 		'\\npfourdigitsep
 		'\\begin{table<if(tablestar){>*<}>}
 		'\\centering
-		'<if(captionOnTop){>\\caption{The Corpus.\\label{tbl:php-corpus}}<}>
+		'<if(captionOnTop){>\\caption{Clause Counts for each Query Type.\\label{tbl:clause-counts}}<}>
 		'\\ra{1.2}
 		'\\begin{tabularx}{\\columnwidth}{Xlll} \\toprule
 		'Query Type & Clauses & Counts \\\\ \\midrule
@@ -325,8 +347,8 @@ public str clauseCountsAsLatexTable(bool captionOnTop = false, bool tablestar = 
 	return res;
 }
 
-public str qcp3bYieldComparisonAsLatexTable(bool captionOnTop = true, bool tablestar = false){
-	models = groupSQLModelsCorpus()[qcp3b];
+public str qcp3bYieldComparisonAsLatexTable(set[str] systems, bool captionOnTop = true, bool tablestar = false){
+	models = groupSQLModelsCorpus(systems)[qcp3b];
 	counts = extractClauseComparison(models);
 	sortedTypes  = ["select", "insert", "update", "delete"];
 	sortedSelect = ["select", "from", "where", "groupBy", "having", "orderBy", "limit", "joins"];
@@ -408,20 +430,30 @@ public str qcp3bYieldComparisonAsLatexTable(bool captionOnTop = true, bool table
 	
 }
 
-public str qcpCountsAsLatexTable(bool captionOnTop = true, bool tablestar = true){
+public str qcpCountsAsLatexTable(set[loc] regularCalls, set[loc] wrappedCalls, bool captionOnTop = true, bool tablestar = true){
 	Corpus corpus = getCorpus();
-	counts = groupPatternCountsBySystem();
+	counts = groupPatternCountsBySystem(locFilter = regularCalls);
+	counts2 = groupPatternCountsBySystem(locFilter = wrappedCalls);
 	totals = counts[<"total", "0.0">];
+	totals2 = counts2[<"total", "0.0">];
 	delete(counts, "total");//total should be printed last
+	delete(counts2, "total");//total should be printed last
 	
 	top20 = getTop20Rel();
 	sortedQ = [qcp0, qcp1, qcp2, qcp3a, qcp3b, qcp3c, qcp4, otherType, parseError, unknown];
 	
 	str getLine(str p, str v){
 		sysCounts = counts[<p, v>];
+		sysCounts2 = counts2[<p, v>];
 		res = "<p> ";
 		for(qcp <- sortedQ){
-			res +=  "& \\numprint{<(qcp in sysCounts) ? sysCounts[qcp] : 0>}";
+			qcpVal = (qcp in sysCounts) ? sysCounts[qcp] : 0;
+			qcpVal2 = (qcp in sysCounts2) ? sysCounts2[qcp] : 0;
+			if (qcpVal == qcpVal2) {
+				res +=  "& \\numprint{<qcpVal>}";
+			} else {
+				res +=  "& \\numprint{<qcpVal>}/\\numprint{<qcpVal2>}";
+			}
 		}
 		return res;
 	}
@@ -429,7 +461,13 @@ public str qcpCountsAsLatexTable(bool captionOnTop = true, bool tablestar = true
 	str getTotalLine(){
 		res = "TOTAL ";
 		for(qcp <- sortedQ){
-			res +=  "& \\numprint{<(qcp in totals) ? totals[qcp] : 0>}";
+			qcpVal = (qcp in totals) ? totals[qcp] : 0;
+			qcpVal2 = (qcp in totals2) ? totals2[qcp] : 0;
+			if (qcpVal == qcpVal2) {
+				res +=  "& \\numprint{<qcpVal>}";
+			} else {
+				res +=  "& \\numprint{<qcpVal>}/\\numprint{<qcpVal2>}";
+			}
 		}
 		return res;
 	}
@@ -464,24 +502,41 @@ public str qcpCountsAsLatexTable(bool captionOnTop = true, bool tablestar = true
 	return res;
 }
 
-public str fragmentCategoriesAsLatexTable(FCMap fcmap, bool captionOnTop=true, bool tablestar = false){
+public str fragmentCategoriesAsLatexTable(FCMap fcmapDef, FCMap fcmapAll, bool captionOnTop=true, bool tablestar = false){
 	top20 = getTop20Rel();
-	categoriesMap = fcToAbbreviatedMap(totalFC(fcmap));
+	
+	categoriesDef = fcToAbbreviatedMap(totalFC(fcmapDef));
+	categoriesAll = fcToAbbreviatedMap(totalFC(fcmapAll));
+	
 	cForSort = ["L", "LV", "LA", "LP", "LC", "GV", "GA", "GP", "GC", "PN", "PA", "PP", "PC", "C"];
+	cToExclude = { "GP", "GC", "PA", "PP", "PC" };
 	
 	str getLine(tuple[str repoName, str fullName, int fileCount, int lineCount] item){
-		fc = fcToAbbreviatedMap(sumFC(fcmap[item.repoName]));
-		res = "<item.fullName> ";
-		for(category <- cForSort, counts := fc[category]){
-			res += "& <counts> ";
+		fcDef = (item.repoName in fcmapDef) ? fcToAbbreviatedMap(sumFC(fcmapDef[item.repoName])) : ( );
+		fcAll = (item.repoName in fcmapAll) ? fcToAbbreviatedMap(sumFC(fcmapAll[item.repoName])) : ( );
+		res = "<item.repoName> ";
+		for(category <- cForSort, category notin cToExclude){
+			countsDef = (category in fcDef) ? "\\numprint{<fcDef[category]>}" : "\\numprint{0}";
+			countsAll = (category in fcAll) ? "\\numprint{<fcAll[category]>}" : "\\numprint{0}";
+			if (countsDef != countsAll) {
+				res += "& <countsDef>/<countsAll> ";
+			} else {
+				res += "& <countsDef> ";
+			}
 		}
 		return res; 
 	}
 	
 	str getTotalLine(){
 		res = "TOTAL ";
-		for(category <- cForSort, counts := categoriesMap[category]){
-			res += "& <counts> ";
+		for(category <- cForSort, category notin cToExclude){
+			countsDef = (category in categoriesDef) ? "\\numprint{<categoriesDef[category]>}" : "\\numprint{0}";
+			countsAll = (category in categoriesAll) ? "\\numprint{<categoriesAll[category]>}" : "\\numprint{0}";
+			if (countsDef != countsAll) {
+				res += "& <countsDef>/<countsAll> ";
+			} else {
+				res += "& <countsDef> ";
+			}
 		}
 		return res; 
 	}
@@ -493,8 +548,8 @@ public str fragmentCategoriesAsLatexTable(FCMap fcmap, bool captionOnTop=true, b
 		'\\centering
 		'<if(captionOnTop){>\\caption{Query Fragment Category Counts, Top 20 Systems and Total.\\label{tbl:fragment-category-counts}}<}>
 		'\\ra{1.2}
-		'\\begin{tabularx}{<if(tablestar){>\\textwidth<}else{>\\columnwidth<}>}{Xrrrrrrrrrrrrrr} \\toprule
-		'System <for(c <- cForSort){> & <c> <}> \\\\ \\midrule
+		'\\begin{tabularx}{<if(tablestar){>\\textwidth<}else{>\\columnwidth<}>}{Xrrrrrrrrr} \\toprule
+		'System <for(c <- cForSort, c notin cToExclude){> & <c> <}> \\\\ \\midrule
 		'<for(item <- top20){><getLine(item)> \\\\
 		'<}>\\midrule
 		'<getTotalLine()> \\\\
@@ -505,8 +560,8 @@ public str fragmentCategoriesAsLatexTable(FCMap fcmap, bool captionOnTop=true, b
 		'\\footnotesize
 		' Counts of each Query Fragment Category in the corpus. The table headings for each fragment category have the following
 		' abbreviations: L for literals, LV for local variables, LA for local array elements, LP for properties of local variables, LC for computed local names, 
-		' GV for global variables, GA for global array elements, GP for properties of global variables, GC for computed global names, PN for parameters,
-		' PA for elements of array parameters, PP for properties of parameters, PC for computed property names and C for computed fragments that are not names
+		' GV for global variables, GA for global array elements, PN for parameters,
+		' and C for computed fragments that are not names.
 		'<if(!captionOnTop){>\\caption{Query Fragment Category Counts, Top 20 Systems and Total.\\label{tbl:fragment-category-counts}}<}>
 		'\\end{table<if(tablestar){>*<}>}
 		'\\npfourdigitnosep
