@@ -131,10 +131,10 @@ public int getRanking(tuple[loc location, SQLModel model, rel[SQLYield, str, SQL
 }
 
 @doc{returns the corpus wide counts of each pattern}
-public map[str, int] countPatternsInCorpus(Corpus corpus = getCorpus()){
+public map[str, int] countPatternsInCorpus(Corpus corpus = getCorpus(), set[loc] locFilter = { }){
 	res = ();
 	for(p <- corpus, v := corpus[p]){
-		sysCounts = countPatternsInSystem(p, v);
+		sysCounts = countPatternsInSystem(p, v, locFilter = locFilter);
 		println("<p>, <v>, <sysCounts>");
 		for(pattern <- sysCounts, count := sysCounts[pattern]){
 			if(pattern in res){
@@ -150,29 +150,29 @@ public map[str, int] countPatternsInCorpus(Corpus corpus = getCorpus()){
 }
 
 @doc{return just the counts of each pattern in a system}
-public map[str, int] countPatternsInSystem(str p, str v) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v), 
+public map[str, int] countPatternsInSystem(str p, str v, set[loc] locFilter = { }) = (pattern : size([m | m <- models]) | modelMap := groupSQLModels(p, v, locFilter = locFilter), 
 		pattern <- modelMap, models := modelMap[pattern]);
 		
 @doc{groups the counts of each QCP by system}
-public map[tuple[str,str], map[str, int]] groupPatternCountsBySystem(){
+public map[tuple[str,str], map[str, int]] groupPatternCountsBySystem(set[loc] locFilter = { }){
 	res = ( );
 	Corpus corpus = getCorpus();
 	for(p <- corpus, v := corpus[p]){
-		res += (<p, v> : countPatternsInSystem(p, v));
+		res += (<p, v> : countPatternsInSystem(p, v, locFilter = locFilter));
 	}
-	res += (<"total" , "0.0"> : countPatternsInCorpus());
+	res += (<"total" , "0.0"> : countPatternsInCorpus(locFilter = locFilter));
 	
 	return res;
 }
 		
 @doc{group models based on pattern from the whole corpus}
-public map[str, SQLModelRel] groupSQLModelsCorpus(){
+public map[str, SQLModelRel] groupSQLModelsCorpus(set[str] systems, set[loc] locFilter = { }){
 
 	res = (qcp0 : {}, qcp1 : {}, qcp2 : {}, qcp3a : {}, qcp3b : {}, qcp3c : {}, qcp4 : {}, unknown : {}, parseError : {}, otherType : {});
 	Corpus corpus = getCorpus();
 		
-	for(p <- corpus, v := corpus[p]){
-		models = groupSQLModels(p, v);
+	for(p <- corpus, p in systems, v := corpus[p]){
+		models = groupSQLModels(p, v, locFilter = locFilter);
 		for(pattern <- models){
 			res[pattern] = res[pattern] + models[pattern];
 		}
@@ -181,9 +181,9 @@ public map[str, SQLModelRel] groupSQLModelsCorpus(){
 }
 
 @doc{group models in a whole system based on pattern}
-public map[str, SQLModelRel] groupSQLModels(str p, str v){
+public map[str, SQLModelRel] groupSQLModels(str p, str v, set[loc] locFilter = { }){
 	map[str, SQLModelRel] res = ( );
-	models = getModels(p, v);
+	models = getModels(p, v, locFilter = locFilter);
 	
 	for(model <- models){
 		pattern = classifySQLModel(model);
@@ -862,23 +862,27 @@ public int holesInExpr(Exp expr){
 	}
 }
 
-public SQLModelRel getModelsCorpus(Corpus corpus = getCorpus()){
+public SQLModelRel getModelsCorpus(set[str] systems, Corpus corpus = getCorpus()){
 	res = {};
-	for(p <- corpus, v := corpus[p]){
+	for(p <- corpus, p in systems, v := corpus[p]){
 		res = res + getModels(p, v);
 	}
 	return res;	
 }
 
-public SQLModelRel getModels(str p, str v){
+public SQLModelRel getModels(str p, str v, set[loc] locFilter = { }){
 	modelsRel = {};
 	rel[loc, SQLModel] models; 
 	if(exists(analysisLoc + "<p>-<v>.bin")){
  		modelsRel = readBinaryValueFile(#SQLModelRel, analysisLoc + "<p>-<v>.bin");
+ 		if (size(locFilter) > 0) {
+ 			modelsRel = { lt | lt:<l,_,_,_> <- modelsRel, l in locFilter };
+ 		}
  	}
  	else{
 	 	models = modelsFileExists(p, v) ? readModels(p, v) : buildModelsForSystem(p, v);
  		for(<l,m> <- models, m is sqlModel){
+ 			if (size(locFilter) > 0 && l notin locFilter) continue;
  			yieldsAndParsed = {};
  			modelYields = yields(m);
  			int i = 0;
